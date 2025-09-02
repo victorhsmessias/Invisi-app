@@ -17,7 +17,6 @@ const HomeScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Função de navegação usando useCallback para evitar re-renders desnecessários
   const navigateToSection = useCallback(
     (section) => {
       switch (section) {
@@ -32,7 +31,6 @@ const HomeScreen = ({ navigation }) => {
     [navigation]
   );
 
-  // Função para carregar dados do usuário
   const loadUserData = useCallback(async () => {
     try {
       const [savedUsername, savedToken] = await AsyncStorage.multiGet([
@@ -47,7 +45,6 @@ const HomeScreen = ({ navigation }) => {
     }
   }, []);
 
-  // Função de logout usando useCallback
   const handleLogout = useCallback(() => {
     Alert.alert("Confirmar Logout", "Tem certeza que deseja sair do sistema?", [
       {
@@ -70,7 +67,6 @@ const HomeScreen = ({ navigation }) => {
     ]);
   }, [navigation]);
 
-  // Função de refresh usando useCallback
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -86,7 +82,6 @@ const HomeScreen = ({ navigation }) => {
   useEffect(() => {
     loadUserData();
 
-    // Atualizar horário a cada minuto
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 60000);

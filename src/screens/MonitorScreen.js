@@ -13,12 +13,12 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const MonitorScreen = ({ navigation }) => {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedFilial, setSelectedFilial] = useState("LDA");
   const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [error, setError] = useState(null);
 
-  // Estados dos dados simulados baseados na documentação da API
   const [monitorData, setMonitorData] = useState({
     contratos_fila: {
       fila: "12",
@@ -53,8 +53,6 @@ const MonitorScreen = ({ navigation }) => {
   const filiais = [
     { code: "LDA", name: "LDA" },
     { code: "CHP", name: "CHP" },
-    { code: "JCT", name: "JCT" },
-    { code: "CMB", name: "CMB" },
   ];
 
   const servicos = [
@@ -66,7 +64,6 @@ const MonitorScreen = ({ navigation }) => {
   useEffect(() => {
     fetchMonitorData();
 
-    // Atualização automática a cada 30 segundos
     const interval = setInterval(() => {
       fetchMonitorData();
     }, 30000);
@@ -76,51 +73,317 @@ const MonitorScreen = ({ navigation }) => {
 
   const fetchMonitorData = async () => {
     try {
+      setLoading(true);
       const token = await AsyncStorage.getItem("userToken");
       if (!token) {
         navigation.replace("Login");
         return;
       }
 
-      const responses = await Promise.all([
-        fetch(`http://192.168.10.52/attmonitor/api/monitor.php`, {
-          method: "POST",
-          headers: { token: token },
-          body: JSON.stringify({
-            AttApi: {
-              tipoOperacao: "d_monitor",
-              filtro_filial: selectedFilial,
-            },
-          }),
-        }),
-        fetch(
+      let realData = {
+        contratos_fila: null,
+        transito: null,
+        patio_descarga: null,
+        patio_carga: null,
+        monitor_geral: null,
+      };
+
+      try {
+        const contratosResponse = await fetch(
           `http://192.168.10.52/attmonitor/api/monitor_contratos_fila.php`,
+          {
+            method: "GET",
+            headers: { token: token },
+          }
+        );
+
+        if (contratosResponse.ok) {
+          const contratosText = await contratosResponse.text();
+
+          try {
+            const contratosData = JSON.parse(contratosText);
+            if (contratosData && typeof contratosData === "object") {
+              realData.contratos_fila = contratosData;
+            }
+          } catch (parseError) {
+            console.warn(
+              "Erro ao parsear dados de contratos:",
+              contratosText.substring(0, 200)
+            );
+          }
+        }
+      } catch (error) {
+        console.warn("Erro ao buscar contratos:", error.message);
+      }
+
+      try {
+        const monitorResponse = await fetch(
+          `http://192.168.10.52/attmonitor/api/d_monitor.php`,
           {
             method: "POST",
             headers: { token: token },
+            body: JSON.stringify({
+              AttApi: {
+                tipoOperacao: "d_monitor",
+                filtro_filial: selectedFilial,
+                filtro_servico: {
+                  armazenagem: 1,
+                  transbordo: 1,
+                  pesagem: 0,
+                },
+                filtro_op_padrao: {
+                  rodo_ferro: 1,
+                  ferro_rodo: 1,
+                  rodo_rodo: 1,
+                  outros: 0,
+                },
+                filtro_data_inicio: "2024-08-01",
+                filtro_data_fim: "2025-12-31",
+                filtro_acumulador: {
+                  dia: 0,
+                  mes: 1,
+                  ano: 0,
+                },
+              },
+            }),
           }
-        ),
-        // Mais endpoints conforme necessário
-      ]);
-      setLastUpdate(new Date());
+        );
 
-      // Simular pequenas variações nos dados
-      setMonitorData((prev) => ({
-        ...prev,
-        transito: {
-          ...prev.transito,
-          veiculos_transito:
-            prev.transito.veiculos_transito + Math.floor(Math.random() * 3) - 1,
+        if (monitorResponse.ok) {
+          const monitorText = await monitorResponse.text();
+
+          try {
+            const monitorData = JSON.parse(monitorText);
+            if (monitorData && typeof monitorData === "object") {
+              realData.monitor_geral = monitorData;
+            }
+          } catch (parseError) {
+            console.warn(
+              "Erro ao parsear dados do monitor:",
+              monitorText.substring(0, 200)
+            );
+          }
+        }
+      } catch (error) {
+        console.warn("Erro ao buscar monitor geral:", error.message);
+      }
+
+      try {
+        const transitoResponse = await fetch(
+          `http://192.168.10.52/attmonitor/api/monitor.php`,
+          {
+            method: "POST",
+            headers: { token: token },
+            body: JSON.stringify({
+              AttApi: {
+                tipoOperacao: "monitor_transito",
+                filtro_filial: selectedFilial,
+                filtro_servico: {
+                  armazenagem: 1,
+                  transbordo: 1,
+                  pesagem: 0,
+                },
+              },
+            }),
+          }
+        );
+
+        if (transitoResponse.ok) {
+          const transitoText = await transitoResponse.text();
+
+          try {
+            const transitoData = JSON.parse(transitoText);
+            if (transitoData && typeof transitoData === "object") {
+              realData.transito = transitoData;
+            }
+          } catch (parseError) {
+            console.warn(
+              "Erro ao parsear dados de trânsito:",
+              transitoText.substring(0, 200)
+            );
+          }
+        }
+      } catch (error) {
+        console.warn("Erro ao buscar trânsito:", error.message);
+      }
+
+      try {
+        const patioDescResponse = await fetch(
+          `http://192.168.10.52/attmonitor/api/monitor.php`,
+          {
+            method: "POST",
+            headers: { token: token },
+            body: JSON.stringify({
+              AttApi: {
+                tipoOperacao: "monitor_patio_desc",
+                filtro_filial: selectedFilial,
+              },
+            }),
+          }
+        );
+
+        if (patioDescResponse.ok) {
+          const patioDescText = await patioDescResponse.text();
+
+          try {
+            const patioDescData = JSON.parse(patioDescText);
+            if (patioDescData && typeof patioDescData === "object") {
+              realData.patio_descarga = patioDescData;
+            }
+          } catch (parseError) {
+            console.warn(
+              "Erro ao parsear pátio descarga:",
+              patioDescText.substring(0, 200)
+            );
+          }
+        }
+
+        const patioCargaResponse = await fetch(
+          `http://192.168.10.52/attmonitor/api/monitor.php`,
+          {
+            method: "POST",
+            headers: { token: token },
+            body: JSON.stringify({
+              AttApi: {
+                tipoOperacao: "monitor_patio_carga",
+                filtro_filial: selectedFilial,
+              },
+            }),
+          }
+        );
+
+        if (patioCargaResponse.ok) {
+          const patioCargaText = await patioCargaResponse.text();
+
+          try {
+            const patioCargaData = JSON.parse(patioCargaText);
+            if (patioCargaData && typeof patioCargaData === "object") {
+              realData.patio_carga = patioCargaData;
+            }
+          } catch (parseError) {
+            console.warn(
+              "Erro ao parsear pátio carga:",
+              patioCargaText.substring(0, 200)
+            );
+          }
+        }
+      } catch (error) {
+        console.warn("Erro ao buscar dados dos pátios:", error.message);
+      }
+
+      const mappedData = {
+        contratos_fila: {
+          fila:
+            realData.contratos_fila?.fila ||
+            realData.contratos_fila?.id ||
+            "N/A",
+          grupo:
+            realData.contratos_fila?.grupo ||
+            realData.contratos_fila?.empresa ||
+            realData.contratos_fila?.cliente ||
+            "Sem dados",
+          produto:
+            realData.contratos_fila?.produto ||
+            realData.contratos_fila?.prod ||
+            realData.contratos_fila?.tipo_produto ||
+            "Produto não informado",
+          peso_origem: realData.contratos_fila?.peso_origem || 0,
+          peso_descarga: realData.contratos_fila?.peso_descarga || 0,
+          peso_carga: realData.contratos_fila?.peso_carga || 0,
+          veiculos_descarga: (
+            realData.contratos_fila?.veiculos_descarga ||
+            realData.contratos_fila?.total_veiculos_desc ||
+            0
+          ).toString(),
+          veiculos_carga: (
+            realData.contratos_fila?.veiculos_carga ||
+            realData.contratos_fila?.total_veiculos_carga ||
+            0
+          ).toString(),
+          eficiencia:
+            realData.contratos_fila?.eficiencia ||
+            realData.contratos_fila?.percentual_eficiencia ||
+            0,
         },
-      }));
+        transito: {
+          veiculos_transito:
+            realData.transito?.veiculos_transito ||
+            realData.transito?.total_transito ||
+            realData.monitor_geral?.veiculos_transito ||
+            0,
+          tempo_medio:
+            realData.transito?.tempo_medio ||
+            realData.transito?.tempo_medio_transito ||
+            "N/A",
+          proximas_chegadas:
+            realData.transito?.proximas_chegadas ||
+            realData.transito?.chegadas_previstas ||
+            0,
+        },
+        patio_descarga: {
+          ocupacao:
+            realData.patio_descarga?.ocupacao ||
+            realData.patio_descarga?.total_ocupacao ||
+            0,
+          capacidade_maxima:
+            realData.patio_descarga?.capacidade_maxima ||
+            realData.patio_descarga?.capacidade_total ||
+            100,
+          fila_espera:
+            realData.patio_descarga?.fila_espera ||
+            realData.patio_descarga?.total_fila ||
+            0,
+          tempo_medio_descarga:
+            realData.patio_descarga?.tempo_medio_descarga ||
+            realData.patio_descarga?.tempo_medio ||
+            "N/A",
+        },
+        patio_carga: {
+          ocupacao:
+            realData.patio_carga?.ocupacao ||
+            realData.patio_carga?.total_ocupacao ||
+            0,
+          capacidade_maxima:
+            realData.patio_carga?.capacidade_maxima ||
+            realData.patio_carga?.capacidade_total ||
+            100,
+          fila_espera:
+            realData.patio_carga?.fila_espera ||
+            realData.patio_carga?.total_fila ||
+            0,
+          tempo_medio_carga:
+            realData.patio_carga?.tempo_medio_carga ||
+            realData.patio_carga?.tempo_medio ||
+            "N/A",
+        },
+      };
+      setMonitorData(mappedData);
+      setLastUpdate(new Date());
+      setError(null);
     } catch (error) {
-      console.error("Erro ao buscar dados do monitor:", error);
-      Alert.alert("Erro", "Falha ao atualizar dados do monitor");
+      console.error("=== ERRO GERAL ===");
+      console.error("Erro:", error);
+
+      setError(`Erro ao carregar dados: ${error.message}`);
+
+      if (!refreshing) {
+        Alert.alert(
+          "Erro ao Carregar Dados",
+          `Não foi possível carregar os dados do monitor.\n\nErro: ${error.message}`,
+          [
+            { text: "Tentar Novamente", onPress: () => fetchMonitorData() },
+            { text: "OK" },
+          ]
+        );
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
+    setError(null);
     await fetchMonitorData();
     setRefreshing(false);
   };
@@ -141,9 +404,9 @@ const MonitorScreen = ({ navigation }) => {
   };
 
   const getStatusColor = (percentage) => {
-    if (percentage >= 90) return "#dc3545"; // Vermelho
-    if (percentage >= 70) return "#ffc107"; // Amarelo
-    return "#28a745"; // Verde
+    if (percentage >= 90) return "#dc3545";
+    if (percentage >= 70) return "#ffc107";
+    return "#28a745";
   };
 
   return (
@@ -209,230 +472,263 @@ const MonitorScreen = ({ navigation }) => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* Contratos em Fila */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            Contrato em Fila #{monitorData.contratos_fila.fila}
-          </Text>
-
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>
-                {monitorData.contratos_fila.grupo}
-              </Text>
-              <View
-                style={[styles.statusBadge, { backgroundColor: "#28a745" }]}
-              >
-                <Text style={styles.statusBadgeText}>Ativo</Text>
-              </View>
-            </View>
-
-            <Text style={styles.productText}>
-              {monitorData.contratos_fila.produto}
+        {/* Loading State */}
+        {loading && !refreshing && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#007AFF" />
+            <Text style={styles.loadingText}>
+              Carregando dados do monitor...
             </Text>
-
-            <View style={styles.statsGrid}>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>
-                  {formatWeight(monitorData.contratos_fila.peso_origem)}
-                </Text>
-                <Text style={styles.statLabel}>Peso Origem</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>
-                  {formatWeight(monitorData.contratos_fila.peso_descarga)}
-                </Text>
-                <Text style={styles.statLabel}>Peso Descarga</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>
-                  {formatWeight(monitorData.contratos_fila.peso_carga)}
-                </Text>
-                <Text style={styles.statLabel}>Peso Carga</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>
-                  {monitorData.contratos_fila.eficiencia}%
-                </Text>
-                <Text style={styles.statLabel}>Eficiência</Text>
-              </View>
-            </View>
-
-            <View style={styles.vehicleInfo}>
-              <View style={styles.vehicleItem}>
-                <Text style={styles.vehicleCount}>
-                  {monitorData.contratos_fila.veiculos_descarga}
-                </Text>
-                <Text style={styles.vehicleLabel}>Veículos Descarga</Text>
-              </View>
-              <View style={styles.vehicleItem}>
-                <Text style={styles.vehicleCount}>
-                  {monitorData.contratos_fila.veiculos_carga}
-                </Text>
-                <Text style={styles.vehicleLabel}>Veículos Carga</Text>
-              </View>
-            </View>
           </View>
-        </View>
+        )}
 
-        {/* Trânsito */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Trânsito</Text>
-          <View style={styles.card}>
-            <View style={styles.transitStats}>
-              <View style={styles.transitItem}>
-                <Text style={styles.transitNumber}>
-                  {monitorData.transito.veiculos_transito}
-                </Text>
-                <Text style={styles.transitLabel}>Em Trânsito</Text>
-              </View>
-              <View style={styles.transitItem}>
-                <Text style={styles.transitNumber}>
-                  {monitorData.transito.tempo_medio}
-                </Text>
-                <Text style={styles.transitLabel}>Tempo Médio</Text>
-              </View>
-              <View style={styles.transitItem}>
-                <Text style={styles.transitNumber}>
-                  {monitorData.transito.proximas_chegadas}
-                </Text>
-                <Text style={styles.transitLabel}>Próximas Chegadas</Text>
-              </View>
-            </View>
+        {/* Error State */}
+        {error && !loading && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorIcon}>⚠️</Text>
+            <Text style={styles.errorTitle}>Erro de Conexão</Text>
+            <Text style={styles.errorMessage}>{error}</Text>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={() => {
+                setError(null);
+                fetchMonitorData();
+              }}
+            >
+              <Text style={styles.retryButtonText}>Tentar Novamente</Text>
+            </TouchableOpacity>
           </View>
-        </View>
+        )}
 
-        {/* Pátios */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Status dos Pátios</Text>
-
-          {/* Pátio Descarga */}
-          <View style={styles.card}>
-            <View style={styles.patioHeader}>
-              <Text style={styles.patioTitle}>Pátio de Descarga</Text>
-              <Text
-                style={[
-                  styles.patioOccupancy,
-                  {
-                    color: getStatusColor(
-                      (monitorData.patio_descarga.ocupacao /
-                        monitorData.patio_descarga.capacidade_maxima) *
-                        100
-                    ),
-                  },
-                ]}
-              >
-                {monitorData.patio_descarga.ocupacao}/
-                {monitorData.patio_descarga.capacidade_maxima}
+        {/* Content - apenas mostrar se não estiver carregando e não houver erro */}
+        {!loading && !error && (
+          <>
+            {/* Contratos em Fila */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>
+                Contrato em Fila #{monitorData.contratos_fila.fila}
               </Text>
-            </View>
 
-            <View style={styles.progressBar}>
-              <View
-                style={[
-                  styles.progressFill,
-                  {
-                    width: `${
-                      (monitorData.patio_descarga.ocupacao /
-                        monitorData.patio_descarga.capacidade_maxima) *
-                      100
-                    }%`,
-                    backgroundColor: getStatusColor(
-                      (monitorData.patio_descarga.ocupacao /
-                        monitorData.patio_descarga.capacidade_maxima) *
-                        100
-                    ),
-                  },
-                ]}
-              />
-            </View>
+              <View style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.cardTitle}>
+                    {monitorData.contratos_fila.grupo}
+                  </Text>
+                  <View
+                    style={[styles.statusBadge, { backgroundColor: "#28a745" }]}
+                  >
+                    <Text style={styles.statusBadgeText}>Ativo</Text>
+                  </View>
+                </View>
 
-            <View style={styles.patioStats}>
-              <View style={styles.patioStat}>
-                <Text style={styles.patioStatValue}>
-                  {monitorData.patio_descarga.fila_espera}
+                <Text style={styles.productText}>
+                  {monitorData.contratos_fila.produto}
                 </Text>
-                <Text style={styles.patioStatLabel}>Fila de Espera</Text>
-              </View>
-              <View style={styles.patioStat}>
-                <Text style={styles.patioStatValue}>
-                  {monitorData.patio_descarga.tempo_medio_descarga}
-                </Text>
-                <Text style={styles.patioStatLabel}>Tempo Médio</Text>
-              </View>
-            </View>
-          </View>
 
-          {/* Pátio Carga */}
-          <View style={styles.card}>
-            <View style={styles.patioHeader}>
-              <Text style={styles.patioTitle}>Pátio de Carga</Text>
-              <Text
-                style={[
-                  styles.patioOccupancy,
-                  {
-                    color: getStatusColor(
-                      (monitorData.patio_carga.ocupacao /
-                        monitorData.patio_carga.capacidade_maxima) *
-                        100
-                    ),
-                  },
-                ]}
-              >
-                {monitorData.patio_carga.ocupacao}/
-                {monitorData.patio_carga.capacidade_maxima}
-              </Text>
-            </View>
+                <View style={styles.statsGrid}>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>
+                      {formatWeight(monitorData.contratos_fila.peso_origem)}
+                    </Text>
+                    <Text style={styles.statLabel}>Peso Origem</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>
+                      {formatWeight(monitorData.contratos_fila.peso_descarga)}
+                    </Text>
+                    <Text style={styles.statLabel}>Peso Descarga</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>
+                      {formatWeight(monitorData.contratos_fila.peso_carga)}
+                    </Text>
+                    <Text style={styles.statLabel}>Peso Carga</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>
+                      {monitorData.contratos_fila.eficiencia}%
+                    </Text>
+                    <Text style={styles.statLabel}>Eficiência</Text>
+                  </View>
+                </View>
 
-            <View style={styles.progressBar}>
-              <View
-                style={[
-                  styles.progressFill,
-                  {
-                    width: `${
-                      (monitorData.patio_carga.ocupacao /
-                        monitorData.patio_carga.capacidade_maxima) *
-                      100
-                    }%`,
-                    backgroundColor: getStatusColor(
-                      (monitorData.patio_carga.ocupacao /
-                        monitorData.patio_carga.capacidade_maxima) *
-                        100
-                    ),
-                  },
-                ]}
-              />
-            </View>
-
-            <View style={styles.patioStats}>
-              <View style={styles.patioStat}>
-                <Text style={styles.patioStatValue}>
-                  {monitorData.patio_carga.fila_espera}
-                </Text>
-                <Text style={styles.patioStatLabel}>Fila de Espera</Text>
-              </View>
-              <View style={styles.patioStat}>
-                <Text style={styles.patioStatValue}>
-                  {monitorData.patio_carga.tempo_medio_carga}
-                </Text>
-                <Text style={styles.patioStatLabel}>Tempo Médio</Text>
+                <View style={styles.vehicleInfo}>
+                  <View style={styles.vehicleItem}>
+                    <Text style={styles.vehicleCount}>
+                      {monitorData.contratos_fila.veiculos_descarga}
+                    </Text>
+                    <Text style={styles.vehicleLabel}>Veículos Descarga</Text>
+                  </View>
+                  <View style={styles.vehicleItem}>
+                    <Text style={styles.vehicleCount}>
+                      {monitorData.contratos_fila.veiculos_carga}
+                    </Text>
+                    <Text style={styles.vehicleLabel}>Veículos Carga</Text>
+                  </View>
+                </View>
               </View>
             </View>
-          </View>
-        </View>
 
-        {/* Botão de Atualização Manual */}
-        <TouchableOpacity
-          style={styles.refreshButton}
-          onPress={() => onRefresh()}
-          disabled={refreshing}
-        >
-          {refreshing ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Text style={styles.refreshButtonText}>Atualizar Dados</Text>
-          )}
-        </TouchableOpacity>
+            {/* Trânsito */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Trânsito</Text>
+              <View style={styles.card}>
+                <View style={styles.transitStats}>
+                  <View style={styles.transitItem}>
+                    <Text style={styles.transitNumber}>
+                      {monitorData.transito.veiculos_transito}
+                    </Text>
+                    <Text style={styles.transitLabel}>Em Trânsito</Text>
+                  </View>
+                  <View style={styles.transitItem}>
+                    <Text style={styles.transitNumber}>
+                      {monitorData.transito.tempo_medio}
+                    </Text>
+                    <Text style={styles.transitLabel}>Tempo Médio</Text>
+                  </View>
+                  <View style={styles.transitItem}>
+                    <Text style={styles.transitNumber}>
+                      {monitorData.transito.proximas_chegadas}
+                    </Text>
+                    <Text style={styles.transitLabel}>Próximas Chegadas</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* Pátios */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Status dos Pátios</Text>
+
+              {/* Pátio Descarga */}
+              <View style={styles.card}>
+                <View style={styles.patioHeader}>
+                  <Text style={styles.patioTitle}>Pátio de Descarga</Text>
+                  <Text
+                    style={[
+                      styles.patioOccupancy,
+                      {
+                        color: getStatusColor(
+                          (monitorData.patio_descarga.ocupacao /
+                            monitorData.patio_descarga.capacidade_maxima) *
+                            100
+                        ),
+                      },
+                    ]}
+                  >
+                    {monitorData.patio_descarga.ocupacao}/
+                    {monitorData.patio_descarga.capacidade_maxima}
+                  </Text>
+                </View>
+
+                <View style={styles.progressBar}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      {
+                        width: `${
+                          (monitorData.patio_descarga.ocupacao /
+                            monitorData.patio_descarga.capacidade_maxima) *
+                          100
+                        }%`,
+                        backgroundColor: getStatusColor(
+                          (monitorData.patio_descarga.ocupacao /
+                            monitorData.patio_descarga.capacidade_maxima) *
+                            100
+                        ),
+                      },
+                    ]}
+                  />
+                </View>
+
+                <View style={styles.patioStats}>
+                  <View style={styles.patioStat}>
+                    <Text style={styles.patioStatValue}>
+                      {monitorData.patio_descarga.fila_espera}
+                    </Text>
+                    <Text style={styles.patioStatLabel}>Fila de Espera</Text>
+                  </View>
+                  <View style={styles.patioStat}>
+                    <Text style={styles.patioStatValue}>
+                      {monitorData.patio_descarga.tempo_medio_descarga}
+                    </Text>
+                    <Text style={styles.patioStatLabel}>Tempo Médio</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Pátio Carga */}
+              <View style={styles.card}>
+                <View style={styles.patioHeader}>
+                  <Text style={styles.patioTitle}>Pátio de Carga</Text>
+                  <Text
+                    style={[
+                      styles.patioOccupancy,
+                      {
+                        color: getStatusColor(
+                          (monitorData.patio_carga.ocupacao /
+                            monitorData.patio_carga.capacidade_maxima) *
+                            100
+                        ),
+                      },
+                    ]}
+                  >
+                    {monitorData.patio_carga.ocupacao}/
+                    {monitorData.patio_carga.capacidade_maxima}
+                  </Text>
+                </View>
+
+                <View style={styles.progressBar}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      {
+                        width: `${
+                          (monitorData.patio_carga.ocupacao /
+                            monitorData.patio_carga.capacidade_maxima) *
+                          100
+                        }%`,
+                        backgroundColor: getStatusColor(
+                          (monitorData.patio_carga.ocupacao /
+                            monitorData.patio_carga.capacidade_maxima) *
+                            100
+                        ),
+                      },
+                    ]}
+                  />
+                </View>
+
+                <View style={styles.patioStats}>
+                  <View style={styles.patioStat}>
+                    <Text style={styles.patioStatValue}>
+                      {monitorData.patio_carga.fila_espera}
+                    </Text>
+                    <Text style={styles.patioStatLabel}>Fila de Espera</Text>
+                  </View>
+                  <View style={styles.patioStat}>
+                    <Text style={styles.patioStatValue}>
+                      {monitorData.patio_carga.tempo_medio_carga}
+                    </Text>
+                    <Text style={styles.patioStatLabel}>Tempo Médio</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* Botão de Atualização Manual */}
+            <TouchableOpacity
+              style={styles.refreshButton}
+              onPress={() => onRefresh()}
+              disabled={refreshing}
+            >
+              {refreshing ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.refreshButtonText}>Atualizar Dados</Text>
+              )}
+            </TouchableOpacity>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -679,6 +975,54 @@ const styles = StyleSheet.create({
     marginVertical: 20,
   },
   refreshButtonText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 50,
+  },
+  loadingText: {
+    marginTop: 15,
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 50,
+    paddingHorizontal: 30,
+  },
+  errorIcon: {
+    fontSize: 48,
+    marginBottom: 15,
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#dc3545",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  errorMessage: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 25,
+    lineHeight: 22,
+  },
+  retryButton: {
+    backgroundColor: "#007AFF",
+    paddingHorizontal: 25,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
     color: "#ffffff",
     fontSize: 16,
     fontWeight: "600",

@@ -18,7 +18,6 @@ const LoginScreen = ({ navigation }) => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // URL correta confirmada pelos testes
   const API_URL = "http://192.168.10.52/attmonitor/api/login.php";
 
   const handleLogin = async () => {
@@ -53,7 +52,6 @@ const LoginScreen = ({ navigation }) => {
           return;
         }
 
-        // Busca token nos headers
         const headerToken =
           response.headers.get("token") ||
           response.headers.get("authorization") ||
@@ -72,7 +70,6 @@ const LoginScreen = ({ navigation }) => {
           return;
         }
 
-        // Busca token no body JSON (JWT)
         try {
           const data = JSON.parse(responseText);
           const token = data.token || data.jwt || data.access_token;
@@ -93,7 +90,6 @@ const LoginScreen = ({ navigation }) => {
           console.warn("Erro ao parsear resposta JSON:", parseError);
         }
 
-        // Login bem-sucedido mas sem token explícito
         if (response.status === 200) {
           await AsyncStorage.setItem("userToken", "login_success");
           await AsyncStorage.setItem("username", username.trim());
@@ -109,7 +105,6 @@ const LoginScreen = ({ navigation }) => {
 
         Alert.alert("Erro", "Resposta inesperada do servidor");
       } else {
-        // Tratamento de erros
         let errorMessage = "Credenciais inválidas";
 
         try {

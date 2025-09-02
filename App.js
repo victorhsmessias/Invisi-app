@@ -13,7 +13,6 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Verifica se usuário já está logado
   useEffect(() => {
     checkLoginStatus();
   }, []);
@@ -30,7 +29,7 @@ export default function App() {
   };
 
   if (isLoading) {
-    return null; // ou um componente de loading
+    return null;
   }
 
   return (
