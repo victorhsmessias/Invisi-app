@@ -19,8 +19,10 @@ const LoginScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
 
   const API_URL = "http://192.168.10.52/attmonitor/api/login.php";
+  const BACKUP_URL = "http://45.4.111.173:9090/attmonitor/api/login.php"; // URL backup
 
   const handleLogin = async () => {
+    // Validação básica
     if (!username.trim()) {
       Alert.alert("Erro", "Por favor, insira o nome de usuário");
       return;
@@ -31,48 +33,67 @@ const LoginScreen = ({ navigation }) => {
 
     setLoading(true);
 
-    try {
-      const response = await fetch(API_URL, {
-        method: "POST",
-        headers: {},
-        body: JSON.stringify({
-          id_nome: username.trim(),
-          senha: password,
-        }),
-      });
+    // Tentar login com retry
+    let success = false;
+    let lastError = null;
+    const urls = [API_URL, BACKUP_URL]; // Tentar URL principal e depois backup
 
-      const responseText = await response.text();
-
-      if (response.ok) {
-        if (
-          responseText.includes("Login failed") ||
-          responseText.includes("failed")
-        ) {
-          Alert.alert("Erro de Login", "Credenciais inválidas");
-          return;
-        }
-
-        const headerToken =
-          response.headers.get("token") ||
-          response.headers.get("authorization") ||
-          response.headers.get("x-auth-token");
-
-        if (headerToken) {
-          await AsyncStorage.setItem("userToken", headerToken);
-          await AsyncStorage.setItem("username", username.trim());
-
-          Alert.alert("Sucesso", "Login realizado com sucesso!", [
-            {
-              text: "OK",
-              onPress: () => navigation.replace("Home"),
-            },
-          ]);
-          return;
-        }
-
+    for (let attempt = 0; attempt < 3; attempt++) {
+      // 3 tentativas
+      for (const url of urls) {
         try {
-          const data = JSON.parse(responseText);
-          const token = data.token || data.jwt || data.access_token;
+          console.log(`Tentativa ${attempt + 1} com URL: ${url}`);
+
+          const response = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({
+              id_nome: username.trim().toUpperCase(),
+              senha: password.toUpperCase(),
+            }),
+          });
+
+          const responseText = await response.text();
+          console.log("Status:", response.status);
+          console.log("Response preview:", responseText.substring(0, 100));
+
+          if (
+            responseText.toLowerCase().includes("failed") ||
+            responseText.toLowerCase().includes("invalid") ||
+            responseText.toLowerCase().includes("error")
+          ) {
+            throw new Error("Credenciais inválidas");
+          }
+
+          let token = null;
+
+          token =
+            response.headers.get("token") ||
+            response.headers.get("authorization") ||
+            response.headers.get("x-auth-token") ||
+            response.headers.get("x-access-token");
+
+          if (!token) {
+            try {
+              const data = JSON.parse(responseText);
+              token =
+                data.token ||
+                data.jwt ||
+                data.access_token ||
+                data.accessToken ||
+                data.authToken;
+            } catch (parseError) {
+              console.log("Resposta não é JSON");
+            }
+          }
+
+          if (!token && response.status === 200) {
+            console.log("Status 200 sem token, considerando sucesso");
+            token = "success_" + Date.now();
+          }
 
           if (token) {
             await AsyncStorage.setItem("userToken", token);
@@ -84,70 +105,35 @@ const LoginScreen = ({ navigation }) => {
                 onPress: () => navigation.replace("Home"),
               },
             ]);
-            return;
+
+            success = true;
+            break;
           }
-        } catch (parseError) {
-          console.warn("Erro ao parsear resposta JSON:", parseError);
-        }
+        } catch (error) {
+          console.error(`Erro na tentativa ${attempt + 1}:`, error.message);
+          lastError = error;
 
-        if (response.status === 200) {
-          await AsyncStorage.setItem("userToken", "login_success");
-          await AsyncStorage.setItem("username", username.trim());
-
-          Alert.alert("Sucesso", "Login realizado com sucesso!", [
-            {
-              text: "OK",
-              onPress: () => navigation.replace("Home"),
-            },
-          ]);
-          return;
-        }
-
-        Alert.alert("Erro", "Resposta inesperada do servidor");
-      } else {
-        let errorMessage = "Credenciais inválidas";
-
-        try {
-          const errorData = JSON.parse(responseText);
-          errorMessage = errorData.message || errorData.error || errorMessage;
-        } catch {
-          if (response.status === 404) {
-            errorMessage = "Serviço não encontrado. Verifique sua conexão.";
-          } else {
-            errorMessage = `Erro ${response.status}: ${
-              response.statusText || "Credenciais inválidas"
-            }`;
+          if (attempt < 2) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
           }
         }
-
-        Alert.alert("Erro de Autenticação", errorMessage);
-      }
-    } catch (error) {
-      console.error("Erro de conexão:", error);
-
-      let errorMessage = "Erro de conexão com o servidor";
-
-      if (error.message.includes("Network request failed")) {
-        errorMessage =
-          "Não foi possível conectar ao servidor. Verifique sua conexão com a internet.";
-      } else if (error.message.includes("timeout")) {
-        errorMessage = "Tempo limite de conexão excedido";
       }
 
-      Alert.alert("Erro de Conexão", errorMessage);
-    } finally {
-      setLoading(false);
+      if (success) break;
     }
-  };
 
-  const logout = async () => {
-    try {
-      await AsyncStorage.multiRemove(["userToken", "username"]);
-      setUsername("");
-      setPassword("");
-      Alert.alert("Sucesso", "Dados limpos com sucesso");
-    } catch (error) {
-      console.error("Erro ao limpar dados:", error);
+    setLoading(false);
+
+    if (!success) {
+      let errorMessage = "Não foi possível fazer login";
+
+      if (lastError?.message.includes("Credenciais")) {
+        errorMessage = "Usuário ou senha incorretos";
+      } else if (lastError?.message.includes("Network")) {
+        errorMessage = "Erro de conexão. Verifique sua internet";
+      }
+
+      Alert.alert("Erro de Login", errorMessage);
     }
   };
 
@@ -158,9 +144,13 @@ const LoginScreen = ({ navigation }) => {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <View style={styles.loginContainer}>
-          <Text style={styles.title}>Invisi</Text>
-          <Text style={styles.subtitle}>Sistema de Monitoramento</Text>
+          {/* Título */}
+          <View style={styles.headerContainer}>
+            <Text style={styles.title}>Invisi</Text>
+            <Text style={styles.subtitle}>Login </Text>
+          </View>
 
+          {/* Campo Usuário */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Nome de Usuário</Text>
             <TextInput
@@ -168,33 +158,41 @@ const LoginScreen = ({ navigation }) => {
               value={username}
               onChangeText={setUsername}
               placeholder="Digite seu nome de usuário"
-              autoCapitalize="none"
+              placeholderTextColor="#999"
+              autoCapitalize="characters" // Já mostra teclado em maiúsculas
               autoCorrect={false}
               editable={!loading}
             />
           </View>
 
+          {/* Campo Senha */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Senha</Text>
-            <TextInput
-              style={styles.input}
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Digite sua senha"
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!loading}
-            />
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={[styles.input, styles.passwordInput]}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Digite sua senha"
+                placeholderTextColor="#999"
+                autoCorrect={false}
+                editable={!loading}
+                secureTextEntry={true}
+              />
+            </View>
           </View>
 
+          {/* Botão de Login */}
           <TouchableOpacity
             style={[styles.loginButton, loading && styles.loginButtonDisabled]}
             onPress={handleLogin}
             disabled={loading}
           >
             {loading ? (
-              <ActivityIndicator color="#FFF" size="small" />
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator color="#FFF" size="small" />
+                <Text style={styles.loginButtonText}>Entrando...</Text>
+              </View>
             ) : (
               <Text style={styles.loginButtonText}>Entrar</Text>
             )}
@@ -218,18 +216,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 30,
   },
+  headerContainer: {
+    alignItems: "center",
+    marginBottom: 40,
+  },
   title: {
     fontSize: 32,
     fontWeight: "bold",
     color: "#333",
-    textAlign: "center",
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
     color: "#666",
-    textAlign: "center",
-    marginBottom: 40,
   },
   inputContainer: {
     marginBottom: 20,
@@ -249,6 +248,22 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     fontSize: 16,
   },
+  passwordContainer: {
+    position: "relative",
+  },
+  passwordInput: {
+    paddingRight: 50,
+  },
+  eyeButton: {
+    position: "absolute",
+    right: 15,
+    top: 0,
+    height: 50,
+    justifyContent: "center",
+  },
+  eyeText: {
+    fontSize: 20,
+  },
   loginButton: {
     height: 50,
     backgroundColor: "#007AFF",
@@ -265,6 +280,35 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 18,
     fontWeight: "600",
+  },
+  loadingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  infoText: {
+    fontSize: 12,
+    color: "#666",
+    textAlign: "center",
+    marginTop: 10,
+    fontStyle: "italic",
+  },
+  debugContainer: {
+    marginTop: 30,
+    padding: 15,
+    backgroundColor: "#f0f0f0",
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  debugText: {
+    fontSize: 12,
+    color: "#666",
+    marginBottom: 8,
+  },
+  debugLink: {
+    fontSize: 14,
+    color: "#007AFF",
+    textDecorationLine: "underline",
   },
 });
 

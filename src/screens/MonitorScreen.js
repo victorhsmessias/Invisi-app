@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+// MonitorScreen.js
+import React, { useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -11,7 +12,41 @@ import {
   ActivityIndicator,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from "@react-navigation/native";
 
+const BASE_URL = "http://192.168.10.52/attmonitor/api";
+
+const apiFetch = async (
+  path,
+  { token, method = "POST", body = null, timeoutMs = 12000, signal } = {}
+) => {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${BASE_URL}/${path}`, {
+      method,
+      headers: {
+        ...(token ? { token } : {}),
+        ...(method !== "GET" ? { "Content-Type": "application/json" } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+      signal: signal || controller.signal,
+    });
+    const text = await res.text();
+    console.log(`[${method}] ${path} -> ${res.status}`, text.slice(0, 300));
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      /* mantém null */
+    }
+    return { ok: res.ok, status: res.status, text, data };
+  } finally {
+    clearTimeout(id);
+  }
+};
+
+/* ===================== Tela ===================== */
 const MonitorScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -19,34 +54,36 @@ const MonitorScreen = ({ navigation }) => {
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [error, setError] = useState(null);
 
+  const inFlightRef = useRef(false);
+  const pollTimerRef = useRef(null);
+
   const [monitorData, setMonitorData] = useState({
     contratos_fila: {
-      fila: "12",
-      grupo: "USINA ALTO ALEGRE",
-      produto: "ACUCAR CRISTAL VHP A GRANEL",
-      peso_origem: 78977400,
-      peso_descarga: 78878080,
-      peso_carga: 58431480,
-      veiculos_descarga: "2167",
-      veiculos_carga: "776",
-      eficiencia: 98.5,
+      fila: "N/A",
+      grupo: "Sem dados",
+      produto: "Produto não informado",
+      peso_origem: 0,
+      peso_descarga: 0,
+      peso_carga: 0,
+      veiculos_descarga: "0",
+      veiculos_carga: "0",
+      eficiencia: 0,
     },
     transito: {
-      veiculos_transito: 24,
-      tempo_medio: "2h 15min",
-      proximas_chegadas: 8,
+      veiculos_transito: 0,
+      proximas_chegadas: 0,
     },
     patio_descarga: {
-      ocupacao: 75,
-      capacidade_maxima: 120,
-      fila_espera: 15,
-      tempo_medio_descarga: "45min",
+      ocupacao: 0,
+      capacidade_maxima: 100,
+      fila_espera: 0,
+      tempo_medio_descarga: "—",
     },
     patio_carga: {
-      ocupacao: 62,
+      ocupacao: 0,
       capacidade_maxima: 100,
-      fila_espera: 12,
-      tempo_medio_carga: "38min",
+      fila_espera: 0,
+      tempo_medio_carga: "—",
     },
   });
 
@@ -56,358 +93,259 @@ const MonitorScreen = ({ navigation }) => {
   ];
 
   const servicos = [
-    { key: "armazenagem", label: "Armazenagem", active: true },
-    { key: "transbordo", label: "Transbordo", active: true },
-    { key: "pesagem", label: "Pesagem", active: false },
+    { key: "armazenagem", label: "Armazenagem", active: 1 },
+    { key: "transbordo", label: "Transbordo", active: 1 },
+    { key: "pesagem", label: "Pesagem", active: 0 },
   ];
 
-  useEffect(() => {
-    fetchMonitorData();
+  const formatNumber = (num) =>
+    new Intl.NumberFormat("pt-BR").format(Number(num || 0));
+  const formatWeight = (w) => `${formatNumber(w)} kg`;
+  const formatDateTime = (d) =>
+    d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  const getStatusColor = (p) =>
+    p >= 90 ? "#dc3545" : p >= 70 ? "#ffc107" : "#28a745";
 
-    const interval = setInterval(() => {
-      fetchMonitorData();
-    }, 30000);
+  const fetchMonitorData = useCallback(async () => {
+    if (inFlightRef.current) return; // evita chamadas paralelas
+    inFlightRef.current = true;
 
-    return () => clearInterval(interval);
-  }, [selectedFilial]);
-
-  const fetchMonitorData = async () => {
     try {
-      setLoading(true);
+      setError(null);
+      if (!refreshing) setLoading(true);
+
       const token = await AsyncStorage.getItem("userToken");
       if (!token) {
         navigation.replace("Login");
         return;
       }
 
-      let realData = {
-        contratos_fila: null,
-        transito: null,
-        patio_descarga: null,
-        patio_carga: null,
-        monitor_geral: null,
+      const okResp = (resp) =>
+        resp?.ok && resp?.data && typeof resp.data === "object";
+      const isSucesso = (resp) =>
+        okResp(resp) && resp.data?.mensagemRetorno?.codigo === "SUCESSO";
+      const getDados = (resp) => (okResp(resp) ? resp.data?.dados : null);
+
+      /* ========== CONTRATOS (se a API continuar respondendo ERRO, mantemos defaults) ========== */
+      let contratos = null;
+      try {
+        const r = await apiFetch("monitor_contratos_fila.php", {
+          token,
+          body: {
+            AttApi: {
+              tipoOperacao: "monitor_contratos_fila",
+              filial: selectedFilial,
+            },
+          },
+        });
+        if (isSucesso(r)) {
+          contratos = getDados(r) || r.data; // cobre ambos formatos
+        }
+      } catch (e) {
+        console.warn("contratos erro:", e?.message);
+      }
+
+      /* ========== D_MONITOR (agregados) – opcionalmente útil p/ métricas globais) ========== */
+      try {
+        await apiFetch("d_monitor.php", {
+          token,
+          body: {
+            AttApi: {
+              tipoOperacao: "d_monitor",
+              filtro_filial: selectedFilial,
+              filtro_servico: { armazenagem: 1, transbordo: 1, pesagem: 0 },
+              filtro_op_padrao: {
+                rodo_ferro: 1,
+                ferro_rodo: 1,
+                rodo_rodo: 1,
+                outros: 0,
+              },
+              filtro_data_inicio: "2024-08-01",
+              filtro_data_fim: "2025-12-31",
+              filtro_acumulador: { dia: 0, mes: 1, ano: 0 },
+            },
+          },
+        });
+      } catch (e) {
+        console.warn("d_monitor erro:", e?.message);
+      }
+
+      /* ========== TRÂNSITO ========== */
+      let transito = {
+        veiculos_transito: 0,
+        proximas_chegadas: 0,
       };
-
       try {
-        const contratosResponse = await fetch(
-          `http://192.168.10.52/attmonitor/api/monitor_contratos_fila.php`,
-          {
-            method: "GET",
-            headers: { token: token },
-          }
-        );
-
-        if (contratosResponse.ok) {
-          const contratosText = await contratosResponse.text();
-
-          try {
-            const contratosData = JSON.parse(contratosText);
-            if (contratosData && typeof contratosData === "object") {
-              realData.contratos_fila = contratosData;
-            }
-          } catch (parseError) {
-            console.warn(
-              "Erro ao parsear dados de contratos:",
-              contratosText.substring(0, 200)
+        const r = await apiFetch("monitor.php", {
+          token,
+          body: {
+            AttApi: {
+              tipoOperacao: "monitor_transito",
+              filtro_filial: selectedFilial,
+              filtro_servico: { armazenagem: 1, transbordo: 1, pesagem: 0 },
+              filtro_op_padrao: {
+                rodo_ferro: 1,
+                ferro_rodo: 1,
+                rodo_rodo: 1,
+                outros: 0,
+              },
+            },
+          },
+        });
+        if (isSucesso(r)) {
+          const arr = getDados(r)?.listaTransito?.transitoVeiculos;
+          if (Array.isArray(arr)) {
+            const total = arr.reduce(
+              (s, it) => s + (Number(it?.t_veiculos) || 0),
+              0
             );
+            transito = {
+              veiculos_transito: total,
+              proximas_chegadas: arr.length,
+            };
           }
         }
-      } catch (error) {
-        console.warn("Erro ao buscar contratos:", error.message);
+      } catch (e) {
+        console.warn("transito erro:", e?.message);
       }
 
+      /* ========== PÁTIO DESCARGA ========== */
+      let patio_descarga = {
+        ocupacao: 0,
+        capacidade_maxima: 100,
+        fila_espera: 0,
+        tempo_medio_descarga: "—",
+      };
       try {
-        const monitorResponse = await fetch(
-          `http://192.168.10.52/attmonitor/api/d_monitor.php`,
-          {
-            method: "POST",
-            headers: { token: token },
-            body: JSON.stringify({
-              AttApi: {
-                tipoOperacao: "d_monitor",
-                filtro_filial: selectedFilial,
-                filtro_servico: {
-                  armazenagem: 1,
-                  transbordo: 1,
-                  pesagem: 0,
-                },
-                filtro_op_padrao: {
-                  rodo_ferro: 1,
-                  ferro_rodo: 1,
-                  rodo_rodo: 1,
-                  outros: 0,
-                },
-                filtro_data_inicio: "2024-08-01",
-                filtro_data_fim: "2025-12-31",
-                filtro_acumulador: {
-                  dia: 0,
-                  mes: 1,
-                  ano: 0,
-                },
-              },
-            }),
-          }
-        );
-
-        if (monitorResponse.ok) {
-          const monitorText = await monitorResponse.text();
-
-          try {
-            const monitorData = JSON.parse(monitorText);
-            if (monitorData && typeof monitorData === "object") {
-              realData.monitor_geral = monitorData;
-            }
-          } catch (parseError) {
-            console.warn(
-              "Erro ao parsear dados do monitor:",
-              monitorText.substring(0, 200)
-            );
-          }
+        const r = await apiFetch("monitor.php", {
+          token,
+          body: {
+            AttApi: {
+              tipoOperacao: "monitor_patio_desc",
+              filtro_filial: selectedFilial,
+            },
+          },
+        });
+        if (isSucesso(r)) {
+          const dados = getDados(r);
+          patio_descarga = {
+            ocupacao: Number(dados?.ocupacao ?? dados?.total_ocupacao ?? 0),
+            capacidade_maxima: Number(
+              dados?.capacidade_maxima ?? dados?.capacidade_total ?? 100
+            ),
+            fila_espera: Number(dados?.fila_espera ?? dados?.total_fila ?? 0),
+            tempo_medio_descarga:
+              dados?.tempo_medio_descarga ?? dados?.tempo_medio ?? "—",
+          };
         }
-      } catch (error) {
-        console.warn("Erro ao buscar monitor geral:", error.message);
+      } catch (e) {
+        console.warn("patio desc erro:", e?.message);
       }
 
+      /* ========== PÁTIO CARGA ========== */
+      let patio_carga = {
+        ocupacao: 0,
+        capacidade_maxima: 100,
+        fila_espera: 0,
+        tempo_medio_carga: "—",
+      };
       try {
-        const transitoResponse = await fetch(
-          `http://192.168.10.52/attmonitor/api/monitor.php`,
-          {
-            method: "POST",
-            headers: { token: token },
-            body: JSON.stringify({
-              AttApi: {
-                tipoOperacao: "monitor_transito",
-                filtro_filial: selectedFilial,
-                filtro_servico: {
-                  armazenagem: 1,
-                  transbordo: 1,
-                  pesagem: 0,
-                },
-              },
-            }),
-          }
-        );
-
-        if (transitoResponse.ok) {
-          const transitoText = await transitoResponse.text();
-
-          try {
-            const transitoData = JSON.parse(transitoText);
-            if (transitoData && typeof transitoData === "object") {
-              realData.transito = transitoData;
-            }
-          } catch (parseError) {
-            console.warn(
-              "Erro ao parsear dados de trânsito:",
-              transitoText.substring(0, 200)
-            );
-          }
+        const r = await apiFetch("monitor.php", {
+          token,
+          body: {
+            AttApi: {
+              tipoOperacao: "monitor_patio_carga",
+              filtro_filial: selectedFilial,
+            },
+          },
+        });
+        if (isSucesso(r)) {
+          const dados = getDados(r);
+          patio_carga = {
+            ocupacao: Number(dados?.ocupacao ?? dados?.total_ocupacao ?? 0),
+            capacidade_maxima: Number(
+              dados?.capacidade_maxima ?? dados?.capacidade_total ?? 100
+            ),
+            fila_espera: Number(dados?.fila_espera ?? dados?.total_fila ?? 0),
+            tempo_medio_carga:
+              dados?.tempo_medio_carga ?? dados?.tempo_medio ?? "—",
+          };
         }
-      } catch (error) {
-        console.warn("Erro ao buscar trânsito:", error.message);
+      } catch (e) {
+        console.warn("patio carga erro:", e?.message);
       }
 
-      try {
-        const patioDescResponse = await fetch(
-          `http://192.168.10.52/attmonitor/api/monitor.php`,
-          {
-            method: "POST",
-            headers: { token: token },
-            body: JSON.stringify({
-              AttApi: {
-                tipoOperacao: "monitor_patio_desc",
-                filtro_filial: selectedFilial,
-              },
-            }),
-          }
-        );
-
-        if (patioDescResponse.ok) {
-          const patioDescText = await patioDescResponse.text();
-
-          try {
-            const patioDescData = JSON.parse(patioDescText);
-            if (patioDescData && typeof patioDescData === "object") {
-              realData.patio_descarga = patioDescData;
-            }
-          } catch (parseError) {
-            console.warn(
-              "Erro ao parsear pátio descarga:",
-              patioDescText.substring(0, 200)
-            );
-          }
-        }
-
-        const patioCargaResponse = await fetch(
-          `http://192.168.10.52/attmonitor/api/monitor.php`,
-          {
-            method: "POST",
-            headers: { token: token },
-            body: JSON.stringify({
-              AttApi: {
-                tipoOperacao: "monitor_patio_carga",
-                filtro_filial: selectedFilial,
-              },
-            }),
-          }
-        );
-
-        if (patioCargaResponse.ok) {
-          const patioCargaText = await patioCargaResponse.text();
-
-          try {
-            const patioCargaData = JSON.parse(patioCargaText);
-            if (patioCargaData && typeof patioCargaData === "object") {
-              realData.patio_carga = patioCargaData;
-            }
-          } catch (parseError) {
-            console.warn(
-              "Erro ao parsear pátio carga:",
-              patioCargaText.substring(0, 200)
-            );
-          }
-        }
-      } catch (error) {
-        console.warn("Erro ao buscar dados dos pátios:", error.message);
-      }
-
-      const mappedData = {
+      /* ========== Mapeia para UI ========== */
+      setMonitorData({
         contratos_fila: {
-          fila:
-            realData.contratos_fila?.fila ||
-            realData.contratos_fila?.id ||
-            "N/A",
+          fila: contratos?.fila ?? contratos?.id ?? "N/A",
           grupo:
-            realData.contratos_fila?.grupo ||
-            realData.contratos_fila?.empresa ||
-            realData.contratos_fila?.cliente ||
+            contratos?.grupo ??
+            contratos?.empresa ??
+            contratos?.cliente ??
             "Sem dados",
           produto:
-            realData.contratos_fila?.produto ||
-            realData.contratos_fila?.prod ||
-            realData.contratos_fila?.tipo_produto ||
+            contratos?.produto ??
+            contratos?.prod ??
+            contratos?.tipo_produto ??
             "Produto não informado",
-          peso_origem: realData.contratos_fila?.peso_origem || 0,
-          peso_descarga: realData.contratos_fila?.peso_descarga || 0,
-          peso_carga: realData.contratos_fila?.peso_carga || 0,
-          veiculos_descarga: (
-            realData.contratos_fila?.veiculos_descarga ||
-            realData.contratos_fila?.total_veiculos_desc ||
-            0
-          ).toString(),
-          veiculos_carga: (
-            realData.contratos_fila?.veiculos_carga ||
-            realData.contratos_fila?.total_veiculos_carga ||
-            0
-          ).toString(),
+          peso_origem: Number(contratos?.peso_origem ?? 0),
+          peso_descarga: Number(contratos?.peso_descarga ?? 0),
+          peso_carga: Number(contratos?.peso_carga ?? 0),
+          veiculos_descarga: String(
+            contratos?.veiculos_descarga ?? contratos?.total_veiculos_desc ?? 0
+          ),
+          veiculos_carga: String(
+            contratos?.veiculos_carga ?? contratos?.total_veiculos_carga ?? 0
+          ),
           eficiencia:
-            realData.contratos_fila?.eficiencia ||
-            realData.contratos_fila?.percentual_eficiencia ||
-            0,
+            Number(
+              contratos?.eficiencia ?? contratos?.percentual_eficiencia ?? 0
+            ) || 0,
         },
-        transito: {
-          veiculos_transito:
-            realData.transito?.veiculos_transito ||
-            realData.transito?.total_transito ||
-            realData.monitor_geral?.veiculos_transito ||
-            0,
-          tempo_medio:
-            realData.transito?.tempo_medio ||
-            realData.transito?.tempo_medio_transito ||
-            "N/A",
-          proximas_chegadas:
-            realData.transito?.proximas_chegadas ||
-            realData.transito?.chegadas_previstas ||
-            0,
-        },
-        patio_descarga: {
-          ocupacao:
-            realData.patio_descarga?.ocupacao ||
-            realData.patio_descarga?.total_ocupacao ||
-            0,
-          capacidade_maxima:
-            realData.patio_descarga?.capacidade_maxima ||
-            realData.patio_descarga?.capacidade_total ||
-            100,
-          fila_espera:
-            realData.patio_descarga?.fila_espera ||
-            realData.patio_descarga?.total_fila ||
-            0,
-          tempo_medio_descarga:
-            realData.patio_descarga?.tempo_medio_descarga ||
-            realData.patio_descarga?.tempo_medio ||
-            "N/A",
-        },
-        patio_carga: {
-          ocupacao:
-            realData.patio_carga?.ocupacao ||
-            realData.patio_carga?.total_ocupacao ||
-            0,
-          capacidade_maxima:
-            realData.patio_carga?.capacidade_maxima ||
-            realData.patio_carga?.capacidade_total ||
-            100,
-          fila_espera:
-            realData.patio_carga?.fila_espera ||
-            realData.patio_carga?.total_fila ||
-            0,
-          tempo_medio_carga:
-            realData.patio_carga?.tempo_medio_carga ||
-            realData.patio_carga?.tempo_medio ||
-            "N/A",
-        },
-      };
-      setMonitorData(mappedData);
+        transito,
+        patio_descarga,
+        patio_carga,
+      });
+
       setLastUpdate(new Date());
-      setError(null);
-    } catch (error) {
-      console.error("=== ERRO GERAL ===");
-      console.error("Erro:", error);
-
-      setError(`Erro ao carregar dados: ${error.message}`);
-
-      if (!refreshing) {
-        Alert.alert(
-          "Erro ao Carregar Dados",
-          `Não foi possível carregar os dados do monitor.\n\nErro: ${error.message}`,
-          [
-            { text: "Tentar Novamente", onPress: () => fetchMonitorData() },
-            { text: "OK" },
-          ]
-        );
-      }
+    } catch (err) {
+      console.error("=== ERRO GERAL ===", err);
+      setError(`Erro ao carregar dados: ${err?.message || err}`);
+      Alert.alert(
+        "Erro ao Carregar Dados",
+        `Não foi possível carregar os dados do monitor.\n\nErro: ${
+          err?.message || err
+        }`,
+        [
+          { text: "Tentar Novamente", onPress: () => fetchMonitorData() },
+          { text: "OK" },
+        ]
+      );
     } finally {
       setLoading(false);
+      inFlightRef.current = false;
     }
-  };
+  }, [navigation, refreshing, selectedFilial]);
 
-  const onRefresh = async () => {
+  // Polling apenas quando a tela está em foco
+  useFocusEffect(
+    useCallback(() => {
+      fetchMonitorData();
+      pollTimerRef.current = setInterval(fetchMonitorData, 30000);
+      return () => {
+        if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      };
+    }, [fetchMonitorData])
+  );
+
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
     setError(null);
     await fetchMonitorData();
     setRefreshing(false);
-  };
-
-  const formatNumber = (num) => {
-    return new Intl.NumberFormat("pt-BR").format(num);
-  };
-
-  const formatWeight = (weight) => {
-    return `${formatNumber(weight)} kg`;
-  };
-
-  const formatDateTime = (date) => {
-    return date.toLocaleTimeString("pt-BR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const getStatusColor = (percentage) => {
-    if (percentage >= 90) return "#dc3545";
-    if (percentage >= 70) return "#ffc107";
-    return "#28a745";
-  };
+  }, [fetchMonitorData]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -472,7 +410,7 @@ const MonitorScreen = ({ navigation }) => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* Loading State */}
+        {/* Loading */}
         {loading && !refreshing && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#007AFF" />
@@ -482,7 +420,7 @@ const MonitorScreen = ({ navigation }) => {
           </View>
         )}
 
-        {/* Error State */}
+        {/* Erro */}
         {error && !loading && (
           <View style={styles.errorContainer}>
             <Text style={styles.errorIcon}>⚠️</Text>
@@ -500,7 +438,7 @@ const MonitorScreen = ({ navigation }) => {
           </View>
         )}
 
-        {/* Content - apenas mostrar se não estiver carregando e não houver erro */}
+        {/* Conteúdo */}
         {!loading && !error && (
           <>
             {/* Contratos em Fila */}
@@ -579,12 +517,6 @@ const MonitorScreen = ({ navigation }) => {
                       {monitorData.transito.veiculos_transito}
                     </Text>
                     <Text style={styles.transitLabel}>Em Trânsito</Text>
-                  </View>
-                  <View style={styles.transitItem}>
-                    <Text style={styles.transitNumber}>
-                      {monitorData.transito.tempo_medio}
-                    </Text>
-                    <Text style={styles.transitLabel}>Tempo Médio</Text>
                   </View>
                   <View style={styles.transitItem}>
                     <Text style={styles.transitNumber}>
@@ -718,7 +650,7 @@ const MonitorScreen = ({ navigation }) => {
             {/* Botão de Atualização Manual */}
             <TouchableOpacity
               style={styles.refreshButton}
-              onPress={() => onRefresh()}
+              onPress={onRefresh}
               disabled={refreshing}
             >
               {refreshing ? (
@@ -753,25 +685,10 @@ const styles = StyleSheet.create({
     paddingTop: 15,
     marginBottom: 10,
   },
-  backButton: {
-    fontSize: 16,
-    color: "#007AFF",
-    fontWeight: "500",
-  },
-  lastUpdateText: {
-    fontSize: 12,
-    color: "#666",
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 15,
-  },
-  filialSelector: {
-    flexDirection: "row",
-    marginBottom: 15,
-  },
+  backButton: { fontSize: 16, color: "#007AFF", fontWeight: "500" },
+  lastUpdateText: { fontSize: 12, color: "#666" },
+  title: { fontSize: 24, fontWeight: "bold", color: "#333", marginBottom: 15 },
+  filialSelector: { flexDirection: "row", marginBottom: 15 },
   filialButton: {
     paddingHorizontal: 20,
     paddingVertical: 8,
@@ -779,49 +696,25 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8f9fa",
     marginRight: 10,
   },
-  filialButtonActive: {
-    backgroundColor: "#007AFF",
-  },
-  filialButtonText: {
-    fontSize: 14,
-    color: "#666",
-    fontWeight: "500",
-  },
-  filialButtonTextActive: {
-    color: "#ffffff",
-  },
+  filialButtonActive: { backgroundColor: "#007AFF" },
+  filialButtonText: { fontSize: 14, color: "#666", fontWeight: "500" },
+  filialButtonTextActive: { color: "#ffffff" },
   servicosContainer: {
     flexDirection: "row",
     alignItems: "center",
     flexWrap: "wrap",
   },
-  servicosLabel: {
-    fontSize: 14,
-    color: "#666",
-    marginRight: 10,
-  },
-  servicosList: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-  },
+  servicosLabel: { fontSize: 14, color: "#666", marginRight: 10 },
+  servicosList: { flexDirection: "row", flexWrap: "wrap" },
   servicoTag: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
     marginRight: 8,
   },
-  servicoTagText: {
-    fontSize: 12,
-    color: "#ffffff",
-    fontWeight: "500",
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  section: {
-    marginTop: 20,
-  },
+  servicoTagText: { fontSize: 12, color: "#ffffff", fontWeight: "500" },
+  content: { flex: 1, paddingHorizontal: 20 },
+  section: { marginTop: 20 },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "bold",
@@ -845,48 +738,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 8,
   },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#333",
-    flex: 1,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  statusBadgeText: {
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "500",
-  },
-  productText: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 15,
-  },
+  cardTitle: { fontSize: 16, fontWeight: "bold", color: "#333", flex: 1 },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
+  statusBadgeText: { color: "#ffffff", fontSize: 12, fontWeight: "500" },
+  productText: { fontSize: 14, color: "#666", marginBottom: 15 },
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
     marginBottom: 15,
   },
-  statItem: {
-    width: "48%",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#007AFF",
-  },
-  statLabel: {
-    fontSize: 12,
-    color: "#666",
-    marginTop: 2,
-  },
+  statItem: { width: "48%", alignItems: "center", marginBottom: 10 },
+  statValue: { fontSize: 16, fontWeight: "bold", color: "#007AFF" },
+  statLabel: { fontSize: 12, color: "#666", marginTop: 2 },
   vehicleInfo: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -894,51 +758,21 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#f0f0f0",
   },
-  vehicleItem: {
-    alignItems: "center",
-  },
-  vehicleCount: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#28a745",
-  },
-  vehicleLabel: {
-    fontSize: 12,
-    color: "#666",
-    marginTop: 4,
-  },
-  transitStats: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-  },
-  transitItem: {
-    alignItems: "center",
-  },
-  transitNumber: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#ffc107",
-  },
-  transitLabel: {
-    fontSize: 12,
-    color: "#666",
-    marginTop: 4,
-  },
+  vehicleItem: { alignItems: "center" },
+  vehicleCount: { fontSize: 20, fontWeight: "bold", color: "#28a745" },
+  vehicleLabel: { fontSize: 12, color: "#666", marginTop: 4 },
+  transitStats: { flexDirection: "row", justifyContent: "space-around" },
+  transitItem: { alignItems: "center" },
+  transitNumber: { fontSize: 18, fontWeight: "bold", color: "#ffc107" },
+  transitLabel: { fontSize: 12, color: "#666", marginTop: 4 },
   patioHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 10,
   },
-  patioTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-  },
-  patioOccupancy: {
-    fontSize: 16,
-    fontWeight: "bold",
-  },
+  patioTitle: { fontSize: 16, fontWeight: "600", color: "#333" },
+  patioOccupancy: { fontSize: 16, fontWeight: "bold" },
   progressBar: {
     height: 8,
     backgroundColor: "#e9ecef",
@@ -946,27 +780,11 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginBottom: 15,
   },
-  progressFill: {
-    height: "100%",
-    borderRadius: 4,
-  },
-  patioStats: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-  },
-  patioStat: {
-    alignItems: "center",
-  },
-  patioStatValue: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#333",
-  },
-  patioStatLabel: {
-    fontSize: 12,
-    color: "#666",
-    marginTop: 2,
-  },
+  progressFill: { height: "100%", borderRadius: 4 },
+  patioStats: { flexDirection: "row", justifyContent: "space-around" },
+  patioStat: { alignItems: "center" },
+  patioStatValue: { fontSize: 16, fontWeight: "bold", color: "#333" },
+  patioStatLabel: { fontSize: 12, color: "#666", marginTop: 2 },
   refreshButton: {
     backgroundColor: "#007AFF",
     paddingVertical: 15,
@@ -974,11 +792,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginVertical: 20,
   },
-  refreshButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
+  refreshButtonText: { color: "#ffffff", fontSize: 16, fontWeight: "600" },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -998,10 +812,7 @@ const styles = StyleSheet.create({
     paddingVertical: 50,
     paddingHorizontal: 30,
   },
-  errorIcon: {
-    fontSize: 48,
-    marginBottom: 15,
-  },
+  errorIcon: { fontSize: 48, marginBottom: 15 },
   errorTitle: {
     fontSize: 18,
     fontWeight: "bold",
@@ -1022,11 +833,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 8,
   },
-  retryButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
+  retryButtonText: { color: "#ffffff", fontSize: 16, fontWeight: "600" },
 });
 
 export default MonitorScreen;
