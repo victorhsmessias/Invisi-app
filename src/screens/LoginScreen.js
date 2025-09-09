@@ -18,8 +18,8 @@ const LoginScreen = ({ navigation }) => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const API_URL = "http://192.168.10.52/attmonitor/api/login.php";
-  const BACKUP_URL = "http://45.4.111.173:9090/attmonitor/api/login.php"; // URL backup
+  const API_URL = "http://192.168.10.201/attmonitor/api/login.php";
+  const BACKUP_URL = "http://45.4.111.173:9090/attmonitor/api/login.php";
 
   const handleLogin = async () => {
     // Validação básica
@@ -42,8 +42,6 @@ const LoginScreen = ({ navigation }) => {
       // 3 tentativas
       for (const url of urls) {
         try {
-          console.log(`Tentativa ${attempt + 1} com URL: ${url}`);
-
           const response = await fetch(url, {
             method: "POST",
             headers: {
@@ -57,9 +55,6 @@ const LoginScreen = ({ navigation }) => {
           });
 
           const responseText = await response.text();
-          console.log("Status:", response.status);
-          console.log("Response preview:", responseText.substring(0, 100));
-
           if (
             responseText.toLowerCase().includes("failed") ||
             responseText.toLowerCase().includes("invalid") ||
@@ -91,7 +86,6 @@ const LoginScreen = ({ navigation }) => {
           }
 
           if (!token && response.status === 200) {
-            console.log("Status 200 sem token, considerando sucesso");
             token = "success_" + Date.now();
           }
 
@@ -110,7 +104,6 @@ const LoginScreen = ({ navigation }) => {
             break;
           }
         } catch (error) {
-          console.error(`Erro na tentativa ${attempt + 1}:`, error.message);
           lastError = error;
 
           if (attempt < 2) {

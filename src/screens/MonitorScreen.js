@@ -14,7 +14,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 
-const BASE_URL = "http://192.168.10.52/attmonitor/api";
+const BASE_URL = "http://192.168.10.201/attmonitor/api";
 
 const apiFetch = async (
   path,
@@ -33,7 +33,6 @@ const apiFetch = async (
       signal: signal || controller.signal,
     });
     const text = await res.text();
-    console.log(`[${method}] ${path} -> ${res.status}`, text.slice(0, 300));
     let data = null;
     try {
       data = JSON.parse(text);

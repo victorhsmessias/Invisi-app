@@ -1,10 +1,5 @@
-// src/utils/homeScreenUtils.js
 import { useState, useEffect, useCallback, useRef } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-// ==========================================
-// HOOKS CUSTOMIZADOS
-// ==========================================
 
 /**
  * Hook para gerenciar cache com expiração
@@ -250,8 +245,6 @@ export const retryWithBackoff = async (fn, maxRetries = 3, delay = 1000) => {
       if (i === maxRetries - 1) throw error;
 
       const backoffDelay = delay * Math.pow(2, i);
-      console.log(`Retry ${i + 1}/${maxRetries} after ${backoffDelay}ms`);
-
       await new Promise((resolve) => setTimeout(resolve, backoffDelay));
     }
   }
@@ -290,24 +283,12 @@ export const cleanOldCache = async (maxAge = 24 * 60 * 60 * 1000) => {
         const { timestamp } = JSON.parse(stored);
         if (Date.now() - timestamp > maxAge) {
           await AsyncStorage.removeItem(key);
-          console.log(`Removed old cache: ${key}`);
         }
       }
     }
   } catch (error) {
     console.log("Cache cleanup error:", error);
   }
-};
-
-// ==========================================
-// CONSTANTES E CONFIGURAÇÕES
-// ==========================================
-
-export const CACHE_KEYS = {
-  HOME_DATA: "cache_home_data",
-  USER_PREFERENCES: "cache_user_preferences",
-  MONITOR_DATA: "cache_monitor_data",
-  CONTRACTS_DATA: "cache_contracts_data",
 };
 
 export const API_ENDPOINTS = {
@@ -332,10 +313,6 @@ export const CACHE_TTL = {
   VERY_LONG: 24 * 60 * 60 * 1000, // 24 horas
 };
 
-// ==========================================
-// MOCK DATA PARA DESENVOLVIMENTO
-// ==========================================
-
 export const getMockData = () => ({
   operacoesHoje: Math.floor(Math.random() * 100),
   emTransito: Math.floor(Math.random() * 50),
@@ -352,10 +329,6 @@ export const getMockData = () => ({
     manutencao: Math.floor(Math.random() * 5),
   },
 });
-
-// ==========================================
-// HELPERS DE API
-// ==========================================
 
 /**
  * Criar headers padrão para requisições

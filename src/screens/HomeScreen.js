@@ -21,8 +21,8 @@ const { width: screenWidth } = Dimensions.get("window");
 
 // Configurações
 const API_CONFIG = {
-  BASE_URL: "http://192.168.10.52/attmonitor/api",
-  CACHE_TIME: 2 * 60 * 1000, // 2 minutos (mais frequente para transporte)
+  BASE_URL: "http://192.168.10.201/attmonitor/api",
+  CACHE_TIME: 2 * 60 * 1000, // 2 minutos
   AUTO_REFRESH: 30 * 1000, // 30 segundos
 };
 
@@ -46,9 +46,9 @@ const StatusCard = memo(({ title, value, icon, color, loading, subtitle }) => {
 
   const getColorByValue = (val, type) => {
     if (type === "fila") {
-      if (val > 20) return "#dc3545"; // Vermelho - muitos na fila
-      if (val > 10) return "#ffc107"; // Amarelo - atenção
-      return "#28a745"; // Verde - normal
+      if (val > 20) return "#dc3545";
+      if (val > 10) return "#ffc107";
+      return "#28a745";
     }
     return color;
   };
@@ -227,11 +227,6 @@ const SideMenu = memo(({ visible, onClose, navigation, username }) => {
                   );
                 })}
               </ScrollView>
-
-              {/* Footer */}
-              <View style={styles.menuFooter}>
-                <Text style={styles.menuFooterText}>ATT Monitor v1.0</Text>
-              </View>
             </Animated.View>
           </TouchableWithoutFeedback>
         </View>
@@ -261,64 +256,279 @@ const useTransportData = (filial) => {
 
       setLoading(true);
 
-      const response = await fetch(`${API_CONFIG.BASE_URL}/monitor.php`, {
-        method: "POST",
-        headers: {
-          token: `${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          AttApi: {
-            tipoOperacao: "monitor_transito",
-            filtro_filial: filial,
-            filtro_servico: {
-              armazenagem: 1,
-              transbordo: 1,
-              pesagem: 0,
-            },
-            filtro_op_padrao: {
-              rodo_ferro: 1,
-              ferro_rodo: 1,
-              rodo_rodo: 1,
-              outros: 0,
-            },
+      const [
+        responseTransito,
+        responseFilaDescarga,
+        responseFilaCarga,
+        responsePatioDesc,
+        responsePatioCarga,
+      ] = await Promise.all([
+        // 1. Em Trânsito
+        fetch(`${API_CONFIG.BASE_URL}/monitor.php`, {
+          method: "POST",
+          headers: {
+            token: token,
+            "Content-Type": "application/json",
           },
+          body: JSON.stringify({
+            AttApi: {
+              tipoOperacao: "monitor_transito",
+              filtro_filial: filial,
+              filtro_servico: {
+                armazenagem: 1,
+                transbordo: 1,
+                pesagem: 0,
+              },
+              filtro_op_padrao: {
+                rodo_ferro: 1,
+                ferro_rodo: 1,
+                rodo_rodo: 1,
+                outros: 0,
+              },
+            },
+          }),
         }),
-      });
 
-      if (!response.ok) {
-        throw new Error("Erro ao buscar dados da API");
-      }
+        // 2. Fila de Descarga
+        fetch(`${API_CONFIG.BASE_URL}/monitor.php`, {
+          method: "POST",
+          headers: {
+            token: token,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            AttApi: {
+              tipoOperacao: "monitor_fila_desc",
+              filtro_filial: filial,
+              filtro_servico: {
+                armazenagem: 1,
+                transbordo: 1,
+                pesagem: 0,
+              },
+              filtro_op_padrao: {
+                rodo_ferro: 1,
+                ferro_rodo: 1,
+                rodo_rodo: 1,
+                outros: 0,
+              },
+            },
+          }),
+        }),
 
-      const result = await response.json();
+        // 3. Fila de Carga
+        fetch(`${API_CONFIG.BASE_URL}/monitor.php`, {
+          method: "POST",
+          headers: {
+            token: token,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            AttApi: {
+              tipoOperacao: "monitor_fila_carga",
+              filtro_filial: filial,
+              filtro_servico: {
+                armazenagem: 1,
+                transbordo: 1,
+                pesagem: 0,
+              },
+              filtro_op_padrao: {
+                rodo_ferro: 1,
+                ferro_rodo: 1,
+                rodo_rodo: 1,
+                outros: 0,
+              },
+            },
+          }),
+        }),
 
+        // 4. Pátio Descarga
+        fetch(`${API_CONFIG.BASE_URL}/monitor.php`, {
+          method: "POST",
+          headers: {
+            token: token,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            AttApi: {
+              tipoOperacao: "monitor_patio_desc",
+              filtro_filial: filial,
+              filtro_servico: {
+                armazenagem: 1,
+                transbordo: 1,
+                pesagem: 0,
+              },
+              filtro_op_padrao: {
+                rodo_ferro: 1,
+                ferro_rodo: 1,
+                rodo_rodo: 1,
+                outros: 0,
+              },
+            },
+          }),
+        }),
+        // 5. Pátio Carga
+        fetch(`${API_CONFIG.BASE_URL}/monitor.php`, {
+          method: "POST",
+          headers: {
+            token: token,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            AttApi: {
+              tipoOperacao: "monitor_patio_carga",
+              filtro_filial: filial,
+              filtro_servico: {
+                armazenagem: 1,
+                transbordo: 1,
+                pesagem: 0,
+              },
+              filtro_op_padrao: {
+                rodo_ferro: 1,
+                ferro_rodo: 1,
+                rodo_rodo: 1,
+                outros: 0,
+              },
+            },
+          }),
+        }),
+      ]);
+
+      // Converter para JSON
+      const [
+        dataTransito,
+        dataFilaDescarga,
+        dataFilaCarga,
+        dataPatioDesc,
+        dataPatioCarga,
+      ] = await Promise.all([
+        responseTransito.json(),
+        responseFilaDescarga.json(),
+        responseFilaCarga.json(),
+        responsePatioDesc.json(),
+        responsePatioCarga.json(),
+      ]);
+
+      // 1. Em Trânsito (já existente)
       const transitoVeiculos =
-        result.dados?.listaTransito?.transitoVeiculos || [];
-
+        dataTransito.dados?.listaTransito?.transitoVeiculos || [];
       const totalEmTransito = transitoVeiculos.reduce(
         (acc, item) => acc + (item.t_veiculos || 0),
         0
       );
 
+      // 2. Fila de Descarga
+      const filaDescargaVeiculos =
+        dataFilaDescarga.dados?.listaFilaDescarga?.filaDescargaVeiculos || [];
+
+      const filaDescarga = filaDescargaVeiculos.reduce(
+        (acc, item) => acc + (item.fd_veiculos || 0),
+        0
+      );
+
+      // 3. Fila de Carga
+      const filaCargaVeiculos =
+        dataFilaCarga.dados?.listaFilaCarga?.filaCargaVeiculos || [];
+
+      const filaCarga = filaCargaVeiculos.reduce(
+        (acc, item) => acc + (item.fc_veiculos || 0),
+        0
+      );
+
+      // 4. Pátio Descarregando
+      const patioDescargaVeiculos =
+        dataPatioDesc.dados?.listaPatioDescarga?.patioDescargaVeiculos || [];
+
+      const patioDescarregando = patioDescargaVeiculos.reduce(
+        (acc, item) => acc + (item.pd_veiculos || 0),
+        0
+      );
+
+      // 5. Pátio Carregando
+      const patioCargaVeiculos =
+        dataPatioCarga.dados?.listaPatioCarga?.patioCargaVeiculos || [];
+
+      const patioCarregando = patioCargaVeiculos.reduce(
+        (acc, item) => acc + (item.pc_veiculos || 0),
+        0
+      );
+
+      // 6 e 7. Descargas e Cargas Hoje
+      const responseMonitor = await fetch(
+        `${API_CONFIG.BASE_URL}/d_monitor.php`,
+        {
+          method: "POST",
+          headers: {
+            token: token,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            AttApi: {
+              tipoOperacao: "d_monitor",
+              filtro_filial: filial,
+              filtro_servico: {
+                armazenagem: 1,
+                transbordo: 1,
+                pesagem: 0,
+              },
+              filtro_data_inicio: new Date().toISOString().split("T")[0], // Hoje
+              filtro_data_fim: new Date().toISOString().split("T")[0], // Hoje
+              filtro_acumulador: {
+                dia: 1,
+                mes: 0,
+                ano: 0,
+              },
+            },
+          }),
+        }
+      );
+
+      const dataMonitor = await responseMonitor.json();
+
+      const descargasHoje =
+        dataMonitor.dados?.total_descargas ||
+        dataMonitor.dados?.descargas_hoje ||
+        dataMonitor.descargas ||
+        0;
+
+      const cargasHoje =
+        dataMonitor.dados?.total_cargas ||
+        dataMonitor.dados?.cargas_hoje ||
+        dataMonitor.cargas ||
+        0;
+
       const newData = {
         emTransito: totalEmTransito,
-        filaDescarga: 0,
-        filaCarga: Math.floor(Math.random() * 20),
-        patioDescarregando: Math.floor(Math.random() * 15),
-        patioCarregando: Math.floor(Math.random() * 12),
-        descargasHoje: Math.floor(Math.random() * 100),
-        cargasHoje: Math.floor(Math.random() * 80),
+        filaDescarga: filaDescarga,
+        filaCarga: filaCarga,
+        patioDescarregando: patioDescarregando,
+        patioCarregando: patioCarregando,
+        descargasHoje: descargasHoje,
+        cargasHoje: cargasHoje,
       };
 
+      // Atualizar estados
       setData(newData);
       setLastUpdate(new Date());
 
+      // Salvar em cache
       await AsyncStorage.setItem(
         "transportCache",
         JSON.stringify({ data: newData, timestamp: Date.now() })
       );
     } catch (error) {
-      console.log("Erro ao buscar dados:", error);
+      console.error("Erro ao buscar dados:", error);
+
+      // Tentar usar cache em caso de erro
+      try {
+        const cached = await AsyncStorage.getItem("transportCache");
+        if (cached) {
+          const { data: cachedData } = JSON.parse(cached);
+          setData(cachedData);
+          console.log("Usando dados do cache devido a erro");
+        }
+      } catch (cacheError) {
+        console.error("Erro ao recuperar cache:", cacheError);
+      }
     } finally {
       setLoading(false);
     }
@@ -327,7 +537,6 @@ const useTransportData = (filial) => {
   return { data, loading, fetchData, lastUpdate };
 };
 
-// Componente Principal
 const HomeScreen = ({ navigation }) => {
   const [username, setUsername] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -338,11 +547,9 @@ const HomeScreen = ({ navigation }) => {
   useEffect(() => {
     fetchData();
   }, [selectedFilial]);
-  // Animações
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Carregar dados iniciais
     loadUserData();
     fetchData();
 
@@ -375,7 +582,6 @@ const HomeScreen = ({ navigation }) => {
     setRefreshing(false);
   }, [fetchData]);
 
-  // Cards de status do transporte
   const transportCards = [
     {
       id: "transito",
@@ -448,7 +654,7 @@ const HomeScreen = ({ navigation }) => {
           </TouchableOpacity>
 
           <View style={styles.headerCenter}>
-            <Text style={styles.headerTitle}>ATT Monitor</Text>
+            <Text style={styles.headerTitle}>Invisi</Text>
             <Text style={styles.headerSubtitle}>Filial: {selectedFilial}</Text>
           </View>
 
