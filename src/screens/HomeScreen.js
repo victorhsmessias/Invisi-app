@@ -27,73 +27,82 @@ const API_CONFIG = {
 };
 
 // Componente de Card de Status Otimizado
-const StatusCard = memo(({ title, value, icon, color, loading, subtitle }) => {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+const StatusCard = memo(
+  ({ title, value, icon, color, loading, subtitle, onPress }) => {
+    const scaleAnim = useRef(new Animated.Value(1)).current;
 
-  const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 0.98,
-      useNativeDriver: true,
-    }).start();
-  };
+    const handlePressIn = () => {
+      Animated.spring(scaleAnim, {
+        toValue: 0.98,
+        useNativeDriver: true,
+      }).start();
+    };
 
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-    }).start();
-  };
+    const handlePressOut = () => {
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+      }).start();
+    };
 
-  const getColorByValue = (val, type) => {
-    if (type === "fila") {
-      if (val > 20) return "#dc3545";
-      if (val > 10) return "#ffc107";
-      return "#28a745";
-    }
-    return color;
-  };
+    const handlePress = () => {
+      if (onPress) {
+        onPress();
+      }
+    };
 
-  const displayColor = getColorByValue(
-    value,
-    title.includes("fila") ? "fila" : "normal"
-  );
+    const getColorByValue = (val, type) => {
+      if (type === "fila") {
+        if (val > 20) return "#dc3545";
+        if (val > 10) return "#ffc107";
+        return "#28a745";
+      }
+      return color;
+    };
 
-  return (
-    <TouchableWithoutFeedback
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-    >
-      <Animated.View
-        style={[
-          styles.statusCard,
-          {
-            transform: [{ scale: scaleAnim }],
-            borderLeftColor: displayColor,
-          },
-        ]}
+    const displayColor = getColorByValue(
+      value,
+      title.includes("fila") ? "fila" : "normal"
+    );
+
+    return (
+      <TouchableWithoutFeedback
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        onPress={handlePress}
       >
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardIcon}>{icon}</Text>
-          <View style={styles.cardContent}>
-            {loading ? (
-              <ActivityIndicator size="small" color={displayColor} />
-            ) : (
-              <>
-                <Text style={[styles.cardValue, { color: displayColor }]}>
-                  {value}
-                </Text>
-                {subtitle && (
-                  <Text style={styles.cardSubtitle}>{subtitle}</Text>
-                )}
-              </>
-            )}
-            <Text style={styles.cardTitle}>{title}</Text>
+        <Animated.View
+          style={[
+            styles.statusCard,
+            {
+              transform: [{ scale: scaleAnim }],
+              borderLeftColor: displayColor,
+            },
+          ]}
+        >
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardIcon}>{icon}</Text>
+            <View style={styles.cardContent}>
+              {loading ? (
+                <ActivityIndicator size="small" color={displayColor} />
+              ) : (
+                <>
+                  <Text style={[styles.cardValue, { color: displayColor }]}>
+                    {value}
+                  </Text>
+                  {subtitle && (
+                    <Text style={styles.cardSubtitle}>{subtitle}</Text>
+                  )}
+                </>
+              )}
+              <Text style={styles.cardTitle}>{title}</Text>
+            </View>
           </View>
-        </View>
-      </Animated.View>
-    </TouchableWithoutFeedback>
-  );
-});
+        </Animated.View>
+      </TouchableWithoutFeedback>
+    );
+  }
+);
 
 // Menu Lateral (Drawer)
 const SideMenu = memo(({ visible, onClose, navigation, username }) => {
@@ -109,13 +118,6 @@ const SideMenu = memo(({ visible, onClose, navigation, username }) => {
 
   const menuItems = [
     {
-      id: "monitor",
-      title: "Monitor",
-      icon: "📊",
-      screen: "Monitor",
-      description: "Visualização em tempo real",
-    },
-    {
       id: "contratos",
       title: "Contratos",
       icon: "📋",
@@ -125,13 +127,6 @@ const SideMenu = memo(({ visible, onClose, navigation, username }) => {
     {
       id: "divider",
       isDivider: true,
-    },
-    {
-      id: "config",
-      title: "Configurações",
-      icon: "⚙️",
-      screen: null,
-      description: "Preferências do sistema",
     },
     {
       id: "logout",
@@ -463,15 +458,21 @@ const useTransportData = (filial) => {
           },
           body: JSON.stringify({
             AttApi: {
-              tipoOperacao: "d_monitor",
+              tipoOperacao: "monitor",
               filtro_filial: filial,
               filtro_servico: {
                 armazenagem: 1,
                 transbordo: 1,
                 pesagem: 0,
               },
-              filtro_data_inicio: new Date().toISOString().split("T")[0], // Hoje
-              filtro_data_fim: new Date().toISOString().split("T")[0], // Hoje
+              filtro_op_padrao: {
+                rodo_ferro: 1,
+                ferro_rodo: 1,
+                rodo_rodo: 1,
+                outros: 0,
+              },
+              filtro_data_inicio: new Date().toISOString().split("T")[0],
+              filtro_data_fim: new Date().toISOString().split("T")[0],
               filtro_acumulador: {
                 dia: 1,
                 mes: 0,
@@ -524,7 +525,6 @@ const useTransportData = (filial) => {
         if (cached) {
           const { data: cachedData } = JSON.parse(cached);
           setData(cachedData);
-          console.log("Usando dados do cache devido a erro");
         }
       } catch (cacheError) {
         console.error("Erro ao recuperar cache:", cacheError);
@@ -590,6 +590,8 @@ const HomeScreen = ({ navigation }) => {
       icon: "🚛",
       color: "#ffc107",
       subtitle: "veículos",
+      onPress: () =>
+        navigation.navigate("Transito", { filial: selectedFilial }),
     },
     {
       id: "filaDescarga",
@@ -598,6 +600,8 @@ const HomeScreen = ({ navigation }) => {
       icon: "⏳",
       color: "#17a2b8",
       subtitle: "aguardando",
+      onPress: () =>
+        navigation.navigate("FilaDescarga", { filial: selectedFilial }),
     },
     {
       id: "filaCarga",
@@ -606,6 +610,8 @@ const HomeScreen = ({ navigation }) => {
       icon: "⏰",
       color: "#fd7e14",
       subtitle: "aguardando",
+      onPress: () =>
+        navigation.navigate("FilaCarga", { filial: selectedFilial }),
     },
     {
       id: "patioDescarregando",
@@ -614,6 +620,8 @@ const HomeScreen = ({ navigation }) => {
       icon: "📦",
       color: "#6f42c1",
       subtitle: "em operação",
+      onPress: () =>
+        navigation.navigate("PatioDescarga", { filial: selectedFilial }),
     },
     {
       id: "patioCarregando",
@@ -622,6 +630,8 @@ const HomeScreen = ({ navigation }) => {
       icon: "🏗️",
       color: "#20c997",
       subtitle: "em operação",
+      onPress: () =>
+        navigation.navigate("PatioCarga", { filial: selectedFilial }),
     },
     {
       id: "descargasHoje",
@@ -727,35 +737,9 @@ const HomeScreen = ({ navigation }) => {
                 color={card.color}
                 subtitle={card.subtitle}
                 loading={loading}
+                onPress={card.onPress}
               />
             ))}
-          </View>
-
-          {/* Resumo Rápido */}
-          <View style={styles.summaryContainer}>
-            <Text style={styles.summaryTitle}>Resumo do Dia</Text>
-            <View style={styles.summaryRow}>
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryValue}>
-                  {data.emTransito + data.filaDescarga + data.filaCarga}
-                </Text>
-                <Text style={styles.summaryLabel}>Total Aguardando</Text>
-              </View>
-              <View style={styles.summaryDivider} />
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryValue}>
-                  {data.patioDescarregando + data.patioCarregando}
-                </Text>
-                <Text style={styles.summaryLabel}>Em Operação</Text>
-              </View>
-              <View style={styles.summaryDivider} />
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryValue}>
-                  {data.descargasHoje + data.cargasHoje}
-                </Text>
-                <Text style={styles.summaryLabel}>Total Concluído</Text>
-              </View>
-            </View>
           </View>
         </ScrollView>
       </Animated.View>
