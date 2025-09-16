@@ -8,8 +8,10 @@ import HomeScreen from "./src/screens/HomeScreen";
 import TransitoScreen from "./src/screens/TransitoScreen";
 import FilaDescargaScreen from "./src/screens/FilaDescargaScreen";
 import FilaCargaScreen from "./src/screens/FilaCargaScreen";
-import PatioDescargaScreen from "./src/screens/PatioDescarga";
+import PatioDescargaScreen from "./src/screens/PatioDescargaScreen";
 import PatioCargaScreen from "./src/screens/PatioCargaScreen";
+import CargasHojeScreen from "./src/screens/CargasHojeScreen";
+import DescargasHojeScreen from "./src/screens/DescargasHojeScreen";
 
 const Stack = createStackNavigator();
 
@@ -44,6 +46,16 @@ export default function App() {
           headerShown: false,
         }}
       >
+        <Stack.Screen
+          name="CargasHoje"
+          component={CargasHojeScreen}
+          options={{ title: "Cargas de Hoje" }}
+        />
+        <Stack.Screen
+          name="DescargasHoje"
+          component={DescargasHojeScreen}
+          options={{ title: "Descargas de Hoje" }}
+        />
         <Stack.Screen
           name="Transito"
           component={TransitoScreen}

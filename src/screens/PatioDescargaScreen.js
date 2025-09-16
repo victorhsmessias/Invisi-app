@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
   Dimensions,
   FlatList,
-  ScrollView,
   Modal,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -37,66 +36,66 @@ const SERVICO_OPTIONS = [
 ];
 
 const PatioDescargaScreen = ({ navigation, route }) => {
-  const [selectedFilial, setSelectedFilial] = useState(
-    route.params?.filial || "LDA"
-  );
-  const [selectedOpPadrao, setSelectedOpPadrao] = useState([
-    "rodo_ferro",
-    "ferro_rodo",
-    "rodo_rodo",
-  ]);
-  const [selectedServicos, setSelectedServicos] = useState([
-    "armazenagem",
-    "transbordo",
-  ]);
-  const [patioDescargaData, setPatioDescargaData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState(null);
-  const [totalVeiculos, setTotalVeiculos] = useState(0);
-  const [totalPeso, setTotalPeso] = useState(0);
-  const [filtersVisible, setFiltersVisible] = useState(false);
+  const [state, setState] = useState({
+    selectedFilial: route.params?.filial || "LDA",
+    selectedOpPadrao: ["rodo_ferro", "ferro_rodo", "rodo_rodo"],
+    selectedServicos: ["armazenagem", "transbordo"],
+    patioDescargaData: [],
+    loading: false,
+    refreshing: false,
+    lastUpdate: null,
+    totalVeiculos: 0,
+    totalPeso: 0,
+    filtersVisible: false,
+    errorMessage: "",
+  });
+
+  // Atualizar apenas um campo do estado
+  const updateState = (key, value) => {
+    setState((prev) => ({ ...prev, [key]: value }));
+  };
 
   const toggleOpPadraoFilter = (filterKey) => {
-    if (selectedOpPadrao.includes(filterKey)) {
-      setSelectedOpPadrao(
-        selectedOpPadrao.filter((item) => item !== filterKey)
-      );
-    } else {
-      setSelectedOpPadrao([...selectedOpPadrao, filterKey]);
-    }
+    setState((prev) => {
+      const newOpPadrao = prev.selectedOpPadrao.includes(filterKey)
+        ? prev.selectedOpPadrao.filter((item) => item !== filterKey)
+        : [...prev.selectedOpPadrao, filterKey];
+
+      return { ...prev, selectedOpPadrao: newOpPadrao };
+    });
   };
 
   const toggleServicoFilter = (filterKey) => {
-    if (selectedServicos.includes(filterKey)) {
-      setSelectedServicos(
-        selectedServicos.filter((item) => item !== filterKey)
-      );
-    } else {
-      setSelectedServicos([...selectedServicos, filterKey]);
-    }
+    setState((prev) => {
+      const newServicos = prev.selectedServicos.includes(filterKey)
+        ? prev.selectedServicos.filter((item) => item !== filterKey)
+        : [...prev.selectedServicos, filterKey];
+
+      return { ...prev, selectedServicos: newServicos };
+    });
   };
 
-  const fetchPatioDescargaData = async () => {
+  const fetchPatioDescargaData = useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem("userToken");
       if (!token) return;
 
-      setLoading(true);
+      updateState("loading", true);
+      updateState("errorMessage", "");
 
       // Preparar o filtro de operação padrão baseado na seleção
       const filtroOpPadrao = {
-        rodo_ferro: selectedOpPadrao.includes("rodo_ferro") ? 1 : 0,
-        ferro_rodo: selectedOpPadrao.includes("ferro_rodo") ? 1 : 0,
-        rodo_rodo: selectedOpPadrao.includes("rodo_rodo") ? 1 : 0,
-        outros: selectedOpPadrao.includes("outros") ? 1 : 0,
+        rodo_ferro: state.selectedOpPadrao.includes("rodo_ferro") ? 1 : 0,
+        ferro_rodo: state.selectedOpPadrao.includes("ferro_rodo") ? 1 : 0,
+        rodo_rodo: state.selectedOpPadrao.includes("rodo_rodo") ? 1 : 0,
+        outros: state.selectedOpPadrao.includes("outros") ? 1 : 0,
       };
 
       // Preparar o filtro de serviço baseado na seleção
       const filtroServico = {
-        armazenagem: selectedServicos.includes("armazenagem") ? 1 : 0,
-        transbordo: selectedServicos.includes("transbordo") ? 1 : 0,
-        pesagem: selectedServicos.includes("pesagem") ? 1 : 0,
+        armazenagem: state.selectedServicos.includes("armazenagem") ? 1 : 0,
+        transbordo: state.selectedServicos.includes("transbordo") ? 1 : 0,
+        pesagem: state.selectedServicos.includes("pesagem") ? 1 : 0,
       };
 
       const response = await fetch(`${API_CONFIG.BASE_URL}/monitor.php`, {
@@ -108,7 +107,7 @@ const PatioDescargaScreen = ({ navigation, route }) => {
         body: JSON.stringify({
           AttApi: {
             tipoOperacao: "monitor_patio_desc",
-            filtro_filial: selectedFilial,
+            filtro_filial: state.selectedFilial,
             filtro_servico: filtroServico,
             filtro_op_padrao: filtroOpPadrao,
           },
@@ -117,10 +116,21 @@ const PatioDescargaScreen = ({ navigation, route }) => {
 
       const data = await response.json();
 
-      if (data.dados?.listaPatioDescarga?.patioDescargaVeiculos) {
+      // Verificar se há erro de "não encontrado"
+      if (
+        data.mensagemRetorno?.codigo === "ERRO" &&
+        data.mensagemRetorno?.descricao.includes("Nao tem veiculos")
+      ) {
+        updateState("patioDescargaData", []);
+        updateState("totalVeiculos", 0);
+        updateState("totalPeso", 0);
+        updateState(
+          "errorMessage",
+          data.mensagemRetorno.mensagem || "Nenhum veículo encontrado"
+        );
+      } else if (data.dados?.listaPatioDescarga?.patioDescargaVeiculos) {
         const patioDescargaData =
           data.dados.listaPatioDescarga.patioDescargaVeiculos;
-        setPatioDescargaData(patioDescargaData);
 
         // Calcular totais
         const totalV = patioDescargaData.reduce(
@@ -132,47 +142,51 @@ const PatioDescargaScreen = ({ navigation, route }) => {
           0
         );
 
-        setTotalVeiculos(totalV);
-        setTotalPeso(totalP);
+        updateState("patioDescargaData", patioDescargaData);
+        updateState("totalVeiculos", totalV);
+        updateState("totalPeso", totalP);
+        updateState("errorMessage", "");
       } else {
-        setPatioDescargaData([]);
-        setTotalVeiculos(0);
-        setTotalPeso(0);
+        updateState("patioDescargaData", []);
+        updateState("totalVeiculos", 0);
+        updateState("totalPeso", 0);
+        updateState("errorMessage", "Nenhum dado disponível");
       }
 
-      setLastUpdate(new Date());
+      updateState("lastUpdate", new Date());
     } catch (error) {
       console.error("Erro ao buscar dados do pátio de descarga:", error);
+      updateState("errorMessage", "Erro ao carregar dados");
     } finally {
-      setLoading(false);
+      updateState("loading", false);
     }
-  };
+  }, [state.selectedFilial, state.selectedOpPadrao, state.selectedServicos]);
 
   useFocusEffect(
     useCallback(() => {
       fetchPatioDescargaData();
-    }, [selectedFilial, selectedOpPadrao, selectedServicos])
+    }, [fetchPatioDescargaData])
   );
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
+    updateState("refreshing", true);
     await fetchPatioDescargaData();
-    setRefreshing(false);
-  }, [selectedFilial, selectedOpPadrao, selectedServicos]);
+    updateState("refreshing", false);
+  }, [fetchPatioDescargaData]);
 
   const formatPeso = (peso) => {
-    if (peso >= 1000000) {
-      return (peso / 1000000).toFixed(2) + "T";
-    } else if (peso >= 1000) {
-      return (peso / 1000).toFixed(1) + "K";
+    if (!peso || isNaN(peso)) return "0 kg";
+
+    if (peso >= 1000) {
+      return (peso / 1000).toFixed(2) + " T";
     }
-    return peso + "Kg";
+    return peso + " kg";
   };
 
   const renderPatioDescargaItem = ({ item }) => (
     <View style={styles.patioCard}>
       <View style={styles.cardHeader}>
-        <Text style={styles.filaText}>Fila {item.pd_fila}</Text>
+        <Text style={styles.filaText}>{item.pd_grupo || "Não informado"}</Text>
         <View style={styles.veiculosBadge}>
           <Text style={styles.veiculosText}>{item.pd_veiculos} veíc.</Text>
         </View>
@@ -180,9 +194,9 @@ const PatioDescargaScreen = ({ navigation, route }) => {
 
       <View style={styles.cardContent}>
         <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Grupo:</Text>
+          <Text style={styles.infoLabel}>Fila:</Text>
           <Text style={styles.infoValue} numberOfLines={1} ellipsizeMode="tail">
-            {item.pd_grupo || "Não informado"}
+            {item.pd_fila || "Não informado"}
           </Text>
         </View>
 
@@ -195,7 +209,7 @@ const PatioDescargaScreen = ({ navigation, route }) => {
 
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Peso:</Text>
-          <Text style={styles.infoValue}>{formatPeso(item.pd_peso || 0)}</Text>
+          <Text style={styles.infoValue}>{formatPeso(item.pd_peso)}</Text>
         </View>
       </View>
     </View>
@@ -203,28 +217,29 @@ const PatioDescargaScreen = ({ navigation, route }) => {
 
   const renderHeader = () => (
     <View>
-      {/* Última atualização */}
-      {lastUpdate && (
+      {state.lastUpdate && (
         <View style={styles.updateContainer}>
           <Text style={styles.updateText}>
-            Atualizado: {lastUpdate.toLocaleTimeString("pt-BR").substring(0, 5)}
+            Atualizado:{" "}
+            {state.lastUpdate.toLocaleTimeString("pt-BR").substring(0, 5)}
           </Text>
         </View>
       )}
-      {/* Resumo não fixo */}
       <View style={styles.summaryContainer}>
         <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{totalVeiculos}</Text>
+          <Text style={styles.summaryValue}>{state.totalVeiculos}</Text>
           <Text style={styles.summaryLabel}>Veículos</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{formatPeso(totalPeso)}</Text>
+          <Text style={styles.summaryValue}>{formatPeso(state.totalPeso)}</Text>
           <Text style={styles.summaryLabel}>Peso</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{patioDescargaData.length}</Text>
+          <Text style={styles.summaryValue}>
+            {state.patioDescargaData.length}
+          </Text>
           <Text style={styles.summaryLabel}>Filas</Text>
         </View>
       </View>
@@ -233,7 +248,6 @@ const PatioDescargaScreen = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header fixo */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -244,31 +258,38 @@ const PatioDescargaScreen = ({ navigation, route }) => {
 
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>Pátio de Descarga</Text>
-          <Text style={styles.headerSubtitle}>Filial: {selectedFilial}</Text>
+          <Text style={styles.headerSubtitle}>
+            Filial: {state.selectedFilial}
+          </Text>
         </View>
 
         <TouchableOpacity
           style={styles.filterButton}
-          onPress={() => setFiltersVisible(true)}
+          onPress={() => updateState("filtersVisible", true)}
         >
           <Text style={styles.filterIcon}>🔎</Text>
+          {(state.selectedOpPadrao.length < OP_PADRAO_OPTIONS.length ||
+            state.selectedServicos.length < SERVICO_OPTIONS.length) && (
+            <View style={styles.filterBadge}>
+              <Text style={styles.filterBadgeText}>!</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
-      {/* Lista de Veículos no Pátio de Descarga com resumo no header */}
-      {loading && patioDescargaData.length === 0 ? (
+      {state.loading && state.patioDescargaData.length === 0 ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
           <Text style={styles.loadingText}>Carregando dados...</Text>
         </View>
       ) : (
         <FlatList
-          data={patioDescargaData}
+          data={state.patioDescargaData}
           renderItem={renderPatioDescargaItem}
           keyExtractor={(item, index) => index.toString()}
           refreshControl={
             <RefreshControl
-              refreshing={refreshing}
+              refreshing={state.refreshing}
               onRefresh={onRefresh}
               colors={["#007AFF"]}
               tintColor="#007AFF"
@@ -280,7 +301,7 @@ const PatioDescargaScreen = ({ navigation, route }) => {
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyIcon}>📦</Text>
               <Text style={styles.emptyText}>
-                Nenhum veículo no pátio de descarga
+                {state.errorMessage || "Nenhum veículo no pátio de descarga"}
               </Text>
               <Text style={styles.emptySubtext}>
                 Verifique os filtros aplicados
@@ -290,86 +311,84 @@ const PatioDescargaScreen = ({ navigation, route }) => {
         />
       )}
 
-      {/* Modal de Filtros */}
       <Modal
-        visible={filtersVisible}
+        visible={state.filtersVisible}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setFiltersVisible(false)}
+        onRequestClose={() => updateState("filtersVisible", false)}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Filtros</Text>
               <TouchableOpacity
-                onPress={() => setFiltersVisible(false)}
+                onPress={() => updateState("filtersVisible", false)}
                 style={styles.modalCloseButton}
               >
                 <Text style={styles.modalCloseText}>✕</Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView>
-              {/* Filtros de Serviço */}
-              <View style={styles.filterGroup}>
-                <Text style={styles.filterGroupTitle}>Tipos de Serviço</Text>
-                <View style={styles.filterOptions}>
-                  {SERVICO_OPTIONS.map((option) => (
-                    <TouchableOpacity
-                      key={option.key}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterGroupTitle}>Tipos de Serviço</Text>
+              <View style={styles.filterOptions}>
+                {SERVICO_OPTIONS.map((option) => (
+                  <TouchableOpacity
+                    key={option.key}
+                    style={[
+                      styles.filterOptionButton,
+                      state.selectedServicos.includes(option.key) &&
+                        styles.filterOptionButtonActive,
+                    ]}
+                    onPress={() => toggleServicoFilter(option.key)}
+                  >
+                    <Text
                       style={[
-                        styles.filterOptionButton,
-                        selectedServicos.includes(option.key) &&
-                          styles.filterOptionButtonActive,
+                        styles.filterOptionText,
+                        state.selectedServicos.includes(option.key) &&
+                          styles.filterOptionTextActive,
                       ]}
-                      onPress={() => toggleServicoFilter(option.key)}
                     >
-                      <Text
-                        style={[
-                          styles.filterOptionText,
-                          selectedServicos.includes(option.key) &&
-                            styles.filterOptionTextActive,
-                        ]}
-                      >
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
+            </View>
 
-              {/* Filtros de Operação Padrão */}
-              <View style={styles.filterGroup}>
-                <Text style={styles.filterGroupTitle}>Tipos de Operação</Text>
-                <View style={styles.filterOptions}>
-                  {OP_PADRAO_OPTIONS.map((option) => (
-                    <TouchableOpacity
-                      key={option.key}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterGroupTitle}>Tipos de Operação</Text>
+              <View style={styles.filterOptions}>
+                {OP_PADRAO_OPTIONS.map((option) => (
+                  <TouchableOpacity
+                    key={option.key}
+                    style={[
+                      styles.filterOptionButton,
+                      state.selectedOpPadrao.includes(option.key) &&
+                        styles.filterOptionButtonActive,
+                    ]}
+                    onPress={() => toggleOpPadraoFilter(option.key)}
+                  >
+                    <Text
                       style={[
-                        styles.filterOptionButton,
-                        selectedOpPadrao.includes(option.key) &&
-                          styles.filterOptionButtonActive,
+                        styles.filterOptionText,
+                        state.selectedOpPadrao.includes(option.key) &&
+                          styles.filterOptionTextActive,
                       ]}
-                      onPress={() => toggleOpPadraoFilter(option.key)}
                     >
-                      <Text
-                        style={[
-                          styles.filterOptionText,
-                          selectedOpPadrao.includes(option.key) &&
-                            styles.filterOptionTextActive,
-                        ]}
-                      >
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-            </ScrollView>
+            </View>
 
             <TouchableOpacity
               style={styles.applyFiltersButton}
-              onPress={() => setFiltersVisible(false)}
+              onPress={() => {
+                updateState("filtersVisible", false);
+                fetchPatioDescargaData();
+              }}
             >
               <Text style={styles.applyFiltersText}>Aplicar Filtros</Text>
             </TouchableOpacity>
@@ -393,6 +412,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#e0e0e0",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
   backButton: {
     padding: 8,
@@ -535,6 +559,9 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#ffffff",
   },
+  cardContent: {
+    marginTop: 5,
+  },
   infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -573,7 +600,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 8,
   },
-  // Estilos para o modal de filtros
   modalContainer: {
     flex: 1,
     justifyContent: "center",
@@ -596,7 +622,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#333",
+    color: "##333",
   },
   modalCloseButton: {
     padding: 5,
@@ -605,7 +631,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: "#666",
   },
-  filterGroup: {
+  filterSection: {
     marginBottom: 20,
   },
   filterGroupTitle: {

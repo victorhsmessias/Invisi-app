@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
   Dimensions,
   FlatList,
-  ScrollView,
   Modal,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -37,66 +36,66 @@ const SERVICO_OPTIONS = [
 ];
 
 const TransitoScreen = ({ navigation, route }) => {
-  const [selectedFilial, setSelectedFilial] = useState(
-    route.params?.filial || "LDA"
-  );
-  const [selectedOpPadrao, setSelectedOpPadrao] = useState([
-    "rodo_ferro",
-    "ferro_rodo",
-    "rodo_rodo",
-  ]);
-  const [selectedServicos, setSelectedServicos] = useState([
-    "armazenagem",
-    "transbordo",
-  ]);
-  const [transitoData, setTransitoData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState(null);
-  const [totalVeiculos, setTotalVeiculos] = useState(0);
-  const [totalPeso, setTotalPeso] = useState(0);
-  const [filtersVisible, setFiltersVisible] = useState(false);
+  const [state, setState] = useState({
+    selectedFilial: route.params?.filial || "LDA",
+    selectedOpPadrao: ["rodo_ferro", "ferro_rodo", "rodo_rodo"],
+    selectedServicos: ["armazenagem", "transbordo"],
+    transitoData: [],
+    loading: false,
+    refreshing: false,
+    lastUpdate: null,
+    totalVeiculos: 0,
+    totalPeso: 0,
+    filtersVisible: false,
+    errorMessage: "",
+  });
+
+  // Atualizar apenas um campo do estado
+  const updateState = (key, value) => {
+    setState((prev) => ({ ...prev, [key]: value }));
+  };
 
   const toggleOpPadraoFilter = (filterKey) => {
-    if (selectedOpPadrao.includes(filterKey)) {
-      setSelectedOpPadrao(
-        selectedOpPadrao.filter((item) => item !== filterKey)
-      );
-    } else {
-      setSelectedOpPadrao([...selectedOpPadrao, filterKey]);
-    }
+    setState((prev) => {
+      const newOpPadrao = prev.selectedOpPadrao.includes(filterKey)
+        ? prev.selectedOpPadrao.filter((item) => item !== filterKey)
+        : [...prev.selectedOpPadrao, filterKey];
+
+      return { ...prev, selectedOpPadrao: newOpPadrao };
+    });
   };
 
   const toggleServicoFilter = (filterKey) => {
-    if (selectedServicos.includes(filterKey)) {
-      setSelectedServicos(
-        selectedServicos.filter((item) => item !== filterKey)
-      );
-    } else {
-      setSelectedServicos([...selectedServicos, filterKey]);
-    }
+    setState((prev) => {
+      const newServicos = prev.selectedServicos.includes(filterKey)
+        ? prev.selectedServicos.filter((item) => item !== filterKey)
+        : [...prev.selectedServicos, filterKey];
+
+      return { ...prev, selectedServicos: newServicos };
+    });
   };
 
-  const fetchTransitoData = async () => {
+  const fetchTransitoData = useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem("userToken");
       if (!token) return;
 
-      setLoading(true);
+      updateState("loading", true);
+      updateState("errorMessage", "");
 
       // Preparar o filtro de operação padrão baseado na seleção
       const filtroOpPadrao = {
-        rodo_ferro: selectedOpPadrao.includes("rodo_ferro") ? 1 : 0,
-        ferro_rodo: selectedOpPadrao.includes("ferro_rodo") ? 1 : 0,
-        rodo_rodo: selectedOpPadrao.includes("rodo_rodo") ? 1 : 0,
-        outros: selectedOpPadrao.includes("outros") ? 1 : 0,
+        rodo_ferro: state.selectedOpPadrao.includes("rodo_ferro") ? 1 : 0,
+        ferro_rodo: state.selectedOpPadrao.includes("ferro_rodo") ? 1 : 0,
+        rodo_rodo: state.selectedOpPadrao.includes("rodo_rodo") ? 1 : 0,
+        outros: state.selectedOpPadrao.includes("outros") ? 1 : 0,
       };
 
       // Preparar o filtro de serviço baseado na seleção
       const filtroServico = {
-        armazenagem: selectedServicos.includes("armazenagem") ? 1 : 0,
-        transbordo: selectedServicos.includes("transbordo") ? 1 : 0,
-        pesagem: selectedServicos.includes("pesagem") ? 1 : 0,
+        armazenagem: state.selectedServicos.includes("armazenagem") ? 1 : 0,
+        transbordo: state.selectedServicos.includes("transbordo") ? 1 : 0,
+        pesagem: state.selectedServicos.includes("pesagem") ? 1 : 0,
       };
 
       const response = await fetch(`${API_CONFIG.BASE_URL}/monitor.php`, {
@@ -108,7 +107,7 @@ const TransitoScreen = ({ navigation, route }) => {
         body: JSON.stringify({
           AttApi: {
             tipoOperacao: "monitor_transito",
-            filtro_filial: selectedFilial,
+            filtro_filial: state.selectedFilial,
             filtro_servico: filtroServico,
             filtro_op_padrao: filtroOpPadrao,
           },
@@ -117,9 +116,20 @@ const TransitoScreen = ({ navigation, route }) => {
 
       const data = await response.json();
 
-      if (data.dados?.listaTransito?.transitoVeiculos) {
+      // Verificar se há erro de "não encontrado"
+      if (
+        data.mensagemRetorno?.codigo === "ERRO" &&
+        data.mensagemRetorno?.descricao.includes("Nao tem veiculos")
+      ) {
+        updateState("transitoData", []);
+        updateState("totalVeiculos", 0);
+        updateState("totalPeso", 0);
+        updateState(
+          "errorMessage",
+          data.mensagemRetorno.mensagem || "Nenhum veículo encontrado"
+        );
+      } else if (data.dados?.listaTransito?.transitoVeiculos) {
         const transitoData = data.dados.listaTransito.transitoVeiculos;
-        setTransitoData(transitoData);
 
         // Calcular totais
         const totalV = transitoData.reduce(
@@ -131,47 +141,61 @@ const TransitoScreen = ({ navigation, route }) => {
           0
         );
 
-        setTotalVeiculos(totalV);
-        setTotalPeso(totalP);
+        updateState("transitoData", transitoData);
+        updateState("totalVeiculos", totalV);
+        updateState("totalPeso", totalP);
+        updateState("errorMessage", "");
       } else {
-        setTransitoData([]);
-        setTotalVeiculos(0);
-        setTotalPeso(0);
+        updateState("transitoData", []);
+        updateState("totalVeiculos", 0);
+        updateState("totalPeso", 0);
+        updateState("errorMessage", "Nenhum dado disponível");
       }
 
-      setLastUpdate(new Date());
+      updateState("lastUpdate", new Date());
     } catch (error) {
       console.error("Erro ao buscar dados de trânsito:", error);
+      updateState("errorMessage", "Erro ao carregar dados");
     } finally {
-      setLoading(false);
+      updateState("loading", false);
     }
-  };
+  }, [state.selectedFilial, state.selectedOpPadrao, state.selectedServicos]);
 
   useFocusEffect(
     useCallback(() => {
       fetchTransitoData();
-    }, [selectedFilial, selectedOpPadrao, selectedServicos])
+    }, [fetchTransitoData])
   );
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
+    updateState("refreshing", true);
     await fetchTransitoData();
-    setRefreshing(false);
-  }, [selectedFilial, selectedOpPadrao, selectedServicos]);
+    updateState("refreshing", false);
+  }, [fetchTransitoData]);
 
   const formatPeso = (peso) => {
-    if (peso >= 1000000) {
-      return (peso / 1000000).toFixed(2) + "T";
-    } else if (peso >= 1000) {
-      return (peso / 1000).toFixed(1) + "K";
+    if (!peso || isNaN(peso)) return "0 kg";
+
+    if (peso >= 1000) {
+      return (peso / 1000).toFixed(2) + " T";
     }
-    return peso + "Kg";
+    return peso + " kg";
+  };
+
+  const formatDateTime = (date, time) => {
+    if (!date || !time) return "N/A";
+
+    try {
+      return time.substring(0, 5);
+    } catch (error) {
+      return `${date} ${time}`;
+    }
   };
 
   const renderTransitoItem = ({ item }) => (
     <View style={styles.transitoCard}>
       <View style={styles.cardHeader}>
-        <Text style={styles.filaText}>Fila {item.t_fila}</Text>
+        <Text style={styles.filaText}>{item.t_grupo || "Não informado"}</Text>
         <View style={styles.veiculosBadge}>
           <Text style={styles.veiculosText}>{item.t_veiculos} veíc.</Text>
         </View>
@@ -179,9 +203,9 @@ const TransitoScreen = ({ navigation, route }) => {
 
       <View style={styles.cardContent}>
         <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Grupo:</Text>
+          <Text style={styles.infoLabel}>Fila:</Text>
           <Text style={styles.infoValue} numberOfLines={1} ellipsizeMode="tail">
-            {item.t_grupo || "Não informado"}
+            {item.t_fila || "Não informado"}
           </Text>
         </View>
 
@@ -194,36 +218,44 @@ const TransitoScreen = ({ navigation, route }) => {
 
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Peso:</Text>
-          <Text style={styles.infoValue}>{formatPeso(item.t_peso || 0)}</Text>
+          <Text style={styles.infoValue}>{formatPeso(item.t_peso)}</Text>
         </View>
+
+        {item.t_data && item.t_hora && (
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Atualizado:</Text>
+            <Text style={styles.infoValue}>
+              {formatDateTime(item.t_data, item.t_hora)}
+            </Text>
+          </View>
+        )}
       </View>
     </View>
   );
 
   const renderHeader = () => (
     <View>
-      {/* Última atualização */}
-      {lastUpdate && (
+      {state.lastUpdate && (
         <View style={styles.updateContainer}>
           <Text style={styles.updateText}>
-            Atualizado: {lastUpdate.toLocaleTimeString("pt-BR").substring(0, 5)}
+            Atualizado:{" "}
+            {state.lastUpdate.toLocaleTimeString("pt-BR").substring(0, 5)}
           </Text>
         </View>
       )}
-      {/* Resumo não fixo */}
       <View style={styles.summaryContainer}>
         <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{totalVeiculos}</Text>
+          <Text style={styles.summaryValue}>{state.totalVeiculos}</Text>
           <Text style={styles.summaryLabel}>Veículos</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{formatPeso(totalPeso)}</Text>
+          <Text style={styles.summaryValue}>{formatPeso(state.totalPeso)}</Text>
           <Text style={styles.summaryLabel}>Peso</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{transitoData.length}</Text>
+          <Text style={styles.summaryValue}>{state.transitoData.length}</Text>
           <Text style={styles.summaryLabel}>Grupos</Text>
         </View>
       </View>
@@ -232,7 +264,6 @@ const TransitoScreen = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header fixo */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -243,31 +274,38 @@ const TransitoScreen = ({ navigation, route }) => {
 
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>Veículos em Trânsito</Text>
-          <Text style={styles.headerSubtitle}>Filial: {selectedFilial}</Text>
+          <Text style={styles.headerSubtitle}>
+            Filial: {state.selectedFilial}
+          </Text>
         </View>
 
         <TouchableOpacity
           style={styles.filterButton}
-          onPress={() => setFiltersVisible(true)}
+          onPress={() => updateState("filtersVisible", true)}
         >
           <Text style={styles.filterIcon}>🔎</Text>
+          {(state.selectedOpPadrao.length < OP_PADRAO_OPTIONS.length ||
+            state.selectedServicos.length < SERVICO_OPTIONS.length) && (
+            <View style={styles.filterBadge}>
+              <Text style={styles.filterBadgeText}>!</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
-      {/* Lista de Veículos em Trânsito com resumo no header */}
-      {loading && transitoData.length === 0 ? (
+      {state.loading && state.transitoData.length === 0 ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
           <Text style={styles.loadingText}>Carregando dados...</Text>
         </View>
       ) : (
         <FlatList
-          data={transitoData}
+          data={state.transitoData}
           renderItem={renderTransitoItem}
           keyExtractor={(item, index) => index.toString()}
           refreshControl={
             <RefreshControl
-              refreshing={refreshing}
+              refreshing={state.refreshing}
               onRefresh={onRefresh}
               colors={["#007AFF"]}
               tintColor="#007AFF"
@@ -278,7 +316,9 @@ const TransitoScreen = ({ navigation, route }) => {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyIcon}>🚛</Text>
-              <Text style={styles.emptyText}>Nenhum veículo em trânsito</Text>
+              <Text style={styles.emptyText}>
+                {state.errorMessage || "Nenhum veículo em trânsito"}
+              </Text>
               <Text style={styles.emptySubtext}>
                 Verifique os filtros aplicados
               </Text>
@@ -287,86 +327,84 @@ const TransitoScreen = ({ navigation, route }) => {
         />
       )}
 
-      {/* Modal de Filtros */}
       <Modal
-        visible={filtersVisible}
+        visible={state.filtersVisible}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setFiltersVisible(false)}
+        onRequestClose={() => updateState("filtersVisible", false)}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Filtros</Text>
               <TouchableOpacity
-                onPress={() => setFiltersVisible(false)}
+                onPress={() => updateState("filtersVisible", false)}
                 style={styles.modalCloseButton}
               >
                 <Text style={styles.modalCloseText}>✕</Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView>
-              {/* Filtros de Serviço */}
-              <View style={styles.filterGroup}>
-                <Text style={styles.filterGroupTitle}>Tipos de Serviço</Text>
-                <View style={styles.filterOptions}>
-                  {SERVICO_OPTIONS.map((option) => (
-                    <TouchableOpacity
-                      key={option.key}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterGroupTitle}>Tipos de Serviço</Text>
+              <View style={styles.filterOptions}>
+                {SERVICO_OPTIONS.map((option) => (
+                  <TouchableOpacity
+                    key={option.key}
+                    style={[
+                      styles.filterOptionButton,
+                      state.selectedServicos.includes(option.key) &&
+                        styles.filterOptionButtonActive,
+                    ]}
+                    onPress={() => toggleServicoFilter(option.key)}
+                  >
+                    <Text
                       style={[
-                        styles.filterOptionButton,
-                        selectedServicos.includes(option.key) &&
-                          styles.filterOptionButtonActive,
+                        styles.filterOptionText,
+                        state.selectedServicos.includes(option.key) &&
+                          styles.filterOptionTextActive,
                       ]}
-                      onPress={() => toggleServicoFilter(option.key)}
                     >
-                      <Text
-                        style={[
-                          styles.filterOptionText,
-                          selectedServicos.includes(option.key) &&
-                            styles.filterOptionTextActive,
-                        ]}
-                      >
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
+            </View>
 
-              {/* Filtros de Operação Padrão */}
-              <View style={styles.filterGroup}>
-                <Text style={styles.filterGroupTitle}>Tipos de Operação</Text>
-                <View style={styles.filterOptions}>
-                  {OP_PADRAO_OPTIONS.map((option) => (
-                    <TouchableOpacity
-                      key={option.key}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterGroupTitle}>Tipos de Operação</Text>
+              <View style={styles.filterOptions}>
+                {OP_PADRAO_OPTIONS.map((option) => (
+                  <TouchableOpacity
+                    key={option.key}
+                    style={[
+                      styles.filterOptionButton,
+                      state.selectedOpPadrao.includes(option.key) &&
+                        styles.filterOptionButtonActive,
+                    ]}
+                    onPress={() => toggleOpPadraoFilter(option.key)}
+                  >
+                    <Text
                       style={[
-                        styles.filterOptionButton,
-                        selectedOpPadrao.includes(option.key) &&
-                          styles.filterOptionButtonActive,
+                        styles.filterOptionText,
+                        state.selectedOpPadrao.includes(option.key) &&
+                          styles.filterOptionTextActive,
                       ]}
-                      onPress={() => toggleOpPadraoFilter(option.key)}
                     >
-                      <Text
-                        style={[
-                          styles.filterOptionText,
-                          selectedOpPadrao.includes(option.key) &&
-                            styles.filterOptionTextActive,
-                        ]}
-                      >
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-            </ScrollView>
+            </View>
 
             <TouchableOpacity
               style={styles.applyFiltersButton}
-              onPress={() => setFiltersVisible(false)}
+              onPress={() => {
+                updateState("filtersVisible", false);
+                fetchTransitoData();
+              }}
             >
               <Text style={styles.applyFiltersText}>Aplicar Filtros</Text>
             </TouchableOpacity>
@@ -390,6 +428,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#e0e0e0",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
   backButton: {
     padding: 8,
@@ -443,7 +486,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginHorizontal: 10,
     borderRadius: 10,
-    shadowColor: "#000",
+    shadowColor: "##000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
@@ -570,7 +613,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 8,
   },
-  // Estilos para o modal de filtros
   modalContainer: {
     flex: 1,
     justifyContent: "center",
@@ -602,7 +644,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: "#666",
   },
-  filterGroup: {
+  filterSection: {
     marginBottom: 20,
   },
   filterGroupTitle: {

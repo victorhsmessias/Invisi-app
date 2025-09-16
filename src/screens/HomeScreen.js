@@ -257,6 +257,8 @@ const useTransportData = (filial) => {
         responseFilaCarga,
         responsePatioDesc,
         responsePatioCarga,
+        responseDescargaHoje,
+        responseCargaHoje,
       ] = await Promise.all([
         // 1. Em Trânsito
         fetch(`${API_CONFIG.BASE_URL}/monitor.php`, {
@@ -386,6 +388,44 @@ const useTransportData = (filial) => {
             },
           }),
         }),
+
+        // 6. Descargas Hoje (trocar ordem)
+        fetch(`${API_CONFIG.BASE_URL}/monitor.php`, {
+          method: "POST",
+          headers: { token: token, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            AttApi: {
+              tipoOperacao: "monitor_descarga", // ← DESCARGAS PRIMEIRO
+              filtro_filial: filial,
+              filtro_servico: { armazenagem: 1, transbordo: 1, pesagem: 0 },
+              filtro_op_padrao: {
+                rodo_ferro: 1,
+                ferro_rodo: 1,
+                rodo_rodo: 1,
+                outros: 0,
+              },
+            },
+          }),
+        }),
+
+        // 7. Cargas Hoje (trocar ordem)
+        fetch(`${API_CONFIG.BASE_URL}/monitor.php`, {
+          method: "POST",
+          headers: { token: token, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            AttApi: {
+              tipoOperacao: "monitor_carga", // ← CARGAS DEPOIS
+              filtro_filial: filial,
+              filtro_servico: { armazenagem: 1, transbordo: 1, pesagem: 0 },
+              filtro_op_padrao: {
+                rodo_ferro: 1,
+                ferro_rodo: 1,
+                rodo_rodo: 1,
+                outros: 0,
+              },
+            },
+          }),
+        }),
       ]);
 
       // Converter para JSON
@@ -395,15 +435,19 @@ const useTransportData = (filial) => {
         dataFilaCarga,
         dataPatioDesc,
         dataPatioCarga,
+        dataDescargaHoje,
+        dataCargaHoje,
       ] = await Promise.all([
         responseTransito.json(),
         responseFilaDescarga.json(),
         responseFilaCarga.json(),
         responsePatioDesc.json(),
         responsePatioCarga.json(),
+        responseDescargaHoje.json(),
+        responseCargaHoje.json(),
       ]);
 
-      // 1. Em Trânsito (já existente)
+      // 1. Em Trânsito
       const transitoVeiculos =
         dataTransito.dados?.listaTransito?.transitoVeiculos || [];
       const totalEmTransito = transitoVeiculos.reduce(
@@ -414,7 +458,6 @@ const useTransportData = (filial) => {
       // 2. Fila de Descarga
       const filaDescargaVeiculos =
         dataFilaDescarga.dados?.listaFilaDescarga?.filaDescargaVeiculos || [];
-
       const filaDescarga = filaDescargaVeiculos.reduce(
         (acc, item) => acc + (item.fd_veiculos || 0),
         0
@@ -423,7 +466,6 @@ const useTransportData = (filial) => {
       // 3. Fila de Carga
       const filaCargaVeiculos =
         dataFilaCarga.dados?.listaFilaCarga?.filaCargaVeiculos || [];
-
       const filaCarga = filaCargaVeiculos.reduce(
         (acc, item) => acc + (item.fc_veiculos || 0),
         0
@@ -432,7 +474,6 @@ const useTransportData = (filial) => {
       // 4. Pátio Descarregando
       const patioDescargaVeiculos =
         dataPatioDesc.dados?.listaPatioDescarga?.patioDescargaVeiculos || [];
-
       const patioDescarregando = patioDescargaVeiculos.reduce(
         (acc, item) => acc + (item.pd_veiculos || 0),
         0
@@ -441,70 +482,35 @@ const useTransportData = (filial) => {
       // 5. Pátio Carregando
       const patioCargaVeiculos =
         dataPatioCarga.dados?.listaPatioCarga?.patioCargaVeiculos || [];
-
       const patioCarregando = patioCargaVeiculos.reduce(
         (acc, item) => acc + (item.pc_veiculos || 0),
         0
       );
 
-      // 6 e 7. Descargas e Cargas Hoje
-      const responseMonitor = await fetch(
-        `${API_CONFIG.BASE_URL}/d_monitor.php`,
-        {
-          method: "POST",
-          headers: {
-            token: token,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            AttApi: {
-              tipoOperacao: "monitor",
-              filtro_filial: filial,
-              filtro_servico: {
-                armazenagem: 1,
-                transbordo: 1,
-                pesagem: 0,
-              },
-              filtro_op_padrao: {
-                rodo_ferro: 1,
-                ferro_rodo: 1,
-                rodo_rodo: 1,
-                outros: 0,
-              },
-              filtro_data_inicio: new Date().toISOString().split("T")[0],
-              filtro_data_fim: new Date().toISOString().split("T")[0],
-              filtro_acumulador: {
-                dia: 1,
-                mes: 0,
-                ano: 0,
-              },
-            },
-          }),
-        }
+      // 6. Descargas Hoje
+      const descargasHojeVeiculos =
+        dataDescargaHoje.dados?.listaDescarga?.DescargaVeiculos || [];
+      const descargasHoje = descargasHojeVeiculos.reduce(
+        (acc, item) => acc + (item.d_veiculos || 0),
+        0
       );
 
-      const dataMonitor = await responseMonitor.json();
-
-      const descargasHoje =
-        dataMonitor.dados?.total_descargas ||
-        dataMonitor.dados?.descargas_hoje ||
-        dataMonitor.descargas ||
-        0;
-
-      const cargasHoje =
-        dataMonitor.dados?.total_cargas ||
-        dataMonitor.dados?.cargas_hoje ||
-        dataMonitor.cargas ||
-        0;
+      // 7. Cargas Hoje
+      const cargasHojeVeiculos =
+        dataCargaHoje.dados?.listaCarga?.CargaVeiculos || [];
+      const cargasHoje = cargasHojeVeiculos.reduce(
+        (acc, item) => acc + (item.cargas_hoje || item.c_veiculos || 0),
+        0
+      );
 
       const newData = {
         emTransito: totalEmTransito,
-        filaDescarga: filaDescarga,
-        filaCarga: filaCarga,
-        patioDescarregando: patioDescarregando,
-        patioCarregando: patioCarregando,
-        descargasHoje: descargasHoje,
-        cargasHoje: cargasHoje,
+        filaDescarga,
+        filaCarga,
+        patioDescarregando,
+        patioCarregando,
+        descargasHoje,
+        cargasHoje,
       };
 
       // Atualizar estados
@@ -640,6 +646,8 @@ const HomeScreen = ({ navigation }) => {
       icon: "✅",
       color: "#28a745",
       subtitle: "concluídas",
+      onPress: () =>
+        navigation.navigate("DescargasHoje", { filial: selectedFilial }),
     },
     {
       id: "cargasHoje",
@@ -648,6 +656,8 @@ const HomeScreen = ({ navigation }) => {
       icon: "✅",
       color: "#007AFF",
       subtitle: "concluídas",
+      onPress: () =>
+        navigation.navigate("CargasHoje", { filial: selectedFilial }),
     },
   ];
 

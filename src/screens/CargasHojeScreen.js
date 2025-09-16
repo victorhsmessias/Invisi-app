@@ -35,67 +35,69 @@ const SERVICO_OPTIONS = [
   { key: "pesagem", label: "Pesagem" },
 ];
 
-const FilaCargaScreen = ({ navigation, route }) => {
-  const [state, setState] = useState({
-    selectedFilial: route.params?.filial || "LDA",
-    selectedOpPadrao: ["rodo_ferro", "ferro_rodo", "rodo_rodo"],
-    selectedServicos: ["armazenagem", "transbordo"],
-    filaCargaData: [],
-    loading: false,
-    refreshing: false,
-    lastUpdate: null,
-    totalVeiculos: 0,
-    totalPeso: 0,
-    filtersVisible: false,
-    errorMessage: "",
-  });
-
-  // Atualizar apenas um campo do estado
-  const updateState = (key, value) => {
-    setState((prev) => ({ ...prev, [key]: value }));
-  };
+const CargasHojeScreen = ({ navigation, route }) => {
+  const [selectedFilial, setSelectedFilial] = useState(
+    route.params?.filial || "LDA"
+  );
+  const [selectedOpPadrao, setSelectedOpPadrao] = useState([
+    "rodo_ferro",
+    "ferro_rodo",
+    "rodo_rodo",
+  ]);
+  const [selectedServicos, setSelectedServicos] = useState([
+    "armazenagem",
+    "transbordo",
+  ]);
+  const [cargaData, setCargaData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const [totalVeiculos, setTotalVeiculos] = useState(0);
+  const [totalPeso, setTotalPeso] = useState(0);
+  const [filtersVisible, setFiltersVisible] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const toggleOpPadraoFilter = (filterKey) => {
-    setState((prev) => {
-      const newOpPadrao = prev.selectedOpPadrao.includes(filterKey)
-        ? prev.selectedOpPadrao.filter((item) => item !== filterKey)
-        : [...prev.selectedOpPadrao, filterKey];
-
-      return { ...prev, selectedOpPadrao: newOpPadrao };
-    });
+    if (selectedOpPadrao.includes(filterKey)) {
+      setSelectedOpPadrao(
+        selectedOpPadrao.filter((item) => item !== filterKey)
+      );
+    } else {
+      setSelectedOpPadrao([...selectedOpPadrao, filterKey]);
+    }
   };
 
   const toggleServicoFilter = (filterKey) => {
-    setState((prev) => {
-      const newServicos = prev.selectedServicos.includes(filterKey)
-        ? prev.selectedServicos.filter((item) => item !== filterKey)
-        : [...prev.selectedServicos, filterKey];
-
-      return { ...prev, selectedServicos: newServicos };
-    });
+    if (selectedServicos.includes(filterKey)) {
+      setSelectedServicos(
+        selectedServicos.filter((item) => item !== filterKey)
+      );
+    } else {
+      setSelectedServicos([...selectedServicos, filterKey]);
+    }
   };
 
-  const fetchFilaCargaData = useCallback(async () => {
+  const fetchCargaData = async () => {
     try {
       const token = await AsyncStorage.getItem("userToken");
       if (!token) return;
 
-      updateState("loading", true);
-      updateState("errorMessage", "");
+      setLoading(true);
+      setErrorMessage("");
 
       // Preparar o filtro de operação padrão baseado na seleção
       const filtroOpPadrao = {
-        rodo_ferro: state.selectedOpPadrao.includes("rodo_ferro") ? 1 : 0,
-        ferro_rodo: state.selectedOpPadrao.includes("ferro_rodo") ? 1 : 0,
-        rodo_rodo: state.selectedOpPadrao.includes("rodo_rodo") ? 1 : 0,
-        outros: state.selectedOpPadrao.includes("outros") ? 1 : 0,
+        rodo_ferro: selectedOpPadrao.includes("rodo_ferro") ? 1 : 0,
+        ferro_rodo: selectedOpPadrao.includes("ferro_rodo") ? 1 : 0,
+        rodo_rodo: selectedOpPadrao.includes("rodo_rodo") ? 1 : 0,
+        outros: selectedOpPadrao.includes("outros") ? 1 : 0,
       };
 
       // Preparar o filtro de serviço baseado na seleção
       const filtroServico = {
-        armazenagem: state.selectedServicos.includes("armazenagem") ? 1 : 0,
-        transbordo: state.selectedServicos.includes("transbordo") ? 1 : 0,
-        pesagem: state.selectedServicos.includes("pesagem") ? 1 : 0,
+        armazenagem: selectedServicos.includes("armazenagem") ? 1 : 0,
+        transbordo: selectedServicos.includes("transbordo") ? 1 : 0,
+        pesagem: selectedServicos.includes("pesagem") ? 1 : 0,
       };
 
       const response = await fetch(`${API_CONFIG.BASE_URL}/monitor.php`, {
@@ -106,8 +108,8 @@ const FilaCargaScreen = ({ navigation, route }) => {
         },
         body: JSON.stringify({
           AttApi: {
-            tipoOperacao: "monitor_fila_carga",
-            filtro_filial: state.selectedFilial,
+            tipoOperacao: "monitor_carga",
+            filtro_filial: selectedFilial,
             filtro_servico: filtroServico,
             filtro_op_padrao: filtroOpPadrao,
           },
@@ -121,57 +123,56 @@ const FilaCargaScreen = ({ navigation, route }) => {
         data.mensagemRetorno?.codigo === "ERRO" &&
         data.mensagemRetorno?.descricao.includes("Nao tem veiculos")
       ) {
-        updateState("filaCargaData", []);
-        updateState("totalVeiculos", 0);
-        updateState("totalPeso", 0);
-        updateState(
-          "errorMessage",
+        setCargaData([]);
+        setTotalVeiculos(0);
+        setTotalPeso(0);
+        setErrorMessage(
           data.mensagemRetorno.mensagem || "Nenhum veículo encontrado"
         );
-      } else if (data.dados?.listaFilaCarga?.filaCargaVeiculos) {
-        const filaCargaData = data.dados.listaFilaCarga.filaCargaVeiculos;
+      } else if (data.dados?.listaCarga?.CargaVeiculos) {
+        const cargaData = data.dados.listaCarga.CargaVeiculos;
+        setCargaData(cargaData);
 
         // Calcular totais
-        const totalV = filaCargaData.reduce(
-          (sum, item) => sum + (item.fc_veiculos || 0),
+        const totalV = cargaData.reduce(
+          (sum, item) => sum + (item.c_veiculos || 0),
           0
         );
-        const totalP = filaCargaData.reduce(
-          (sum, item) => sum + (item.fc_peso || 0),
+        const totalP = cargaData.reduce(
+          (sum, item) => sum + (item.c_peso || 0),
           0
         );
 
-        updateState("filaCargaData", filaCargaData);
-        updateState("totalVeiculos", totalV);
-        updateState("totalPeso", totalP);
-        updateState("errorMessage", "");
+        setTotalVeiculos(totalV);
+        setTotalPeso(totalP);
+        setErrorMessage("");
       } else {
-        updateState("filaCargaData", []);
-        updateState("totalVeiculos", 0);
-        updateState("totalPeso", 0);
-        updateState("errorMessage", "Nenhum dado disponível");
+        setCargaData([]);
+        setTotalVeiculos(0);
+        setTotalPeso(0);
+        setErrorMessage("Nenhum dado disponível");
       }
 
-      updateState("lastUpdate", new Date());
+      setLastUpdate(new Date());
     } catch (error) {
-      console.error("Erro ao buscar dados da fila de carga:", error);
-      updateState("errorMessage", "Erro ao carregar dados");
+      console.error("Erro ao buscar dados de carga:", error);
+      setErrorMessage("Erro ao carregar dados");
     } finally {
-      updateState("loading", false);
+      setLoading(false);
     }
-  }, [state.selectedFilial, state.selectedOpPadrao, state.selectedServicos]);
+  };
 
   useFocusEffect(
     useCallback(() => {
-      fetchFilaCargaData();
-    }, [fetchFilaCargaData])
+      fetchCargaData();
+    }, [selectedFilial, selectedOpPadrao, selectedServicos])
   );
 
   const onRefresh = useCallback(async () => {
-    updateState("refreshing", true);
-    await fetchFilaCargaData();
-    updateState("refreshing", false);
-  }, [fetchFilaCargaData]);
+    setRefreshing(true);
+    await fetchCargaData();
+    setRefreshing(false);
+  }, [selectedFilial, selectedOpPadrao, selectedServicos]);
 
   const formatPeso = (peso) => {
     if (!peso || isNaN(peso)) return "0 kg";
@@ -182,22 +183,12 @@ const FilaCargaScreen = ({ navigation, route }) => {
     return peso + " kg";
   };
 
-  const formatDateTime = (date, time) => {
-    if (!date || !time) return "N/A";
-
-    try {
-      return time.substring(0, 5);
-    } catch (error) {
-      return `${date} ${time}`;
-    }
-  };
-
-  const renderFilaCargaItem = ({ item }) => (
-    <View style={styles.filaCard}>
+  const renderCargaItem = ({ item }) => (
+    <View style={styles.cargaCard}>
       <View style={styles.cardHeader}>
-        <Text style={styles.filaText}>{item.fc_grupo || "Não informado"}</Text>
+        <Text style={styles.filaText}> {item.c_grupo || "Não informado"}</Text>
         <View style={styles.veiculosBadge}>
-          <Text style={styles.veiculosText}>{item.fc_veiculos} veíc.</Text>
+          <Text style={styles.veiculosText}>{item.c_veiculos} veíc.</Text>
         </View>
       </View>
 
@@ -205,57 +196,49 @@ const FilaCargaScreen = ({ navigation, route }) => {
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Fila:</Text>
           <Text style={styles.infoValue} numberOfLines={1} ellipsizeMode="tail">
-            {item.fc_fila || "Não informado"}
+            {item.c_fila}
           </Text>
         </View>
 
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Produto:</Text>
           <Text style={styles.infoValue} numberOfLines={1} ellipsizeMode="tail">
-            {item.fc_produto || "Não informado"}
+            {item.c_produto || "Não informado"}
           </Text>
         </View>
 
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Peso:</Text>
-          <Text style={styles.infoValue}>{formatPeso(item.fc_peso)}</Text>
+          <Text style={styles.infoValue}>{formatPeso(item.c_peso || 0)}</Text>
         </View>
-
-        {item.fc_data && item.fc_hora && (
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Atualizado:</Text>
-            <Text style={styles.infoValue}>
-              {formatDateTime(item.fc_data, item.fc_hora)}
-            </Text>
-          </View>
-        )}
       </View>
     </View>
   );
 
   const renderHeader = () => (
     <View>
-      {state.lastUpdate && (
+      {/* Última atualização */}
+      {lastUpdate && (
         <View style={styles.updateContainer}>
           <Text style={styles.updateText}>
-            Atualizado:{" "}
-            {state.lastUpdate.toLocaleTimeString("pt-BR").substring(0, 5)}
+            Atualizado: {lastUpdate.toLocaleTimeString("pt-BR").substring(0, 5)}
           </Text>
         </View>
       )}
+      {/* Resumo não fixo */}
       <View style={styles.summaryContainer}>
         <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{state.totalVeiculos}</Text>
+          <Text style={styles.summaryValue}>{totalVeiculos}</Text>
           <Text style={styles.summaryLabel}>Veículos</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{formatPeso(state.totalPeso)}</Text>
+          <Text style={styles.summaryValue}>{formatPeso(totalPeso)}</Text>
           <Text style={styles.summaryLabel}>Peso</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{state.filaCargaData.length}</Text>
+          <Text style={styles.summaryValue}>{cargaData.length}</Text>
           <Text style={styles.summaryLabel}>Filas</Text>
         </View>
       </View>
@@ -264,6 +247,7 @@ const FilaCargaScreen = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header fixo */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -273,39 +257,32 @@ const FilaCargaScreen = ({ navigation, route }) => {
         </TouchableOpacity>
 
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Fila de Carga</Text>
-          <Text style={styles.headerSubtitle}>
-            Filial: {state.selectedFilial}
-          </Text>
+          <Text style={styles.headerTitle}>Cargas do Dia</Text>
+          <Text style={styles.headerSubtitle}>Filial: {selectedFilial}</Text>
         </View>
 
         <TouchableOpacity
           style={styles.filterButton}
-          onPress={() => updateState("filtersVisible", true)}
+          onPress={() => setFiltersVisible(true)}
         >
           <Text style={styles.filterIcon}>🔎</Text>
-          {(state.selectedOpPadrao.length < OP_PADRAO_OPTIONS.length ||
-            state.selectedServicos.length < SERVICO_OPTIONS.length) && (
-            <View style={styles.filterBadge}>
-              <Text style={styles.filterBadgeText}>!</Text>
-            </View>
-          )}
         </TouchableOpacity>
       </View>
 
-      {state.loading && state.filaCargaData.length === 0 ? (
+      {/* Lista de Veículos em Carga com resumo no header */}
+      {loading && cargaData.length === 0 ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
           <Text style={styles.loadingText}>Carregando dados...</Text>
         </View>
       ) : (
         <FlatList
-          data={state.filaCargaData}
-          renderItem={renderFilaCargaItem}
+          data={cargaData}
+          renderItem={renderCargaItem}
           keyExtractor={(item, index) => index.toString()}
           refreshControl={
             <RefreshControl
-              refreshing={state.refreshing}
+              refreshing={refreshing}
               onRefresh={onRefresh}
               colors={["#007AFF"]}
               tintColor="#007AFF"
@@ -315,9 +292,9 @@ const FilaCargaScreen = ({ navigation, route }) => {
           ListHeaderComponent={renderHeader}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>⏳</Text>
+              <Text style={styles.emptyIcon}>📦</Text>
               <Text style={styles.emptyText}>
-                {state.errorMessage || "Nenhuma fila de carga ativa"}
+                {errorMessage || "Nenhuma carga encontrada"}
               </Text>
               <Text style={styles.emptySubtext}>
                 Verifique os filtros aplicados
@@ -327,18 +304,19 @@ const FilaCargaScreen = ({ navigation, route }) => {
         />
       )}
 
+      {/* Modal de Filtros */}
       <Modal
-        visible={state.filtersVisible}
+        visible={filtersVisible}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => updateState("filtersVisible", false)}
+        onRequestClose={() => setFiltersVisible(false)}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Filtros</Text>
               <TouchableOpacity
-                onPress={() => updateState("filtersVisible", false)}
+                onPress={() => setFiltersVisible(false)}
                 style={styles.modalCloseButton}
               >
                 <Text style={styles.modalCloseText}>✕</Text>
@@ -346,65 +324,66 @@ const FilaCargaScreen = ({ navigation, route }) => {
             </View>
 
             <View style={styles.filterSection}>
-              <Text style={styles.filterGroupTitle}>Tipos de Serviço</Text>
-              <View style={styles.filterOptions}>
-                {SERVICO_OPTIONS.map((option) => (
-                  <TouchableOpacity
-                    key={option.key}
-                    style={[
-                      styles.filterOptionButton,
-                      state.selectedServicos.includes(option.key) &&
-                        styles.filterOptionButtonActive,
-                    ]}
-                    onPress={() => toggleServicoFilter(option.key)}
-                  >
-                    <Text
+              {/* Filtros de Serviço */}
+              <View style={styles.filterGroup}>
+                <Text style={styles.filterGroupTitle}>Tipos de Serviço</Text>
+                <View style={styles.filterOptions}>
+                  {SERVICO_OPTIONS.map((option) => (
+                    <TouchableOpacity
+                      key={option.key}
                       style={[
-                        styles.filterOptionText,
-                        state.selectedServicos.includes(option.key) &&
-                          styles.filterOptionTextActive,
+                        styles.filterOptionButton,
+                        selectedServicos.includes(option.key) &&
+                          styles.filterOptionButtonActive,
                       ]}
+                      onPress={() => toggleServicoFilter(option.key)}
                     >
-                      {option.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                      <Text
+                        style={[
+                          styles.filterOptionText,
+                          selectedServicos.includes(option.key) &&
+                            styles.filterOptionTextActive,
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
-            </View>
 
-            <View style={styles.filterSection}>
-              <Text style={styles.filterGroupTitle}>Tipos de Operação</Text>
-              <View style={styles.filterOptions}>
-                {OP_PADRAO_OPTIONS.map((option) => (
-                  <TouchableOpacity
-                    key={option.key}
-                    style={[
-                      styles.filterOptionButton,
-                      state.selectedOpPadrao.includes(option.key) &&
-                        styles.filterOptionButtonActive,
-                    ]}
-                    onPress={() => toggleOpPadraoFilter(option.key)}
-                  >
-                    <Text
+              {/* Filtros de Operação Padrão */}
+              <View style={styles.filterGroup}>
+                <Text style={styles.filterGroupTitle}>Tipos de Operação</Text>
+                <View style={styles.filterOptions}>
+                  {OP_PADRAO_OPTIONS.map((option) => (
+                    <TouchableOpacity
+                      key={option.key}
                       style={[
-                        styles.filterOptionText,
-                        state.selectedOpPadrao.includes(option.key) &&
-                          styles.filterOptionTextActive,
+                        styles.filterOptionButton,
+                        selectedOpPadrao.includes(option.key) &&
+                          styles.filterOptionButtonActive,
                       ]}
+                      onPress={() => toggleOpPadraoFilter(option.key)}
                     >
-                      {option.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                      <Text
+                        style={[
+                          styles.filterOptionText,
+                          selectedOpPadrao.includes(option.key) &&
+                            styles.filterOptionTextActive,
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
             </View>
 
             <TouchableOpacity
               style={styles.applyFiltersButton}
-              onPress={() => {
-                updateState("filtersVisible", false);
-                fetchFilaCargaData();
-              }}
+              onPress={() => setFiltersVisible(false)}
             >
               <Text style={styles.applyFiltersText}>Aplicar Filtros</Text>
             </TouchableOpacity>
@@ -538,7 +517,7 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: 15,
   },
-  filaCard: {
+  cargaCard: {
     backgroundColor: "#ffffff",
     borderRadius: 10,
     padding: 15,
@@ -565,7 +544,7 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   veiculosBadge: {
-    backgroundColor: "#fd7e14",
+    backgroundColor: "#20c997",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 5,
@@ -650,6 +629,9 @@ const styles = StyleSheet.create({
   filterSection: {
     marginBottom: 20,
   },
+  filterGroup: {
+    marginBottom: 20,
+  },
   filterGroupTitle: {
     fontSize: 16,
     fontWeight: "600",
@@ -693,4 +675,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default FilaCargaScreen;
+export default CargasHojeScreen;
