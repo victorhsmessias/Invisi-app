@@ -12,12 +12,33 @@ const getNestedProperty = (obj, path) => {
 
 // Função auxiliar para extrair dados com diferentes caminhos
 const extractDataFromResponse = (response, paths) => {
+  console.log('=== EXTRACT DATA DEBUG ===');
   for (const path of paths) {
+    console.log(`Trying path: ${path}`);
     const data = getNestedProperty(response, path);
+    console.log(`Path ${path} result:`, data);
+    console.log(`Is array:`, Array.isArray(data));
+    console.log(`Length:`, data?.length);
+
     if (Array.isArray(data) && data.length > 0) {
+      console.log(`✅ Found array data with path: ${path}`);
       return data;
     }
+
+    // Se não é array mas é um objeto, pode conter dados
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      console.log(`🔍 Found object at path: ${path}`, Object.keys(data));
+      // Se o objeto tem propriedades que parecem ser arrays de dados
+      const objectKeys = Object.keys(data);
+      for (const key of objectKeys) {
+        if (Array.isArray(data[key]) && data[key].length > 0) {
+          console.log(`✅ Found array in object property: ${path}.${key}`);
+          return data[key];
+        }
+      }
+    }
   }
+  console.log('❌ No data found in any path');
   return [];
 };
 
@@ -56,16 +77,30 @@ export const useVehicleData = (screenType) => {
       switch (screenType) {
         case "transito":
           response = await apiService.getTransitoData(state.selectedFilial);
+          console.log('=== TRANSITO DEBUG ===');
+          console.log('Full response:', JSON.stringify(response, null, 2));
+
+          // Tentar extrair dados com múltiplas estruturas possíveis
           const transitoData = extractDataFromResponse(response, [
             'dados.listaTransito.transitoVeiculos',
             'dados.listaTransito',
             'dados.transito',
+            'dados.data',
+            'dados.result',
+            'dados.vehicles',
             'listaTransito.transitoVeiculos',
+            'listaTransito',
             'transitoVeiculos',
+            'transito',
+            'vehicles',
+            'data',
+            'result',
             'dados',
             'lista'
           ]);
+          console.log('Extracted transito data:', transitoData);
           processedData = mapVehicleData(transitoData, screenType);
+          console.log('Mapped transito data:', processedData);
           break;
 
         case "fila_descarga":
@@ -159,7 +194,15 @@ export const useVehicleData = (screenType) => {
       }
 
       console.log(`[${screenType}] Response:`, response);
+      console.log(`[${screenType}] Response Keys:`, Object.keys(response || {}));
+      if (response?.dados) {
+        console.log(`[${screenType}] Dados Keys:`, Object.keys(response.dados));
+        if (response.dados.listaTransito) {
+          console.log(`[${screenType}] ListaTransito Keys:`, Object.keys(response.dados.listaTransito));
+        }
+      }
       console.log(`[${screenType}] Processed Data:`, processedData);
+      console.log(`[${screenType}] Processed Data Length:`, processedData.length);
 
       setData(processedData);
       setLastUpdate(new Date());
