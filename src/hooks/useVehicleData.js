@@ -3,208 +3,167 @@ import { useApp } from "../context/AppContext";
 import apiService from "../services/apiService";
 import { handleError } from "../utils/errorHandler";
 
-// Função para acessar propriedades aninhadas
-const getNestedProperty = (obj, path) => {
-  return path.split('.').reduce((current, key) => {
-    return current && current[key] !== undefined ? current[key] : null;
-  }, obj);
-};
-
-// Função auxiliar para extrair dados com diferentes caminhos
-const extractDataFromResponse = (response, paths) => {
-  console.log('=== EXTRACT DATA DEBUG ===');
-  for (const path of paths) {
-    console.log(`Trying path: ${path}`);
-    const data = getNestedProperty(response, path);
-    console.log(`Path ${path} result:`, data);
-    console.log(`Is array:`, Array.isArray(data));
-    console.log(`Length:`, data?.length);
-
-    if (Array.isArray(data) && data.length > 0) {
-      console.log(`✅ Found array data with path: ${path}`);
-      return data;
-    }
-
-    // Se não é array mas é um objeto, pode conter dados
-    if (data && typeof data === 'object' && !Array.isArray(data)) {
-      console.log(`🔍 Found object at path: ${path}`, Object.keys(data));
-      // Se o objeto tem propriedades que parecem ser arrays de dados
-      const objectKeys = Object.keys(data);
-      for (const key of objectKeys) {
-        if (Array.isArray(data[key]) && data[key].length > 0) {
-          console.log(`✅ Found array in object property: ${path}.${key}`);
-          return data[key];
-        }
-      }
-    }
-  }
-  console.log('❌ No data found in any path');
-  return [];
-};
-
-// Função para mapear dados do API para o formato esperado
-const mapVehicleData = (rawData, screenType) => {
-  if (!Array.isArray(rawData)) return [];
-
-  return rawData.map(item => ({
-    // Manter dados originais
-    ...item,
-    // Adicionar campos padronizados
-    veiculo: item.veiculo || item.placa || item.codigo || item.id,
-    placa: item.placa || item.veiculo,
-    status: item.status || item.situacao || "Ativo",
-    situacao: item.situacao || item.status || "Ativo"
-  }));
-};
-
 export const useVehicleData = (screenType) => {
   const { state } = useApp();
-  const [data, setData] = useState([]);
+  const [responseData, setResponseData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [error, setError] = useState(null);
+  const [filtroServico, setFiltroServico] = useState({
+    armazenagem: 1,
+    transbordo: 1,
+    pesagem: 0,
+  });
+  const [filtroOpPadrao, setFiltroOpPadrao] = useState({
+    rodo_ferro: 1,
+    ferro_rodo: 1,
+    rodo_rodo: 1,
+    outros: 0,
+  });
+
+  const extractDataFromResponse = (response, screenType) => {
+    // Verificar se a resposta tem a estrutura esperada
+    if (!response || !response.dados) {
+      console.log(
+        `[${screenType}] Response missing 'dados' property:`,
+        response
+      );
+      return [];
+    }
+
+    const dataMap = {
+      transito: "dados.listaTransito.transitoVeiculos",
+      fila_descarga: "dados.listaFilaDescarga.filaDescargaVeiculos",
+      fila_carga: "dados.listaFilaCarga.filaCargaVeiculos",
+      patio_descarga: "dados.listaPatioDescarga.patioDescargaVeiculos",
+      patio_carga: "dados.listaPatioCarga.patioCargaVeiculos",
+      descargas_hoje: "dados.listaDescarga.DescargaVeiculos",
+      cargas_hoje: "dados.listaCarga.CargaVeiculos",
+      contratos: "dados.CortesFila",
+    };
+
+    const dataPath = dataMap[screenType];
+    if (!dataPath) {
+      console.log(`[${screenType}] Unknown screen type`);
+      return [];
+    }
+
+    const pathParts = dataPath.split(".");
+    let data = response;
+
+    for (const part of pathParts) {
+      data = data[part];
+      if (!data) {
+        console.log(
+          `[${screenType}] Data not found at path: ${dataPath}`,
+          response
+        );
+        return [];
+      }
+    }
+
+    // Garantir que retornamos um array
+    if (!Array.isArray(data)) {
+      console.log(`[${screenType}] Data is not an array:`, data);
+      return [];
+    }
+
+    console.log(`[${screenType}] Extracted data:`, data);
+    return data;
+  };
 
   const fetchData = useCallback(async () => {
     if (!state.isLoggedIn) return;
+
+    console.log(
+      `[useVehicleData] Fetching data for ${screenType} with filters:`,
+      {
+        filtroServico,
+        filtroOpPadrao,
+      }
+    );
 
     try {
       setLoading(true);
       setError(null);
 
       let response;
-      let processedData = [];
 
       switch (screenType) {
         case "transito":
-          response = await apiService.getTransitoData(state.selectedFilial);
-          console.log('=== TRANSITO DEBUG ===');
-          console.log('Full response:', JSON.stringify(response, null, 2));
-
-          // Tentar extrair dados com múltiplas estruturas possíveis
-          const transitoData = extractDataFromResponse(response, [
-            'dados.listaTransito.transitoVeiculos',
-            'dados.listaTransito',
-            'dados.transito',
-            'dados.data',
-            'dados.result',
-            'dados.vehicles',
-            'listaTransito.transitoVeiculos',
-            'listaTransito',
-            'transitoVeiculos',
-            'transito',
-            'vehicles',
-            'data',
-            'result',
-            'dados',
-            'lista'
-          ]);
-          console.log('Extracted transito data:', transitoData);
-          processedData = mapVehicleData(transitoData, screenType);
-          console.log('Mapped transito data:', processedData);
+          response = await apiService.getTransitoData(
+            state.selectedFilial,
+            filtroServico,
+            filtroOpPadrao
+          );
           break;
 
         case "fila_descarga":
-          response = await apiService.getFilaDescargaData(state.selectedFilial);
-          const filaDescData = extractDataFromResponse(response, [
-            'dados.listaFilaDescarga.filaDescargaVeiculos',
-            'dados.listaFilaDescarga',
-            'dados.filaDescarga',
-            'listaFilaDescarga.filaDescargaVeiculos',
-            'filaDescargaVeiculos',
-            'dados',
-            'lista'
-          ]);
-          processedData = mapVehicleData(filaDescData, screenType);
+          response = await apiService.getFilaDescargaData(
+            state.selectedFilial,
+            filtroServico,
+            filtroOpPadrao
+          );
           break;
 
         case "fila_carga":
-          response = await apiService.getFilaCargaData(state.selectedFilial);
-          const filaCargaData = extractDataFromResponse(response, [
-            'dados.listaFilaCarga.filaCargaVeiculos',
-            'dados.listaFilaCarga',
-            'dados.filaCarga',
-            'listaFilaCarga.filaCargaVeiculos',
-            'filaCargaVeiculos',
-            'dados',
-            'lista'
-          ]);
-          processedData = mapVehicleData(filaCargaData, screenType);
+          response = await apiService.getFilaCargaData(
+            state.selectedFilial,
+            filtroServico,
+            filtroOpPadrao
+          );
           break;
 
         case "patio_descarga":
-          response = await apiService.getPatioDescargaData(state.selectedFilial);
-          const patioDescData = extractDataFromResponse(response, [
-            'dados.listaPatioDescarga.patioDescargaVeiculos',
-            'dados.listaPatioDescarga',
-            'dados.patioDescarga',
-            'listaPatioDescarga.patioDescargaVeiculos',
-            'patioDescargaVeiculos',
-            'dados',
-            'lista'
-          ]);
-          processedData = mapVehicleData(patioDescData, screenType);
+          response = await apiService.getPatioDescargaData(
+            state.selectedFilial,
+            filtroServico,
+            filtroOpPadrao
+          );
           break;
 
         case "patio_carga":
-          response = await apiService.getPatioCargaData(state.selectedFilial);
-          const patioCargaData = extractDataFromResponse(response, [
-            'dados.listaPatioCarga.patioCargaVeiculos',
-            'dados.listaPatioCarga',
-            'dados.patioCarga',
-            'listaPatioCarga.patioCargaVeiculos',
-            'patioCargaVeiculos',
-            'dados',
-            'lista'
-          ]);
-          processedData = mapVehicleData(patioCargaData, screenType);
+          response = await apiService.getPatioCargaData(
+            state.selectedFilial,
+            filtroServico,
+            filtroOpPadrao
+          );
           break;
 
         case "descargas_hoje":
-          response = await apiService.getDescargasHojeData(state.selectedFilial);
-          const descargasData = extractDataFromResponse(response, [
-            'dados.listaDescarga.DescargaVeiculos',
-            'dados.listaDescarga',
-            'dados.descarga',
-            'listaDescarga.DescargaVeiculos',
-            'DescargaVeiculos',
-            'descargaVeiculos',
-            'dados',
-            'lista'
-          ]);
-          processedData = mapVehicleData(descargasData, screenType);
+          response = await apiService.getDescargasHojeData(
+            state.selectedFilial,
+            filtroServico,
+            filtroOpPadrao
+          );
           break;
 
         case "cargas_hoje":
-          response = await apiService.getCargasHojeData(state.selectedFilial);
-          const cargasData = extractDataFromResponse(response, [
-            'dados.listaCarga.CargaVeiculos',
-            'dados.listaCarga',
-            'dados.carga',
-            'listaCarga.CargaVeiculos',
-            'CargaVeiculos',
-            'cargaVeiculos',
-            'dados',
-            'lista'
-          ]);
-          processedData = mapVehicleData(cargasData, screenType);
+          response = await apiService.getCargasHojeData(
+            state.selectedFilial,
+            filtroServico,
+            filtroOpPadrao
+          );
+          break;
+
+        case "contratos":
+          response = await apiService.getContratosData(
+            state.selectedFilial,
+            filtroServico,
+            filtroOpPadrao
+          );
           break;
 
         default:
           throw new Error("Tipo de tela inválido");
       }
 
-      console.log(`[${screenType}] Response:`, response);
-      console.log(`[${screenType}] Response Keys:`, Object.keys(response || {}));
-      if (response?.dados) {
-        console.log(`[${screenType}] Dados Keys:`, Object.keys(response.dados));
-        if (response.dados.listaTransito) {
-          console.log(`[${screenType}] ListaTransito Keys:`, Object.keys(response.dados.listaTransito));
-        }
-      }
-      console.log(`[${screenType}] Processed Data:`, processedData);
-      console.log(`[${screenType}] Processed Data Length:`, processedData.length);
+      console.log(`[${screenType}] Full API Response:`, response);
 
-      setData(processedData);
+      // Extrair dados da estrutura aninhada
+      const extractedData = extractDataFromResponse(response, screenType);
+
+      setResponseData(extractedData);
       setLastUpdate(new Date());
     } catch (err) {
       console.error(`[${screenType}] Error:`, err);
@@ -216,9 +175,14 @@ export const useVehicleData = (screenType) => {
     } finally {
       setLoading(false);
     }
-  }, [screenType, state.selectedFilial, state.isLoggedIn]);
+  }, [
+    screenType,
+    state.selectedFilial,
+    state.isLoggedIn,
+    filtroServico,
+    filtroOpPadrao,
+  ]);
 
-  // Auto-fetch when component mounts or filial changes
   useEffect(() => {
     if (state.isLoggedIn) {
       fetchData();
@@ -230,10 +194,14 @@ export const useVehicleData = (screenType) => {
   }, [fetchData]);
 
   return {
-    data,
+    data: responseData,
     loading,
     lastUpdate,
     error,
     refresh,
+    filtroServico,
+    setFiltroServico,
+    filtroOpPadrao,
+    setFiltroOpPadrao,
   };
 };

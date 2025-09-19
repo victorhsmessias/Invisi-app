@@ -6,19 +6,29 @@ import { formatDateTime } from "../utils/formatters";
 
 const FilaDescargaScreen = ({ navigation, route }) => {
   const { state } = useApp();
-  const { data, loading, lastUpdate, error, refresh } = useVehicleData("fila_descarga");
+  const {
+    data,
+    loading,
+    lastUpdate,
+    error,
+    refresh,
+    filtroServico,
+    setFiltroServico,
+    filtroOpPadrao,
+    setFiltroOpPadrao
+  } = useVehicleData("fila_descarga");
+
+  React.useEffect(() => {
+    if (data && data.length > 0) {
+      console.log("[FilaDescargaScreen] Data sample:", data[0]);
+      console.log("[FilaDescargaScreen] All keys:", Object.keys(data[0] || {}));
+    }
+  }, [data]);
 
   const fields = [
-    { key: "origem", label: "Origem:" },
-    { key: "produto", label: "Produto:" },
-    { key: "peso", label: "Peso:" },
-    { key: "motorista", label: "Motorista:" },
-    {
-      key: "data_chegada",
-      label: "Chegada:",
-      format: (value) => value ? formatDateTime(value) : "N/A"
-    },
-    { key: "posicao_fila", label: "Posição na Fila:" },
+    { key: "fd_fila", label: "Fila:" },
+    { key: "fd_produto", label: "Produto:" },
+    { key: "fd_peso", label: "Peso (kg):" },
   ];
 
   return (
@@ -34,6 +44,10 @@ const FilaDescargaScreen = ({ navigation, route }) => {
       fields={fields}
       emptyMessage="Nenhum veículo na fila de descarga"
       emptyIcon="⏳"
+      filtroServico={filtroServico}
+      setFiltroServico={setFiltroServico}
+      filtroOpPadrao={filtroOpPadrao}
+      setFiltroOpPadrao={setFiltroOpPadrao}
     />
   );
 };

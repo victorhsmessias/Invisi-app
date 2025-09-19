@@ -22,6 +22,13 @@ export const SERVICO_OPTIONS = [
   { key: "pesagem", label: "Pesagem" },
 ];
 
+export const OP_PADRAO_OPTIONS = [
+  { key: "rodo_ferro", label: "Rodo-Ferro" },
+  { key: "ferro_rodo", label: "Ferro-Rodo" },
+  { key: "rodo_rodo", label: "Rodo-Rodo" },
+  { key: "outros", label: "Outros" },
+];
+
 export const OP_PADRAO_LABELS = {
   rodo_ferro: "Rodo-Ferro",
   ferro_rodo: "Ferro-Rodo",

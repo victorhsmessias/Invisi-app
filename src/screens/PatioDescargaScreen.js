@@ -6,20 +6,22 @@ import { formatDateTime } from "../utils/formatters";
 
 const PatioDescargaScreen = ({ navigation, route }) => {
   const { state } = useApp();
-  const { data, loading, lastUpdate, error, refresh } = useVehicleData("patio_descarga");
+  const {
+    data,
+    loading,
+    lastUpdate,
+    error,
+    refresh,
+    filtroServico,
+    setFiltroServico,
+    filtroOpPadrao,
+    setFiltroOpPadrao
+  } = useVehicleData("patio_descarga");
 
   const fields = [
-    { key: "origem", label: "Origem:" },
-    { key: "produto", label: "Produto:" },
-    { key: "peso", label: "Peso:" },
-    { key: "motorista", label: "Motorista:" },
-    {
-      key: "inicio_descarga",
-      label: "Início Descarga:",
-      format: (value) => value ? formatDateTime(value) : "N/A"
-    },
-    { key: "box_descarga", label: "Box:" },
-    { key: "progresso", label: "Progresso:" },
+    { key: "pd_fila", label: "Fila:" },
+    { key: "pd_produto", label: "Produto:" },
+    { key: "pd_peso", label: "Peso (kg):" },
   ];
 
   return (
@@ -35,6 +37,10 @@ const PatioDescargaScreen = ({ navigation, route }) => {
       fields={fields}
       emptyMessage="Nenhum veículo descarregando"
       emptyIcon="📦"
+      filtroServico={filtroServico}
+      setFiltroServico={setFiltroServico}
+      filtroOpPadrao={filtroOpPadrao}
+      setFiltroOpPadrao={setFiltroOpPadrao}
     />
   );
 };

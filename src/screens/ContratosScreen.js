@@ -12,121 +12,84 @@ import {
   Platform,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import { useContratos } from "../hooks/useContratos";
 import { useApp } from "../context/AppContext";
+import { useContractFilters } from "../hooks/useContractFilters";
 import { LoadingSpinner, ErrorMessage } from "../components";
-import { COLORS, SERVICO_OPTIONS } from "../constants";
+import { COLORS } from "../constants";
 import { formatPeso, formatPercentual, formatNumber } from "../utils/formatters";
+import apiService from "../services/apiService";
 
-// Componente de Card de Contrato otimizado
-const ContratoCard = React.memo(({ item }) => (
-  <View style={styles.contratoCard}>
-    <View style={styles.cardHeader}>
-      <Text style={styles.filaText}>Fila {item.fila}</Text>
-      <View style={styles.grupoBadge}>
-        <Text style={styles.grupoText}>{item.grupo}</Text>
-      </View>
-    </View>
-
-    <View style={styles.cardContent}>
-      <InfoRow label="Produto:" value={item.prod || "Não informado"} />
-      <InfoRow label="Peso Origem:" value={formatPeso(item.peso_origem)} />
-      <InfoRow label="Peso Descarga:" value={formatPeso(item.peso_descarga)} />
-      <InfoRow label="Peso Carga:" value={formatPeso(item.peso_carga)} />
-      <InfoRow
-        label="Dif. Descarga/Origem:"
-        value={formatPercentual(item.pdif_peso_descarga_origem)}
-        isPercentage
-        percentageValue={item.pdif_peso_descarga_origem}
-      />
-      <InfoRow
-        label="Dif. Carga/Descarga:"
-        value={formatPercentual(item.pdif_peso_carga_descarga)}
-        isPercentage
-        percentageValue={item.pdif_peso_carga_descarga}
-      />
-      <InfoRow
-        label="Veículos Descarga:"
-        value={formatNumber(item.veiculos_descarga)}
-      />
-      <InfoRow label="Veículos Carga:" value={formatNumber(item.veiculos_carga)} />
-    </View>
-  </View>
-));
-
-// Componente de linha de informação reutilizável
-const InfoRow = React.memo(({ label, value, isPercentage, percentageValue }) => (
-  <View style={styles.infoRow}>
-    <Text style={styles.infoLabel}>{label}</Text>
-    <Text
-      style={[
-        styles.infoValue,
-        isPercentage &&
-          (percentageValue < 0 ? styles.negativeValue : styles.positiveValue),
-      ]}
-      numberOfLines={1}
-      ellipsizeMode="tail"
-    >
-      {value}
-    </Text>
-  </View>
-));
-
-// Componente de filtro reutilizável
-const FilterOption = React.memo(({ option, isSelected, onToggle }) => (
-  <TouchableOpacity
-    style={[
-      styles.filterOptionButton,
-      isSelected && styles.filterOptionButtonActive,
-    ]}
-    onPress={() => onToggle(option.key)}
-  >
-    <Text
-      style={[
-        styles.filterOptionText,
-        isSelected && styles.filterOptionTextActive,
-      ]}
-    >
-      {option.label}
-    </Text>
-  </TouchableOpacity>
-));
-
-// Componente principal
 const ContratosScreen = ({ navigation, route }) => {
   const { state } = useApp();
   const {
-    data,
-    loading,
-    lastUpdate,
     filterOptions,
-    filtersLoading,
-    filters,
-    toggleOpPadraoFilter,
-    toggleServicoFilter,
-    toggleGrupoFilter,
-    toggleProdutoFilter,
-    fetchContratosData,
-    refresh,
-    error,
-  } = useContratos();
+    selectedFilters,
+    loading: filtersLoading,
+    error: filtersError,
+    toggleFilter,
+    resetFilters,
+    getApiFilters,
+  } = useContractFilters();
 
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [filtersVisible, setFiltersVisible] = useState(false);
-  const [activeFilterTab, setActiveFilterTab] = useState("servico");
+  const [activeFilterTab, setActiveFilterTab] = useState("servicos");
 
-  // Buscar dados quando a tela ganha foco
+  const fetchContratosData = useCallback(async () => {
+    if (!state.isLoggedIn || !state.selectedFilial) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      console.log("[ContratosScreen] Fetching contratos data with filters:", selectedFilters);
+
+      const { filtroServico, filtroOpPadrao, filtroGrupo, filtroTpProd } = getApiFilters();
+
+      const response = await apiService.getContratosData(
+        state.selectedFilial,
+        filtroServico,
+        filtroOpPadrao,
+        filtroGrupo,
+        filtroTpProd
+      );
+
+      console.log("[ContratosScreen] Full API Response:", response);
+
+      if (response.dados?.CortesFila) {
+        setData(response.dados.CortesFila);
+        setLastUpdate(new Date());
+        console.log("[ContratosScreen] Extracted data:", response.dados.CortesFila);
+      } else {
+        setData([]);
+        setError("Nenhum contrato encontrado");
+      }
+    } catch (err) {
+      console.error("[ContratosScreen] Error:", err);
+      setError("Erro ao carregar contratos");
+    } finally {
+      setLoading(false);
+    }
+  }, [state.isLoggedIn, state.selectedFilial, selectedFilters, getApiFilters]);
+
+  // Buscar dados quando a tela ganha foco ou filtros mudam
   useFocusEffect(
     useCallback(() => {
-      fetchContratosData();
-    }, [fetchContratosData])
+      if (filterOptions.grupos.length > 0) { // Wait for filters to load
+        fetchContratosData();
+      }
+    }, [fetchContratosData, filterOptions.grupos.length])
   );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refresh();
+    await fetchContratosData();
     setRefreshing(false);
-  }, [refresh]);
+  }, [fetchContratosData]);
 
   const handleApplyFilters = useCallback(() => {
     setFiltersVisible(false);
@@ -135,55 +98,136 @@ const ContratosScreen = ({ navigation, route }) => {
 
   const hasActiveFilters = useCallback(() => {
     return (
-      filters.selectedOpPadrao.length < filterOptions.opPadrao.length ||
-      filters.selectedServicos.length < SERVICO_OPTIONS.length ||
-      filters.selectedGrupos.length > 0 ||
-      filters.selectedProdutos.length > 0
+      selectedFilters.servicos.length < filterOptions.servicos.length ||
+      selectedFilters.opPadrao.length < filterOptions.opPadrao.length ||
+      selectedFilters.grupos.length < filterOptions.grupos.length ||
+      selectedFilters.produtos.length < filterOptions.produtos.length
     );
-  }, [filters, filterOptions]);
+  }, [selectedFilters, filterOptions]);
+
+  React.useEffect(() => {
+    if (data && data.length > 0) {
+      console.log("[ContratosScreen] Data sample:", data[0]);
+      console.log("[ContratosScreen] All keys:", Object.keys(data[0] || {}));
+    }
+  }, [data]);
+
+  // Componente de Card de Contrato
+  const ContratoCard = React.memo(({ item }) => (
+    <View style={styles.contratoCard}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.filaText}>Fila {item.fila}</Text>
+        <View style={styles.grupoBadge}>
+          <Text style={styles.grupoText}>{item.grupo}</Text>
+        </View>
+      </View>
+
+      <View style={styles.cardContent}>
+        <InfoRow label="Produto:" value={item.prod || "Não informado"} />
+        <InfoRow label="Peso Origem:" value={formatPeso(item.peso_origem)} />
+        <InfoRow label="Peso Descarga:" value={formatPeso(item.peso_descarga)} />
+        <InfoRow label="Peso Carga:" value={formatPeso(item.peso_carga)} />
+        <InfoRow
+          label="Dif. Descarga/Origem:"
+          value={formatPercentual(item.pdif_peso_descarga_origem)}
+          isPercentage
+          percentageValue={item.pdif_peso_descarga_origem}
+        />
+        <InfoRow
+          label="Dif. Carga/Descarga:"
+          value={formatPercentual(item.pdif_peso_carga_descarga)}
+          isPercentage
+          percentageValue={item.pdif_peso_carga_descarga}
+        />
+        <InfoRow
+          label="Veículos Descarga:"
+          value={formatNumber(item.veiculos_descarga)}
+        />
+        <InfoRow label="Veículos Carga:" value={formatNumber(item.veiculos_carga)} />
+      </View>
+    </View>
+  ));
+
+  // Componente de linha de informação reutilizável
+  const InfoRow = React.memo(({ label, value, isPercentage, percentageValue }) => (
+    <View style={styles.infoRow}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text
+        style={[
+          styles.infoValue,
+          isPercentage &&
+            (percentageValue < 0 ? styles.negativeValue : styles.positiveValue),
+        ]}
+        numberOfLines={1}
+        ellipsizeMode="tail"
+      >
+        {value}
+      </Text>
+    </View>
+  ));
+
+  // Componente de filtro reutilizável
+  const FilterOption = React.memo(({ option, isSelected, onToggle }) => (
+    <TouchableOpacity
+      style={[
+        styles.filterOptionButton,
+        isSelected && styles.filterOptionButtonActive,
+      ]}
+      onPress={() => onToggle(option)}
+    >
+      <Text
+        style={[
+          styles.filterOptionText,
+          isSelected && styles.filterOptionTextActive,
+        ]}
+      >
+        {option}
+      </Text>
+    </TouchableOpacity>
+  ));
 
   const renderFilterTab = useCallback(() => {
     if (filtersLoading) {
       return <LoadingSpinner text="Carregando filtros..." size="small" />;
     }
 
-    const renderFilterOptions = (options, selectedItems, toggleFunction) => (
+    const renderFilterOptions = (options, selectedItems, filterType) => (
       <View style={styles.filterOptions}>
         {options.map((option) => (
           <FilterOption
-            key={option.key}
+            key={option}
             option={option}
-            isSelected={selectedItems.includes(option.key)}
-            onToggle={toggleFunction}
+            isSelected={selectedItems.includes(option)}
+            onToggle={(value) => toggleFilter(filterType, value)}
           />
         ))}
       </View>
     );
 
     switch (activeFilterTab) {
-      case "servico":
+      case "servicos":
         return renderFilterOptions(
-          SERVICO_OPTIONS,
-          filters.selectedServicos,
-          toggleServicoFilter
+          filterOptions.servicos,
+          selectedFilters.servicos,
+          "servicos"
         );
       case "operacao":
         return renderFilterOptions(
           filterOptions.opPadrao,
-          filters.selectedOpPadrao,
-          toggleOpPadraoFilter
+          selectedFilters.opPadrao,
+          "opPadrao"
         );
-      case "grupo":
+      case "grupos":
         return renderFilterOptions(
           filterOptions.grupos,
-          filters.selectedGrupos,
-          toggleGrupoFilter
+          selectedFilters.grupos,
+          "grupos"
         );
-      case "produto":
+      case "produtos":
         return renderFilterOptions(
           filterOptions.produtos,
-          filters.selectedProdutos,
-          toggleProdutoFilter
+          selectedFilters.produtos,
+          "produtos"
         );
       default:
         return null;
@@ -192,33 +236,71 @@ const ContratosScreen = ({ navigation, route }) => {
     filtersLoading,
     activeFilterTab,
     filterOptions,
-    filters,
-    toggleServicoFilter,
-    toggleOpPadraoFilter,
-    toggleGrupoFilter,
-    toggleProdutoFilter,
+    selectedFilters,
+    toggleFilter,
   ]);
 
-  const renderHeader = useCallback(
-    () => (
+  const renderHeader = useCallback(() => {
+    // Calcular totais agregados dos contratos
+    const totals = data.reduce((acc, item) => {
+      const veiculosDescarga = parseInt(item.veiculos_descarga || 0);
+      const veiculosCarga = parseInt(item.veiculos_carga || 0);
+      const pesoOrigem = parseFloat(item.peso_origem || 0);
+
+      return {
+        totalVehicles: acc.totalVehicles + Math.max(veiculosDescarga, veiculosCarga),
+        totalContracts: acc.totalContracts + 1,
+        totalWeight: acc.totalWeight + pesoOrigem
+      };
+    }, { totalVehicles: 0, totalContracts: 0, totalWeight: 0 });
+
+    // Formatar peso em toneladas se for muito grande
+    const formatWeight = (weight) => {
+      if (weight >= 1000) {
+        return `${(weight / 1000).toFixed(1)}t`;
+      }
+      return `${weight.toLocaleString()}kg`;
+    };
+
+    return (
       <View>
         {lastUpdate && (
           <View style={styles.updateContainer}>
-            <Text style={styles.updateText}>
-              Atualizado: {lastUpdate.toLocaleTimeString("pt-BR").substring(0, 5)}
-            </Text>
+            <View style={styles.updateRow}>
+              <Text style={styles.updateText}>
+                Atualizado: {lastUpdate.toLocaleTimeString("pt-BR").substring(0, 5)}
+              </Text>
+              <TouchableOpacity
+                style={styles.filterButton}
+                onPress={() => setFiltersVisible(true)}
+              >
+                <Text style={styles.filterButtonText}>🔍 Filtros</Text>
+                {hasActiveFilters() && (
+                  <View style={styles.filterBadge}>
+                    <Text style={styles.filterBadgeText}>!</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         )}
         <View style={styles.summaryContainer}>
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>{data.length}</Text>
+            <Text style={styles.summaryValue}>{totals.totalVehicles}</Text>
+            <Text style={styles.summaryLabel}>Veículos</Text>
+          </View>
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryValue}>{totals.totalContracts}</Text>
             <Text style={styles.summaryLabel}>Contratos</Text>
+          </View>
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryValue}>{formatWeight(totals.totalWeight)}</Text>
+            <Text style={styles.summaryLabel}>Peso Total</Text>
           </View>
         </View>
       </View>
-    ),
-    [lastUpdate, data.length]
-  );
+    );
+  }, [lastUpdate, data, hasActiveFilters]);
 
   const renderEmptyComponent = useCallback(
     () => (
@@ -238,7 +320,7 @@ const ContratosScreen = ({ navigation, route }) => {
   }
 
   if (error && data.length === 0) {
-    return <ErrorMessage message={error} onRetry={refresh} />;
+    return <ErrorMessage message={error} onRetry={fetchContratosData} />;
   }
 
   return (
@@ -257,24 +339,14 @@ const ContratosScreen = ({ navigation, route }) => {
           <Text style={styles.headerSubtitle}>Filial: {state.selectedFilial}</Text>
         </View>
 
-        <TouchableOpacity
-          style={styles.filterButton}
-          onPress={() => setFiltersVisible(true)}
-        >
-          <Text style={styles.filterIcon}>🔎</Text>
-          {hasActiveFilters() && (
-            <View style={styles.filterBadge}>
-              <Text style={styles.filterBadgeText}>!</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        <View style={styles.headerRight} />
       </View>
 
       {/* Lista de Contratos */}
       <FlatList
         data={data}
         renderItem={({ item }) => <ContratoCard item={item} />}
-        keyExtractor={(item, index) => `${item.fila}-${index}`}
+        keyExtractor={(item, index) => `${item.fila}-${item.grupo}-${index}`}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -314,10 +386,10 @@ const ContratosScreen = ({ navigation, route }) => {
             {/* Tabs */}
             <View style={styles.filterTabs}>
               {[
-                { key: "servico", label: "Serviço" },
+                { key: "servicos", label: "Serviços" },
                 { key: "operacao", label: "Operação" },
-                { key: "grupo", label: "Grupo" },
-                { key: "produto", label: "Produto" },
+                { key: "grupos", label: "Grupos" },
+                { key: "produtos", label: "Produtos" },
               ].map((tab) => (
                 <TouchableOpacity
                   key={tab.key}
@@ -344,13 +416,21 @@ const ContratosScreen = ({ navigation, route }) => {
               {renderFilterTab()}
             </ScrollView>
 
-            {/* Botão Aplicar */}
-            <TouchableOpacity
-              style={styles.applyFiltersButton}
-              onPress={handleApplyFilters}
-            >
-              <Text style={styles.applyFiltersText}>Aplicar Filtros</Text>
-            </TouchableOpacity>
+            {/* Botões */}
+            <View style={styles.filterButtons}>
+              <TouchableOpacity
+                style={styles.resetButton}
+                onPress={resetFilters}
+              >
+                <Text style={styles.resetButtonText}>Limpar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.applyButton}
+                onPress={handleApplyFilters}
+              >
+                <Text style={styles.applyButtonText}>Aplicar Filtros</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -403,28 +483,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.gray,
   },
-  filterButton: {
-    padding: 8,
-    position: "relative",
-  },
-  filterIcon: {
-    fontSize: 22,
-  },
-  filterBadge: {
-    position: "absolute",
-    top: 2,
-    right: 2,
-    backgroundColor: COLORS.danger,
-    borderRadius: 9,
-    width: 18,
-    height: 18,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  filterBadgeText: {
-    color: COLORS.white,
-    fontSize: 12,
-    fontWeight: "bold",
+  headerRight: {
+    width: 40,
   },
   listContent: {
     paddingBottom: 15,
@@ -437,10 +497,42 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
     borderRadius: 5,
   },
+  updateRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   updateText: {
     fontSize: 12,
     color: "#0066cc",
-    textAlign: "center",
+  },
+  filterButton: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 4,
+    position: "relative",
+  },
+  filterButtonText: {
+    fontSize: 12,
+    color: COLORS.white,
+    fontWeight: "500",
+  },
+  filterBadge: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    backgroundColor: COLORS.danger,
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  filterBadgeText: {
+    color: COLORS.white,
+    fontSize: 10,
+    fontWeight: "bold",
   },
   summaryContainer: {
     flexDirection: "row",
@@ -510,7 +602,7 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   grupoBadge: {
-    backgroundColor: COLORS.purple,
+    backgroundColor: COLORS.primary,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 5,
@@ -649,14 +741,32 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontWeight: "600",
   },
-  applyFiltersButton: {
+  filterButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 10,
+  },
+  resetButton: {
+    flex: 1,
+    backgroundColor: COLORS.gray,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginRight: 10,
+  },
+  resetButtonText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  applyButton: {
+    flex: 2,
     backgroundColor: COLORS.primary,
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: "center",
-    marginTop: 10,
   },
-  applyFiltersText: {
+  applyButtonText: {
     color: COLORS.white,
     fontSize: 16,
     fontWeight: "600",

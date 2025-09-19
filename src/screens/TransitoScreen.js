@@ -6,8 +6,17 @@ import { formatDateTime } from "../utils/formatters";
 
 const TransitoScreen = ({ navigation, route }) => {
   const { state } = useApp();
-  const { data, loading, lastUpdate, error, refresh } =
-    useVehicleData("transito");
+  const {
+    data,
+    loading,
+    lastUpdate,
+    error,
+    refresh,
+    filtroServico,
+    setFiltroServico,
+    filtroOpPadrao,
+    setFiltroOpPadrao
+  } = useVehicleData("transito");
 
   React.useEffect(() => {
     if (data && data.length > 0) {
@@ -17,25 +26,15 @@ const TransitoScreen = ({ navigation, route }) => {
   }, [data]);
 
   const fields = [
-    { key: "origem", label: "Origem:" },
-    { key: "destino", label: "Destino:" },
-    { key: "produto", label: "Produto:" },
-    { key: "peso", label: "Peso:" },
-    { key: "motorista", label: "Motorista:" },
-    { key: "placa", label: "Placa:" },
-    { key: "situacao", label: "Situação:" },
-    {
-      key: "data_saida",
-      label: "Data Saída:",
-      format: (value) =>
-        value ? formatDateTime(value, { includeTime: false }) : "N/A",
-    },
+    { key: "t_fila", label: "Fila:" },
+    { key: "t_produto", label: "Produto:" },
+    { key: "t_peso", label: "Peso (kg):" },
   ];
 
   return (
     <VehicleListScreen
       navigation={navigation}
-      title="Veículos em Trânsito"
+      title="Trânsito de Veículos"
       subtitle={`Filial: ${state.selectedFilial}`}
       data={data}
       loading={loading}
@@ -43,8 +42,12 @@ const TransitoScreen = ({ navigation, route }) => {
       lastUpdate={lastUpdate}
       onRefresh={refresh}
       fields={fields}
-      emptyMessage="Nenhum veículo em trânsito"
+      emptyMessage="Nenhum trânsito encontrado"
       emptyIcon="🚛"
+      filtroServico={filtroServico}
+      setFiltroServico={setFiltroServico}
+      filtroOpPadrao={filtroOpPadrao}
+      setFiltroOpPadrao={setFiltroOpPadrao}
     />
   );
 };

@@ -6,22 +6,31 @@ import { formatDateTime } from "../utils/formatters";
 
 const CargasHojeScreen = ({ navigation, route }) => {
   const { state } = useApp();
-  const { data, loading, lastUpdate, error, refresh } = useVehicleData("cargas_hoje");
+  const {
+    data,
+    loading,
+    lastUpdate,
+    error,
+    refresh,
+    filtroServico,
+    setFiltroServico,
+    filtroOpPadrao,
+    setFiltroOpPadrao
+  } = useVehicleData("cargas_hoje");
 
   const fields = [
-    { key: "destino", label: "Destino:" },
-    { key: "produto", label: "Produto:" },
-    { key: "peso_final", label: "Peso Final:" },
-    { key: "motorista", label: "Motorista:" },
+    { key: "c_fila", label: "Fila:" },
+    { key: "c_produto", label: "Produto:" },
+    { key: "c_peso", label: "Peso (kg):" },
     {
-      key: "horario_saida",
-      label: "Horário Saída:",
-      format: (value) => value ? formatDateTime(value) : "N/A"
+      key: "c_data",
+      label: "Data:",
+      format: (value) => value ? new Date(value).toLocaleDateString('pt-BR') : "N/A"
     },
     {
-      key: "data_conclusao",
-      label: "Conclusão:",
-      format: (value) => value ? formatDateTime(value, { includeTime: false }) : "N/A"
+      key: "c_hora",
+      label: "Hora:",
+      format: (value) => value ? value.substring(0, 8) : "N/A"
     },
   ];
 
@@ -38,6 +47,10 @@ const CargasHojeScreen = ({ navigation, route }) => {
       fields={fields}
       emptyMessage="Nenhuma carga realizada hoje"
       emptyIcon="✅"
+      filtroServico={filtroServico}
+      setFiltroServico={setFiltroServico}
+      filtroOpPadrao={filtroOpPadrao}
+      setFiltroOpPadrao={setFiltroOpPadrao}
     />
   );
 };

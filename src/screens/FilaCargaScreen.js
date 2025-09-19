@@ -6,19 +6,32 @@ import { formatDateTime } from "../utils/formatters";
 
 const FilaCargaScreen = ({ navigation, route }) => {
   const { state } = useApp();
-  const { data, loading, lastUpdate, error, refresh } = useVehicleData("fila_carga");
+  const {
+    data,
+    loading,
+    lastUpdate,
+    error,
+    refresh,
+    filtroServico,
+    setFiltroServico,
+    filtroOpPadrao,
+    setFiltroOpPadrao
+  } = useVehicleData("fila_carga");
 
   const fields = [
-    { key: "destino", label: "Destino:" },
-    { key: "produto", label: "Produto:" },
-    { key: "peso_previsto", label: "Peso Previsto:" },
-    { key: "motorista", label: "Motorista:" },
+    { key: "fc_fila", label: "Fila:" },
+    { key: "fc_produto", label: "Produto:" },
+    { key: "fc_peso", label: "Peso (kg):" },
     {
-      key: "data_agendamento",
-      label: "Agendamento:",
-      format: (value) => value ? formatDateTime(value) : "N/A"
+      key: "fc_data",
+      label: "Data:",
+      format: (value) => value ? new Date(value).toLocaleDateString('pt-BR') : "N/A"
     },
-    { key: "posicao_fila", label: "Posição na Fila:" },
+    {
+      key: "fc_hora",
+      label: "Hora:",
+      format: (value) => value ? value.substring(0, 8) : "N/A"
+    },
   ];
 
   return (
@@ -34,6 +47,10 @@ const FilaCargaScreen = ({ navigation, route }) => {
       fields={fields}
       emptyMessage="Nenhum veículo na fila de carga"
       emptyIcon="⏰"
+      filtroServico={filtroServico}
+      setFiltroServico={setFiltroServico}
+      filtroOpPadrao={filtroOpPadrao}
+      setFiltroOpPadrao={setFiltroOpPadrao}
     />
   );
 };

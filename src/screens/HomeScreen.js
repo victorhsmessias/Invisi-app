@@ -13,7 +13,12 @@ import {
 } from "react-native";
 import { useApp } from "../context/AppContext";
 import { useTransportData } from "../hooks/useTransportData";
-import { StatusCard, LoadingSpinner, ErrorMessage, SideMenu } from "../components";
+import {
+  StatusCard,
+  LoadingSpinner,
+  ErrorMessage,
+  SideMenu,
+} from "../components";
 import { COLORS, FILIAIS, SCREEN_NAMES } from "../constants";
 
 const HomeScreen = ({ navigation }) => {
@@ -24,7 +29,6 @@ const HomeScreen = ({ navigation }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Entrada com animação
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 600,
@@ -51,7 +55,9 @@ const HomeScreen = ({ navigation }) => {
       color: COLORS.warning,
       subtitle: "veículos",
       onPress: () =>
-        navigation.navigate(SCREEN_NAMES.TRANSITO, { filial: state.selectedFilial }),
+        navigation.navigate(SCREEN_NAMES.TRANSITO, {
+          filial: state.selectedFilial,
+        }),
     },
     {
       id: "filaDescarga",
@@ -61,7 +67,9 @@ const HomeScreen = ({ navigation }) => {
       color: COLORS.info,
       subtitle: "aguardando",
       onPress: () =>
-        navigation.navigate(SCREEN_NAMES.FILA_DESCARGA, { filial: state.selectedFilial }),
+        navigation.navigate(SCREEN_NAMES.FILA_DESCARGA, {
+          filial: state.selectedFilial,
+        }),
     },
     {
       id: "filaCarga",
@@ -71,7 +79,9 @@ const HomeScreen = ({ navigation }) => {
       color: COLORS.orange,
       subtitle: "aguardando",
       onPress: () =>
-        navigation.navigate(SCREEN_NAMES.FILA_CARGA, { filial: state.selectedFilial }),
+        navigation.navigate(SCREEN_NAMES.FILA_CARGA, {
+          filial: state.selectedFilial,
+        }),
     },
     {
       id: "patioDescarregando",
@@ -81,7 +91,9 @@ const HomeScreen = ({ navigation }) => {
       color: COLORS.purple,
       subtitle: "em operação",
       onPress: () =>
-        navigation.navigate(SCREEN_NAMES.PATIO_DESCARGA, { filial: state.selectedFilial }),
+        navigation.navigate(SCREEN_NAMES.PATIO_DESCARGA, {
+          filial: state.selectedFilial,
+        }),
     },
     {
       id: "patioCarregando",
@@ -91,7 +103,9 @@ const HomeScreen = ({ navigation }) => {
       color: COLORS.teal,
       subtitle: "em operação",
       onPress: () =>
-        navigation.navigate(SCREEN_NAMES.PATIO_CARGA, { filial: state.selectedFilial }),
+        navigation.navigate(SCREEN_NAMES.PATIO_CARGA, {
+          filial: state.selectedFilial,
+        }),
     },
     {
       id: "descargasHoje",
@@ -101,7 +115,9 @@ const HomeScreen = ({ navigation }) => {
       color: COLORS.success,
       subtitle: "concluídas",
       onPress: () =>
-        navigation.navigate(SCREEN_NAMES.DESCARGAS_HOJE, { filial: state.selectedFilial }),
+        navigation.navigate(SCREEN_NAMES.DESCARGAS_HOJE, {
+          filial: state.selectedFilial,
+        }),
     },
     {
       id: "cargasHoje",
@@ -111,7 +127,9 @@ const HomeScreen = ({ navigation }) => {
       color: COLORS.primary,
       subtitle: "concluídas",
       onPress: () =>
-        navigation.navigate(SCREEN_NAMES.CARGAS_HOJE, { filial: state.selectedFilial }),
+        navigation.navigate(SCREEN_NAMES.CARGAS_HOJE, {
+          filial: state.selectedFilial,
+        }),
     },
   ];
 

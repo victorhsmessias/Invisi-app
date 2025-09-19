@@ -103,9 +103,7 @@ class ApiService {
                 data.access_token ||
                 data.accessToken ||
                 data.authToken;
-            } catch (parseError) {
-              console.log("Resposta não é JSON");
-            }
+            } catch (parseError) {}
           }
 
           // Se não encontrou token mas status é 200, gerar um
@@ -132,28 +130,27 @@ class ApiService {
 
   // Métodos para diferentes operações de monitoramento
   async getMonitorData(tipoOperacao, filtros) {
-    console.log(`[ApiService] Calling ${tipoOperacao} with filters:`, filtros);
-
-    const result = await this.requestWithRetry("/monitor.php", {
+    const requestBody = {
       AttApi: {
         tipoOperacao,
         ...filtros,
       },
-    });
+    };
 
-    console.log(`[ApiService] ${tipoOperacao} response:`, result);
+    const result = await this.requestWithRetry("/monitor.php", requestBody);
+
     return result;
   }
 
-  async getTransitoData(filial) {
+  async getTransitoData(filial, filtroServico = null, filtroOpPadrao = null) {
     return this.getMonitorData("monitor_transito", {
       filtro_filial: filial,
-      filtro_servico: {
+      filtro_servico: filtroServico || {
         armazenagem: 1,
         transbordo: 1,
         pesagem: 0,
       },
-      filtro_op_padrao: {
+      filtro_op_padrao: filtroOpPadrao || {
         rodo_ferro: 1,
         ferro_rodo: 1,
         rodo_rodo: 1,
@@ -162,15 +159,19 @@ class ApiService {
     });
   }
 
-  async getFilaDescargaData(filial) {
+  async getFilaDescargaData(
+    filial,
+    filtroServico = null,
+    filtroOpPadrao = null
+  ) {
     return this.getMonitorData("monitor_fila_desc", {
       filtro_filial: filial,
-      filtro_servico: {
+      filtro_servico: filtroServico || {
         armazenagem: 1,
         transbordo: 1,
         pesagem: 0,
       },
-      filtro_op_padrao: {
+      filtro_op_padrao: filtroOpPadrao || {
         rodo_ferro: 1,
         ferro_rodo: 1,
         rodo_rodo: 1,
@@ -179,15 +180,15 @@ class ApiService {
     });
   }
 
-  async getFilaCargaData(filial) {
+  async getFilaCargaData(filial, filtroServico = null, filtroOpPadrao = null) {
     return this.getMonitorData("monitor_fila_carga", {
       filtro_filial: filial,
-      filtro_servico: {
+      filtro_servico: filtroServico || {
         armazenagem: 1,
         transbordo: 1,
         pesagem: 0,
       },
-      filtro_op_padrao: {
+      filtro_op_padrao: filtroOpPadrao || {
         rodo_ferro: 1,
         ferro_rodo: 1,
         rodo_rodo: 1,
@@ -196,15 +197,19 @@ class ApiService {
     });
   }
 
-  async getPatioDescargaData(filial) {
+  async getPatioDescargaData(
+    filial,
+    filtroServico = null,
+    filtroOpPadrao = null
+  ) {
     return this.getMonitorData("monitor_patio_desc", {
       filtro_filial: filial,
-      filtro_servico: {
+      filtro_servico: filtroServico || {
         armazenagem: 1,
         transbordo: 1,
         pesagem: 0,
       },
-      filtro_op_padrao: {
+      filtro_op_padrao: filtroOpPadrao || {
         rodo_ferro: 1,
         ferro_rodo: 1,
         rodo_rodo: 1,
@@ -213,15 +218,15 @@ class ApiService {
     });
   }
 
-  async getPatioCargaData(filial) {
+  async getPatioCargaData(filial, filtroServico = null, filtroOpPadrao = null) {
     return this.getMonitorData("monitor_patio_carga", {
       filtro_filial: filial,
-      filtro_servico: {
+      filtro_servico: filtroServico || {
         armazenagem: 1,
         transbordo: 1,
         pesagem: 0,
       },
-      filtro_op_padrao: {
+      filtro_op_padrao: filtroOpPadrao || {
         rodo_ferro: 1,
         ferro_rodo: 1,
         rodo_rodo: 1,
@@ -230,15 +235,19 @@ class ApiService {
     });
   }
 
-  async getDescargasHojeData(filial) {
+  async getDescargasHojeData(
+    filial,
+    filtroServico = null,
+    filtroOpPadrao = null
+  ) {
     return this.getMonitorData("monitor_descarga", {
       filtro_filial: filial,
-      filtro_servico: {
+      filtro_servico: filtroServico || {
         armazenagem: 1,
         transbordo: 1,
         pesagem: 0,
       },
-      filtro_op_padrao: {
+      filtro_op_padrao: filtroOpPadrao || {
         rodo_ferro: 1,
         ferro_rodo: 1,
         rodo_rodo: 1,
@@ -247,15 +256,15 @@ class ApiService {
     });
   }
 
-  async getCargasHojeData(filial) {
+  async getCargasHojeData(filial, filtroServico = null, filtroOpPadrao = null) {
     return this.getMonitorData("monitor_carga", {
       filtro_filial: filial,
-      filtro_servico: {
+      filtro_servico: filtroServico || {
         armazenagem: 1,
         transbordo: 1,
         pesagem: 0,
       },
-      filtro_op_padrao: {
+      filtro_op_padrao: filtroOpPadrao || {
         rodo_ferro: 1,
         ferro_rodo: 1,
         rodo_rodo: 1,
@@ -264,12 +273,108 @@ class ApiService {
     });
   }
 
-  async getContratosData(filtros) {
-    return this.getMonitorData("monitor_corte", filtros);
+  async getContratosData(filial, filtroServico = null, filtroOpPadrao = null, filtroGrupo = null, filtroTpProd = null) {
+    try {
+      // Buscar filtros dinâmicos se não foram fornecidos
+      let grupos = filtroGrupo;
+      let produtos = filtroTpProd;
+
+      if (!grupos || !produtos) {
+        console.log("[ApiService] Loading dynamic filters for contratos...");
+
+        const [gruposResponse, produtosResponse] = await Promise.all([
+          grupos ? Promise.resolve({ dados: { grupos: grupos.map(g => g.grupo) } }) : this.getGruposFilter(filial),
+          produtos ? Promise.resolve({ dados: { produtos: produtos.map(p => p.tp_prod) } }) : this.getProdutosFilter(filial)
+        ]);
+
+        if (!grupos && gruposResponse.dados?.grupos) {
+          grupos = gruposResponse.dados.grupos.map(grupo => ({ grupo }));
+        }
+
+        if (!produtos && produtosResponse.dados?.produtos) {
+          produtos = produtosResponse.dados.produtos.map(produto => ({ tp_prod: produto }));
+        }
+      }
+
+      // Fallback para valores padrão se as APIs falharem
+      if (!grupos || grupos.length === 0) {
+        console.log("[ApiService] Using fallback grupos for contratos");
+        grupos = [
+          { grupo: "ADM-MGA" },
+          { grupo: "ATT" },
+          { grupo: "CARGILL" },
+          { grupo: "BTG PACTUAL S/A" },
+        ];
+      }
+
+      if (!produtos || produtos.length === 0) {
+        console.log("[ApiService] Using fallback produtos for contratos");
+        produtos = [
+          { tp_prod: "SOJA GRAOS" },
+          { tp_prod: "MILHO GRAOS" },
+          { tp_prod: "FARELO DE SOJA" },
+        ];
+      }
+
+      const requestBody = {
+        AttApi: {
+          tipoOperacao: "monitor_corte",
+          filtro_filial: filial,
+          filtro_servico: filtroServico || {
+            armazenagem: 1,
+            transbordo: 1,
+            pesagem: 0,
+          },
+          filtro_op_padrao: filtroOpPadrao || {
+            rodo_ferro: 1,
+            ferro_rodo: 1,
+            rodo_rodo: 1,
+            outros: 0,
+          },
+          filtro_grupo: grupos,
+          filtro_tp_prod: produtos,
+        },
+      };
+
+      console.log("[ApiService] Making contratos request with dynamic filters:", {
+        grupos: grupos.length,
+        produtos: produtos.length,
+      });
+
+      return this.requestWithRetry("/monitor_corte.php", requestBody);
+    } catch (error) {
+      console.error("[ApiService] Error in getContratosData:", error);
+      throw error;
+    }
   }
 
   async getFilterOptions(tipo, filial) {
     return this.getMonitorData(tipo, {
+      filtro_filial: filial,
+    });
+  }
+
+  // Métodos específicos para buscar filtros dinâmicos
+  async getServicosFilter(filial) {
+    return this.getMonitorData("fservico", {
+      filtro_filial: filial,
+    });
+  }
+
+  async getOpPadraoFilter(filial) {
+    return this.getMonitorData("fop_padrao", {
+      filtro_filial: filial,
+    });
+  }
+
+  async getGruposFilter(filial) {
+    return this.getMonitorData("fgrupo", {
+      filtro_filial: filial,
+    });
+  }
+
+  async getProdutosFilter(filial) {
+    return this.getMonitorData("fproduto", {
       filtro_filial: filial,
     });
   }
