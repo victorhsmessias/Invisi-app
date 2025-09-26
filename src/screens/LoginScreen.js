@@ -12,6 +12,7 @@ import {
   Animated,
 } from "react-native";
 import { useAuth } from "../hooks/useAuth";
+import { useGlobalFilters } from "../hooks/useGlobalFilters";
 import { LoadingSpinner } from "../components";
 import { COLORS, SCREEN_NAMES } from "../constants";
 
@@ -19,6 +20,7 @@ const LoginScreen = ({ navigation }) => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const { login, loading, error, isLoggedIn } = useAuth();
+  const { preloadAllFilters } = useGlobalFilters();
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -40,6 +42,18 @@ const LoginScreen = ({ navigation }) => {
     try {
       const result = await login(username, password);
       if (result.success) {
+        // PRECARREGAMENTO: Iniciar carregamento de filtros após login bem-sucedido
+        if (__DEV__) {
+          console.log('[LoginScreen] Login bem-sucedido, iniciando precarregamento de filtros...');
+        }
+
+        // Precarregar filtros em background enquanto mostra alert
+        preloadAllFilters().catch(error => {
+          if (__DEV__) {
+            console.log('[LoginScreen] Erro no precarregamento pós-login:', error);
+          }
+        });
+
         Alert.alert("Sucesso", "Login realizado com sucesso!", [
           {
             text: "OK",

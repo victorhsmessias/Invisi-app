@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Modal,
   View,
@@ -7,8 +7,14 @@ import {
   StyleSheet,
   ScrollView,
   SafeAreaView,
+  Platform,
 } from "react-native";
-import { COLORS, SERVICO_OPTIONS, OP_PADRAO_OPTIONS } from "../constants";
+import {
+  COLORS,
+  SERVICO_OPTIONS,
+  OP_PADRAO_OPTIONS,
+  DEFAULT_FILTERS,
+} from "../constants";
 
 const FilterModal = ({
   visible,
@@ -22,31 +28,34 @@ const FilterModal = ({
   const [tempFiltroServico, setTempFiltroServico] = useState(filtroServico);
   const [tempFiltroOpPadrao, setTempFiltroOpPadrao] = useState(filtroOpPadrao);
 
+  useEffect(() => {
+    if (visible) {
+      setTempFiltroServico(filtroServico);
+      setTempFiltroOpPadrao(filtroOpPadrao);
+    }
+  }, [visible, filtroServico, filtroOpPadrao]);
+
   const handleApply = () => {
-    console.log('[FilterModal] Applying filters:', {
-      servico: tempFiltroServico,
-      opPadrao: tempFiltroOpPadrao
-    });
+    if (__DEV__) {
+      console.log("[FilterModal] Applying filters:", {
+        servico: tempFiltroServico,
+        opPadrao: tempFiltroOpPadrao,
+      });
+    }
     setFiltroServico(tempFiltroServico);
     setFiltroOpPadrao(tempFiltroOpPadrao);
-    onApply();
+
+    // Chamar onApply com os filtros específicos para sincronização imediata
+    if (onApply) {
+      onApply(tempFiltroServico, tempFiltroOpPadrao);
+    }
+
     onClose();
   };
 
   const handleReset = () => {
-    const defaultServico = {
-      armazenagem: 1,
-      transbordo: 1,
-      pesagem: 0,
-    };
-    const defaultOpPadrao = {
-      rodo_ferro: 1,
-      ferro_rodo: 1,
-      rodo_rodo: 1,
-      outros: 0,
-    };
-    setTempFiltroServico(defaultServico);
-    setTempFiltroOpPadrao(defaultOpPadrao);
+    setTempFiltroServico(DEFAULT_FILTERS.servico);
+    setTempFiltroOpPadrao(DEFAULT_FILTERS.opPadrao);
   };
 
   const toggleServico = (key) => {
@@ -67,7 +76,7 @@ const FilterModal = ({
     <Modal
       visible={visible}
       animationType="slide"
-      presentationStyle="pageSheet"
+      presentationStyle={Platform.OS === "ios" ? "pageSheet" : "fullScreen"}
       onRequestClose={onClose}
     >
       <SafeAreaView style={styles.container}>
@@ -82,7 +91,6 @@ const FilterModal = ({
         </View>
 
         <ScrollView style={styles.content}>
-          {/* Filtro de Serviços */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Tipo de Serviço</Text>
             {SERVICO_OPTIONS.map((option) => (
@@ -90,15 +98,19 @@ const FilterModal = ({
                 key={option.key}
                 style={styles.filterItem}
                 onPress={() => toggleServico(option.key)}
+                accessibilityRole="checkbox"
+                accessibilityState={{
+                  checked: !!tempFiltroServico[option.key],
+                }}
               >
                 <Text style={styles.filterLabel}>{option.label}</Text>
                 <View
                   style={[
                     styles.checkbox,
-                    tempFiltroServico[option.key] === 1 && styles.checkboxActive,
+                    !!tempFiltroServico[option.key] && styles.checkboxActive,
                   ]}
                 >
-                  {tempFiltroServico[option.key] === 1 && (
+                  {!!tempFiltroServico[option.key] && (
                     <Text style={styles.checkmark}>✓</Text>
                   )}
                 </View>
@@ -106,7 +118,6 @@ const FilterModal = ({
             ))}
           </View>
 
-          {/* Filtro de Operações Padrão */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Tipo de Operação</Text>
             {OP_PADRAO_OPTIONS.map((option) => (
@@ -114,15 +125,17 @@ const FilterModal = ({
                 key={option.key}
                 style={styles.filterItem}
                 onPress={() => toggleOpPadrao(option.key)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: tempFiltroOpPadrao[option.key] }}
               >
                 <Text style={styles.filterLabel}>{option.label}</Text>
                 <View
                   style={[
                     styles.checkbox,
-                    tempFiltroOpPadrao[option.key] === 1 && styles.checkboxActive,
+                    !!tempFiltroOpPadrao[option.key] && styles.checkboxActive,
                   ]}
                 >
-                  {tempFiltroOpPadrao[option.key] === 1 && (
+                  {!!tempFiltroOpPadrao[option.key] && (
                     <Text style={styles.checkmark}>✓</Text>
                   )}
                 </View>

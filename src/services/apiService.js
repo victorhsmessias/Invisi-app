@@ -3,8 +3,12 @@ import { API_CONFIG, STORAGE_KEYS } from "../constants";
 
 class ApiService {
   constructor() {
-    this.baseURL = API_CONFIG.BASE_URL;
-    this.backupURL = API_CONFIG.BACKUP_URL;
+    // URLs agora são específicas por filial
+  }
+
+  // Obter URL específica para a filial
+  getFilialURL(filial) {
+    return API_CONFIG.FILIAL_URLS[filial];
   }
 
   async getAuthHeaders() {
@@ -16,8 +20,17 @@ class ApiService {
     };
   }
 
-  async makeRequest(endpoint, body, useBackup = false) {
-    const url = `${useBackup ? this.backupURL : this.baseURL}${endpoint}`;
+  async makeRequest(endpoint, body, filial) {
+    if (!filial || !API_CONFIG.FILIAL_URLS[filial]) {
+      throw new Error(`Filial '${filial}' não configurada ou inválida`);
+    }
+
+    const url = `${API_CONFIG.FILIAL_URLS[filial]}${endpoint}`;
+
+    if (__DEV__) {
+      console.log(`[ApiService] Using filial-specific URL for ${filial}: ${url}`);
+    }
+
     const headers = await this.getAuthHeaders();
 
     const response = await fetch(url, {
@@ -33,32 +46,31 @@ class ApiService {
     return response;
   }
 
-  async requestWithRetry(endpoint, body) {
+  async requestWithRetry(endpoint, body, filial) {
+    if (!filial) {
+      throw new Error("Filial é obrigatória para fazer requisições");
+    }
+
     let lastError = null;
-    const urls = [false, true]; // false = main URL, true = backup URL
 
     for (let attempt = 0; attempt < API_CONFIG.RETRY_ATTEMPTS; attempt++) {
-      for (const useBackup of urls) {
-        try {
-          const response = await this.makeRequest(endpoint, body, useBackup);
-          return await response.json();
-        } catch (error) {
-          lastError = error;
-          if (attempt < API_CONFIG.RETRY_ATTEMPTS - 1) {
-            await new Promise((resolve) =>
-              setTimeout(resolve, API_CONFIG.RETRY_DELAY)
-            );
-          }
+      try {
+        const response = await this.makeRequest(endpoint, body, filial);
+        return await response.json();
+      } catch (error) {
+        lastError = error;
+        if (attempt < API_CONFIG.RETRY_ATTEMPTS - 1) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, API_CONFIG.RETRY_DELAY)
+          );
         }
       }
     }
 
     throw lastError;
   }
-
-  // Método específico para login
   async login(credentials) {
-    const urls = [this.baseURL, this.backupURL];
+    const urls = Object.values(API_CONFIG.FILIAL_URLS);
     let lastError = null;
 
     for (let attempt = 0; attempt < API_CONFIG.RETRY_ATTEMPTS; attempt++) {
@@ -78,7 +90,6 @@ class ApiService {
 
           const responseText = await response.text();
 
-          // Verificar se há erro na resposta
           if (
             responseText.toLowerCase().includes("failed") ||
             responseText.toLowerCase().includes("invalid") ||
@@ -87,7 +98,6 @@ class ApiService {
             throw new Error("Credenciais inválidas");
           }
 
-          // Buscar token nos headers ou no body
           let token =
             response.headers.get("token") ||
             response.headers.get("authorization") ||
@@ -106,7 +116,6 @@ class ApiService {
             } catch (parseError) {}
           }
 
-          // Se não encontrou token mas status é 200, gerar um
           if (!token && response.status === 200) {
             token = "success_" + Date.now();
           }
@@ -128,7 +137,6 @@ class ApiService {
     throw lastError;
   }
 
-  // Métodos para diferentes operações de monitoramento
   async getMonitorData(tipoOperacao, filtros) {
     const requestBody = {
       AttApi: {
@@ -137,7 +145,9 @@ class ApiService {
       },
     };
 
-    const result = await this.requestWithRetry("/monitor.php", requestBody);
+    // Extrair filial dos filtros para usar URL específica
+    const filial = filtros.filtro_filial || filtros.filial;
+    const result = await this.requestWithRetry("/monitor.php", requestBody, filial);
 
     return result;
   }
@@ -273,9 +283,14 @@ class ApiService {
     });
   }
 
-  async getContratosData(filial, filtroServico = null, filtroOpPadrao = null, filtroGrupo = null, filtroTpProd = null) {
+  async getContratosData(
+    filial,
+    filtroServico = null,
+    filtroOpPadrao = null,
+    filtroGrupo = null,
+    filtroTpProd = null
+  ) {
     try {
-      // Buscar filtros dinâmicos se não foram fornecidos
       let grupos = filtroGrupo;
       let produtos = filtroTpProd;
 
@@ -283,20 +298,27 @@ class ApiService {
         console.log("[ApiService] Loading dynamic filters for contratos...");
 
         const [gruposResponse, produtosResponse] = await Promise.all([
-          grupos ? Promise.resolve({ dados: { grupos: grupos.map(g => g.grupo) } }) : this.getGruposFilter(filial),
-          produtos ? Promise.resolve({ dados: { produtos: produtos.map(p => p.tp_prod) } }) : this.getProdutosFilter(filial)
+          grupos
+            ? Promise.resolve({ dados: { grupos: grupos.map((g) => g.grupo) } })
+            : this.getGruposFilter(filial),
+          produtos
+            ? Promise.resolve({
+                dados: { produtos: produtos.map((p) => p.tp_prod) },
+              })
+            : this.getProdutosFilter(filial),
         ]);
 
         if (!grupos && gruposResponse.dados?.grupos) {
-          grupos = gruposResponse.dados.grupos.map(grupo => ({ grupo }));
+          grupos = gruposResponse.dados.grupos.map((grupo) => ({ grupo }));
         }
 
         if (!produtos && produtosResponse.dados?.produtos) {
-          produtos = produtosResponse.dados.produtos.map(produto => ({ tp_prod: produto }));
+          produtos = produtosResponse.dados.produtos.map((produto) => ({
+            tp_prod: produto,
+          }));
         }
       }
 
-      // Fallback para valores padrão se as APIs falharem
       if (!grupos || grupos.length === 0) {
         console.log("[ApiService] Using fallback grupos for contratos");
         grupos = [
@@ -336,12 +358,22 @@ class ApiService {
         },
       };
 
-      console.log("[ApiService] Making contratos request with dynamic filters:", {
-        grupos: grupos.length,
-        produtos: produtos.length,
-      });
+      if (__DEV__) {
+        console.log(
+          "[ApiService] Making contratos request with dynamic filters:",
+          {
+            filial,
+            grupos: grupos ? grupos.length : "null",
+            produtos: produtos ? produtos.length : "null",
+            filtroServico,
+            filtroOpPadrao,
+            gruposArray: grupos,
+            produtosArray: produtos,
+          }
+        );
+      }
 
-      return this.requestWithRetry("/monitor_corte.php", requestBody);
+      return this.requestWithRetry("/monitor_corte.php", requestBody, filial);
     } catch (error) {
       console.error("[ApiService] Error in getContratosData:", error);
       throw error;
@@ -354,7 +386,6 @@ class ApiService {
     });
   }
 
-  // Métodos específicos para buscar filtros dinâmicos
   async getServicosFilter(filial) {
     return this.getMonitorData("fservico", {
       filtro_filial: filial,
@@ -377,6 +408,51 @@ class ApiService {
     return this.getMonitorData("fproduto", {
       filtro_filial: filial,
     });
+  }
+
+  async getContratosFilaData(filial, fila, grupo, produto, dadosCorte) {
+    try {
+      const requestBody = {
+        AttApi: {
+          tipoOperacao: "monitor_contratos_fila",
+          filial: filial,
+          fila: fila,
+          grupo: grupo,
+          prod: produto,
+          ...(dadosCorte && {
+            peso_origem: dadosCorte.peso_origem || 0,
+            peso_descarga: dadosCorte.peso_descarga || 0,
+            peso_carga: dadosCorte.peso_carga || 0,
+            peso_meia_carga: dadosCorte.peso_meia_carga || 0,
+            peso_destino: dadosCorte.peso_destino || 0,
+            dif_peso_descarga_origem: dadosCorte.dif_peso_descarga_origem || 0,
+            pdif_peso_descarga_origem:
+              dadosCorte.pdif_peso_descarga_origem || 0,
+            dif_peso_carga_descarga: dadosCorte.dif_peso_carga_descarga || 0,
+            pdif_peso_carga_descarga: dadosCorte.pdif_peso_carga_descarga || 0,
+            dif_peso_destino_carga: dadosCorte.dif_peso_destino_carga || 0,
+            pdif_peso_destino_carga: dadosCorte.pdif_peso_destino_carga || 0,
+            veiculos_descarga: dadosCorte.veiculos_descarga || "0",
+            veiculos_descarga_med: dadosCorte.veiculos_descarga_med || 0,
+            veiculos_carga: dadosCorte.veiculos_carga || "0",
+            veiculos_carga_med: dadosCorte.veiculos_carga_med || 0,
+            veiculos_meia_carga: dadosCorte.veiculos_meia_carga || 0,
+          }),
+        },
+      };
+
+      console.log("[ApiService] Making contratos fila request:", {
+        filial,
+        fila,
+        grupo,
+        produto,
+      });
+
+      return this.requestWithRetry("/monitor_contratos_fila.php", requestBody, filial);
+    } catch (error) {
+      console.error("[ApiService] Error in getContratosFilaData:", error);
+      throw error;
+    }
   }
 }
 

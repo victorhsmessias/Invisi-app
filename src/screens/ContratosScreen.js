@@ -16,7 +16,11 @@ import { useApp } from "../context/AppContext";
 import { useContractFilters } from "../hooks/useContractFilters";
 import { LoadingSpinner, ErrorMessage } from "../components";
 import { COLORS } from "../constants";
-import { formatPeso, formatPercentual, formatNumber } from "../utils/formatters";
+import {
+  formatPeso,
+  formatPercentual,
+  formatNumber,
+} from "../utils/formatters";
 import apiService from "../services/apiService";
 
 const ContratosScreen = ({ navigation, route }) => {
@@ -46,9 +50,8 @@ const ContratosScreen = ({ navigation, route }) => {
       setLoading(true);
       setError(null);
 
-      console.log("[ContratosScreen] Fetching contratos data with filters:", selectedFilters);
-
-      const { filtroServico, filtroOpPadrao, filtroGrupo, filtroTpProd } = getApiFilters();
+      const { filtroServico, filtroOpPadrao, filtroGrupo, filtroTpProd } =
+        getApiFilters();
 
       const response = await apiService.getContratosData(
         state.selectedFilial,
@@ -58,12 +61,9 @@ const ContratosScreen = ({ navigation, route }) => {
         filtroTpProd
       );
 
-      console.log("[ContratosScreen] Full API Response:", response);
-
       if (response.dados?.CortesFila) {
         setData(response.dados.CortesFila);
         setLastUpdate(new Date());
-        console.log("[ContratosScreen] Extracted data:", response.dados.CortesFila);
       } else {
         setData([]);
         setError("Nenhum contrato encontrado");
@@ -76,10 +76,10 @@ const ContratosScreen = ({ navigation, route }) => {
     }
   }, [state.isLoggedIn, state.selectedFilial, selectedFilters, getApiFilters]);
 
-  // Buscar dados quando a tela ganha foco ou filtros mudam
   useFocusEffect(
     useCallback(() => {
-      if (filterOptions.grupos.length > 0) { // Wait for filters to load
+      if (filterOptions.grupos.length > 0) {
+        // Wait for filters to load
         fetchContratosData();
       }
     }, [fetchContratosData, filterOptions.grupos.length])
@@ -107,12 +107,9 @@ const ContratosScreen = ({ navigation, route }) => {
 
   React.useEffect(() => {
     if (data && data.length > 0) {
-      console.log("[ContratosScreen] Data sample:", data[0]);
-      console.log("[ContratosScreen] All keys:", Object.keys(data[0] || {}));
     }
   }, [data]);
 
-  // Componente de Card de Contrato
   const ContratoCard = React.memo(({ item }) => (
     <View style={styles.contratoCard}>
       <View style={styles.cardHeader}>
@@ -125,7 +122,10 @@ const ContratosScreen = ({ navigation, route }) => {
       <View style={styles.cardContent}>
         <InfoRow label="Produto:" value={item.prod || "Não informado"} />
         <InfoRow label="Peso Origem:" value={formatPeso(item.peso_origem)} />
-        <InfoRow label="Peso Descarga:" value={formatPeso(item.peso_descarga)} />
+        <InfoRow
+          label="Peso Descarga:"
+          value={formatPeso(item.peso_descarga)}
+        />
         <InfoRow label="Peso Carga:" value={formatPeso(item.peso_carga)} />
         <InfoRow
           label="Dif. Descarga/Origem:"
@@ -143,30 +143,35 @@ const ContratosScreen = ({ navigation, route }) => {
           label="Veículos Descarga:"
           value={formatNumber(item.veiculos_descarga)}
         />
-        <InfoRow label="Veículos Carga:" value={formatNumber(item.veiculos_carga)} />
+        <InfoRow
+          label="Veículos Carga:"
+          value={formatNumber(item.veiculos_carga)}
+        />
       </View>
     </View>
   ));
 
-  // Componente de linha de informação reutilizável
-  const InfoRow = React.memo(({ label, value, isPercentage, percentageValue }) => (
-    <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text
-        style={[
-          styles.infoValue,
-          isPercentage &&
-            (percentageValue < 0 ? styles.negativeValue : styles.positiveValue),
-        ]}
-        numberOfLines={1}
-        ellipsizeMode="tail"
-      >
-        {value}
-      </Text>
-    </View>
-  ));
+  const InfoRow = React.memo(
+    ({ label, value, isPercentage, percentageValue }) => (
+      <View style={styles.infoRow}>
+        <Text style={styles.infoLabel}>{label}</Text>
+        <Text
+          style={[
+            styles.infoValue,
+            isPercentage &&
+              (percentageValue < 0
+                ? styles.negativeValue
+                : styles.positiveValue),
+          ]}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {value}
+        </Text>
+      </View>
+    )
+  );
 
-  // Componente de filtro reutilizável
   const FilterOption = React.memo(({ option, isSelected, onToggle }) => (
     <TouchableOpacity
       style={[
@@ -242,17 +247,21 @@ const ContratosScreen = ({ navigation, route }) => {
 
   const renderHeader = useCallback(() => {
     // Calcular totais agregados dos contratos
-    const totals = data.reduce((acc, item) => {
-      const veiculosDescarga = parseInt(item.veiculos_descarga || 0);
-      const veiculosCarga = parseInt(item.veiculos_carga || 0);
-      const pesoOrigem = parseFloat(item.peso_origem || 0);
+    const totals = data.reduce(
+      (acc, item) => {
+        const veiculosDescarga = parseInt(item.veiculos_descarga || 0);
+        const veiculosCarga = parseInt(item.veiculos_carga || 0);
+        const pesoOrigem = parseFloat(item.peso_origem || 0);
 
-      return {
-        totalVehicles: acc.totalVehicles + Math.max(veiculosDescarga, veiculosCarga),
-        totalContracts: acc.totalContracts + 1,
-        totalWeight: acc.totalWeight + pesoOrigem
-      };
-    }, { totalVehicles: 0, totalContracts: 0, totalWeight: 0 });
+        return {
+          totalVehicles:
+            acc.totalVehicles + Math.max(veiculosDescarga, veiculosCarga),
+          totalContracts: acc.totalContracts + 1,
+          totalWeight: acc.totalWeight + pesoOrigem,
+        };
+      },
+      { totalVehicles: 0, totalContracts: 0, totalWeight: 0 }
+    );
 
     // Formatar peso em toneladas se for muito grande
     const formatWeight = (weight) => {
@@ -268,7 +277,8 @@ const ContratosScreen = ({ navigation, route }) => {
           <View style={styles.updateContainer}>
             <View style={styles.updateRow}>
               <Text style={styles.updateText}>
-                Atualizado: {lastUpdate.toLocaleTimeString("pt-BR").substring(0, 5)}
+                Atualizado:{" "}
+                {lastUpdate.toLocaleTimeString("pt-BR").substring(0, 5)}
               </Text>
               <TouchableOpacity
                 style={styles.filterButton}
@@ -284,20 +294,6 @@ const ContratosScreen = ({ navigation, route }) => {
             </View>
           </View>
         )}
-        <View style={styles.summaryContainer}>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>{totals.totalVehicles}</Text>
-            <Text style={styles.summaryLabel}>Veículos</Text>
-          </View>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>{totals.totalContracts}</Text>
-            <Text style={styles.summaryLabel}>Contratos</Text>
-          </View>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>{formatWeight(totals.totalWeight)}</Text>
-            <Text style={styles.summaryLabel}>Peso Total</Text>
-          </View>
-        </View>
       </View>
     );
   }, [lastUpdate, data, hasActiveFilters]);
@@ -336,7 +332,9 @@ const ContratosScreen = ({ navigation, route }) => {
 
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>Contratos</Text>
-          <Text style={styles.headerSubtitle}>Filial: {state.selectedFilial}</Text>
+          <Text style={styles.headerSubtitle}>
+            Filial: {state.selectedFilial}
+          </Text>
         </View>
 
         <View style={styles.headerRight} />
@@ -494,6 +492,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 12,
     marginTop: 2,
+    marginBottom: 4,
     marginHorizontal: 10,
     borderRadius: 5,
   },
@@ -533,41 +532,6 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 10,
     fontWeight: "bold",
-  },
-  summaryContainer: {
-    flexDirection: "row",
-    backgroundColor: COLORS.white,
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    marginTop: 5,
-    marginBottom: 10,
-    marginHorizontal: 10,
-    borderRadius: 10,
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
-  },
-  summaryItem: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  summaryValue: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: COLORS.primary,
-  },
-  summaryLabel: {
-    fontSize: 14,
-    color: COLORS.gray,
   },
   contratoCard: {
     backgroundColor: COLORS.white,

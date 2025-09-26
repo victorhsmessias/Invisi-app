@@ -15,7 +15,8 @@ const CargasHojeScreen = ({ navigation, route }) => {
     filtroServico,
     setFiltroServico,
     filtroOpPadrao,
-    setFiltroOpPadrao
+    setFiltroOpPadrao,
+    applyFiltersAndRefresh
   } = useVehicleData("cargas_hoje");
 
   const fields = [
@@ -51,6 +52,7 @@ const CargasHojeScreen = ({ navigation, route }) => {
       setFiltroServico={setFiltroServico}
       filtroOpPadrao={filtroOpPadrao}
       setFiltroOpPadrao={setFiltroOpPadrao}
+      onApplyFilters={applyFiltersAndRefresh}
     />
   );
 };

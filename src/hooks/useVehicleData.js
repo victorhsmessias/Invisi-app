@@ -1,7 +1,8 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useApp } from "../context/AppContext";
 import apiService from "../services/apiService";
 import { handleError } from "../utils/errorHandler";
+import { DEFAULT_FILTERS } from "../constants";
 
 export const useVehicleData = (screenType) => {
   const { state } = useApp();
@@ -9,25 +10,21 @@ export const useVehicleData = (screenType) => {
   const [loading, setLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [error, setError] = useState(null);
-  const [filtroServico, setFiltroServico] = useState({
-    armazenagem: 1,
-    transbordo: 1,
-    pesagem: 0,
-  });
-  const [filtroOpPadrao, setFiltroOpPadrao] = useState({
-    rodo_ferro: 1,
-    ferro_rodo: 1,
-    rodo_rodo: 1,
-    outros: 0,
-  });
+  const [filtroServico, setFiltroServico] = useState(DEFAULT_FILTERS.servico);
+  const [filtroOpPadrao, setFiltroOpPadrao] = useState(DEFAULT_FILTERS.opPadrao);
+
+  // Ref para prevenir múltiplas requisições simultâneas
+  const isRequestInProgress = useRef(false);
 
   const extractDataFromResponse = (response, screenType) => {
     // Verificar se a resposta tem a estrutura esperada
     if (!response || !response.dados) {
-      console.log(
-        `[${screenType}] Response missing 'dados' property:`,
-        response
-      );
+      if (__DEV__) {
+        console.log(
+          `[${screenType}] Response missing 'dados' property:`,
+          response
+        );
+      }
       return [];
     }
 
@@ -44,7 +41,9 @@ export const useVehicleData = (screenType) => {
 
     const dataPath = dataMap[screenType];
     if (!dataPath) {
-      console.log(`[${screenType}] Unknown screen type`);
+      if (__DEV__) {
+        console.log(`[${screenType}] Unknown screen type`);
+      }
       return [];
     }
 
@@ -54,36 +53,58 @@ export const useVehicleData = (screenType) => {
     for (const part of pathParts) {
       data = data[part];
       if (!data) {
-        console.log(
-          `[${screenType}] Data not found at path: ${dataPath}`,
-          response
-        );
+        if (__DEV__) {
+          console.log(
+            `[${screenType}] Data not found at path: ${dataPath}`,
+            response
+          );
+        }
         return [];
       }
     }
 
     // Garantir que retornamos um array
     if (!Array.isArray(data)) {
-      console.log(`[${screenType}] Data is not an array:`, data);
+      if (__DEV__) {
+        console.log(`[${screenType}] Data is not an array:`, data);
+      }
       return [];
     }
 
-    console.log(`[${screenType}] Extracted data:`, data);
+    if (__DEV__) {
+      console.log(`[${screenType}] Extracted data:`, data);
+    }
     return data;
   };
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (overrideFilters = null) => {
     if (!state.isLoggedIn) return;
 
-    console.log(
-      `[useVehicleData] Fetching data for ${screenType} with filters:`,
-      {
-        filtroServico,
-        filtroOpPadrao,
+    // Prevenir múltiplas requisições simultâneas
+    if (isRequestInProgress.current) {
+      if (__DEV__) {
+        console.log(`[useVehicleData] Request already in progress for ${screenType}, skipping...`);
       }
-    );
+      return;
+    }
+
+    // Usar filtros atuais ou override fornecido
+    const currentFiltroServico = overrideFilters?.filtroServico || filtroServico;
+    const currentFiltroOpPadrao = overrideFilters?.filtroOpPadrao || filtroOpPadrao;
+
+    if (__DEV__) {
+      console.log(
+        `[useVehicleData] Fetching data for ${screenType} with filters:`,
+        {
+          filtroServico: currentFiltroServico,
+          filtroOpPadrao: currentFiltroOpPadrao,
+          isOverride: !!overrideFilters
+        }
+      );
+    }
 
     try {
+      isRequestInProgress.current = true;
       setLoading(true);
       setError(null);
 
@@ -93,64 +114,64 @@ export const useVehicleData = (screenType) => {
         case "transito":
           response = await apiService.getTransitoData(
             state.selectedFilial,
-            filtroServico,
-            filtroOpPadrao
+            currentFiltroServico,
+            currentFiltroOpPadrao
           );
           break;
 
         case "fila_descarga":
           response = await apiService.getFilaDescargaData(
             state.selectedFilial,
-            filtroServico,
-            filtroOpPadrao
+            currentFiltroServico,
+            currentFiltroOpPadrao
           );
           break;
 
         case "fila_carga":
           response = await apiService.getFilaCargaData(
             state.selectedFilial,
-            filtroServico,
-            filtroOpPadrao
+            currentFiltroServico,
+            currentFiltroOpPadrao
           );
           break;
 
         case "patio_descarga":
           response = await apiService.getPatioDescargaData(
             state.selectedFilial,
-            filtroServico,
-            filtroOpPadrao
+            currentFiltroServico,
+            currentFiltroOpPadrao
           );
           break;
 
         case "patio_carga":
           response = await apiService.getPatioCargaData(
             state.selectedFilial,
-            filtroServico,
-            filtroOpPadrao
+            currentFiltroServico,
+            currentFiltroOpPadrao
           );
           break;
 
         case "descargas_hoje":
           response = await apiService.getDescargasHojeData(
             state.selectedFilial,
-            filtroServico,
-            filtroOpPadrao
+            currentFiltroServico,
+            currentFiltroOpPadrao
           );
           break;
 
         case "cargas_hoje":
           response = await apiService.getCargasHojeData(
             state.selectedFilial,
-            filtroServico,
-            filtroOpPadrao
+            currentFiltroServico,
+            currentFiltroOpPadrao
           );
           break;
 
         case "contratos":
           response = await apiService.getContratosData(
             state.selectedFilial,
-            filtroServico,
-            filtroOpPadrao
+            currentFiltroServico,
+            currentFiltroOpPadrao
           );
           break;
 
@@ -158,7 +179,9 @@ export const useVehicleData = (screenType) => {
           throw new Error("Tipo de tela inválido");
       }
 
-      console.log(`[${screenType}] Full API Response:`, response);
+      if (__DEV__) {
+        console.log(`[${screenType}] Full API Response:`, response);
+      }
 
       // Extrair dados da estrutura aninhada
       const extractedData = extractDataFromResponse(response, screenType);
@@ -174,14 +197,9 @@ export const useVehicleData = (screenType) => {
       setError(errorResult.message);
     } finally {
       setLoading(false);
+      isRequestInProgress.current = false;
     }
-  }, [
-    screenType,
-    state.selectedFilial,
-    state.isLoggedIn,
-    filtroServico,
-    filtroOpPadrao,
-  ]);
+  }, [screenType, state.selectedFilial, state.isLoggedIn]); // Removidas dependências dos filtros
 
   useEffect(() => {
     if (state.isLoggedIn) {
@@ -193,6 +211,26 @@ export const useVehicleData = (screenType) => {
     await fetchData();
   }, [fetchData]);
 
+  // Função para aplicar filtros e fazer refresh imediato
+  const applyFiltersAndRefresh = useCallback(async (newFiltroServico, newFiltroOpPadrao) => {
+    if (__DEV__) {
+      console.log(`[useVehicleData] Applying new filters for ${screenType}:`, {
+        newFiltroServico,
+        newFiltroOpPadrao
+      });
+    }
+
+    // Primeiro atualizar os states
+    setFiltroServico(newFiltroServico);
+    setFiltroOpPadrao(newFiltroOpPadrao);
+
+    // Depois fazer fetch com os novos filtros imediatamente
+    await fetchData({
+      filtroServico: newFiltroServico,
+      filtroOpPadrao: newFiltroOpPadrao
+    });
+  }, [fetchData, screenType]);
+
   return {
     data: responseData,
     loading,
@@ -203,5 +241,6 @@ export const useVehicleData = (screenType) => {
     setFiltroServico,
     filtroOpPadrao,
     setFiltroOpPadrao,
+    applyFiltersAndRefresh,
   };
 };

@@ -33,12 +33,20 @@ const SideMenu = memo(({ visible, onClose, navigation }) => {
 
   const menuItems = [
     {
-      id: "contratos",
-      title: "Contratos",
-      icon: "📋",
-      screen: SCREEN_NAMES.CONTRATOS,
-      description: "Gestão de contratos",
-      onPress: () => navigation.navigate(SCREEN_NAMES.CONTRATOS),
+      id: "inicio",
+      title: "Início",
+      icon: "🏠",
+      screen: SCREEN_NAMES.HOME,
+      description: "Tela inicial",
+      onPress: () => navigation.navigate(SCREEN_NAMES.HOME),
+    },
+    {
+      id: "monitor_corte",
+      title: "Monitor Corte",
+      icon: "🔍",
+      screen: SCREEN_NAMES.MONITOR_CORTE,
+      description: "Monitor de cortes",
+      onPress: () => navigation.navigate(SCREEN_NAMES.MONITOR_CORTE),
     },
     {
       id: "divider",
@@ -104,7 +112,6 @@ const SideMenu = memo(({ visible, onClose, navigation }) => {
                 </View>
               </View>
 
-              {/* Menu Items */}
               <ScrollView style={styles.scroll}>
                 {menuItems.map((item) => {
                   if (item.isDivider) {

@@ -36,8 +36,11 @@ const initialState = {
     grupos: [],
     opPadrao: [],
     produtos: [],
+    servicos: [],
   },
   filtersLoading: false,
+  filtersCache: {},
+  filtersCacheExpiry: {},
 
   // Error handling
   error: null,
@@ -55,6 +58,8 @@ const actionTypes = {
   SET_CONTRATOS_LOADING: "SET_CONTRATOS_LOADING",
   SET_FILTER_OPTIONS: "SET_FILTER_OPTIONS",
   SET_FILTERS_LOADING: "SET_FILTERS_LOADING",
+  SET_FILTERS_CACHE: "SET_FILTERS_CACHE",
+  CLEAR_FILTERS_CACHE: "CLEAR_FILTERS_CACHE",
   SET_ERROR: "SET_ERROR",
   LOGOUT: "LOGOUT",
   RESET_ERROR: "RESET_ERROR",
@@ -108,6 +113,26 @@ const appReducer = (state, action) => {
 
     case actionTypes.SET_FILTERS_LOADING:
       return { ...state, filtersLoading: action.payload };
+
+    case actionTypes.SET_FILTERS_CACHE:
+      return {
+        ...state,
+        filtersCache: {
+          ...state.filtersCache,
+          [action.payload.filial]: action.payload.data,
+        },
+        filtersCacheExpiry: {
+          ...state.filtersCacheExpiry,
+          [action.payload.filial]: action.payload.expiry,
+        },
+      };
+
+    case actionTypes.CLEAR_FILTERS_CACHE:
+      return {
+        ...state,
+        filtersCache: {},
+        filtersCacheExpiry: {},
+      };
 
     case actionTypes.SET_ERROR:
       return { ...state, error: action.payload };
@@ -174,6 +199,17 @@ export const AppProvider = ({ children }) => {
 
     setFiltersLoading: (loading) =>
       dispatch({ type: actionTypes.SET_FILTERS_LOADING, payload: loading }),
+
+    setFiltersCache: (filial, data) => {
+      const expiry = Date.now() + 5 * 60 * 1000; // 5 minutos
+      dispatch({
+        type: actionTypes.SET_FILTERS_CACHE,
+        payload: { filial, data, expiry },
+      });
+    },
+
+    clearFiltersCache: () =>
+      dispatch({ type: actionTypes.CLEAR_FILTERS_CACHE }),
 
     setError: (error) =>
       dispatch({ type: actionTypes.SET_ERROR, payload: error }),

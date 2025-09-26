@@ -19,7 +19,6 @@ const BaseScreen = ({
 }) => {
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         {showBackButton && (
           <TouchableOpacity
@@ -40,7 +39,6 @@ const BaseScreen = ({
         </View>
       </View>
 
-      {/* Content */}
       <View style={styles.content}>{children}</View>
     </SafeAreaView>
   );

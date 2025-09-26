@@ -228,6 +228,7 @@ const VehicleListScreen = ({
   error,
   lastUpdate,
   onRefresh,
+  onApplyFilters,
   fields,
   emptyMessage = "Nenhum veículo encontrado",
   emptyIcon = "🚛",
@@ -250,14 +251,22 @@ const VehicleListScreen = ({
     setFilterModalVisible(true);
   }, []);
 
-  const handleFilterApply = useCallback(() => {
-    console.log(
-      "[VehicleListScreen] Filter apply triggered, calling onRefresh"
-    );
-    if (onRefresh) {
+  const handleFilterApply = useCallback((newFiltroServico, newFiltroOpPadrao) => {
+    if (__DEV__) {
+      console.log(
+        "[VehicleListScreen] Filter apply triggered with specific filters:",
+        { newFiltroServico, newFiltroOpPadrao }
+      );
+    }
+
+    // Usar onApplyFilters se disponível, senão fallback para onRefresh
+    if (onApplyFilters) {
+      onApplyFilters(newFiltroServico, newFiltroOpPadrao);
+    } else if (onRefresh) {
+      // Fallback para comportamento antigo
       onRefresh();
     }
-  }, [onRefresh]);
+  }, [onApplyFilters, onRefresh]);
 
   const renderItem = useCallback(
     ({ item }) => <VehicleCard item={item} fields={fields} />,

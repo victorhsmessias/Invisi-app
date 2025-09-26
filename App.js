@@ -1,6 +1,7 @@
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AppProvider, useApp } from "./src/context/AppContext";
 import { LoadingSpinner } from "./src/components";
 import { SCREEN_NAMES } from "./src/constants";
@@ -14,7 +15,8 @@ import PatioDescargaScreen from "./src/screens/PatioDescargaScreen";
 import PatioCargaScreen from "./src/screens/PatioCargaScreen";
 import CargasHojeScreen from "./src/screens/CargasHojeScreen";
 import DescargasHojeScreen from "./src/screens/DescargasHojeScreen";
-import ContratosScreen from "./src/screens/ContratosScreen";
+import MonitorCorteScreen from "./src/screens/MonitorCorteScreen";
+import ContratosDetalhesScreen from "./src/screens/ContratosDetalhesScreen";
 
 const Stack = createStackNavigator();
 
@@ -38,8 +40,13 @@ const AppNavigator = () => {
         <Stack.Screen name={SCREEN_NAMES.LOGIN} component={LoginScreen} />
         <Stack.Screen name={SCREEN_NAMES.HOME} component={HomeScreen} />
         <Stack.Screen
-          name={SCREEN_NAMES.CONTRATOS}
-          component={ContratosScreen}
+          name={SCREEN_NAMES.MONITOR_CORTE}
+          component={MonitorCorteScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name={SCREEN_NAMES.CONTRATOS_DETALHES}
+          component={ContratosDetalhesScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen
@@ -84,8 +91,10 @@ const AppNavigator = () => {
 
 export default function App() {
   return (
-    <AppProvider>
-      <AppNavigator />
-    </AppProvider>
+    <SafeAreaProvider>
+      <AppProvider>
+        <AppNavigator />
+      </AppProvider>
+    </SafeAreaProvider>
   );
 }

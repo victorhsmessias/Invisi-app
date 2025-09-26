@@ -1,10 +1,16 @@
 export const API_CONFIG = {
-  BASE_URL: "http://192.168.10.201/attmonitor/api",
-  BACKUP_URL: "http://45.4.111.173:9090/attmonitor/api",
-  CACHE_TIME: 2 * 60 * 1000, // 2 minutos
-  AUTO_REFRESH: 30 * 1000, // 30 segundos
+  CACHE_TIME: 2 * 60 * 1000,
+  AUTO_REFRESH: 30 * 1000,
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000,
+  // URLs específicas por filial
+  FILIAL_URLS: {
+    LDA: "http://192.168.10.201/attmonitor/api",
+    CHP: "http://45.4.111.173:9090/attmonitor/api",
+    FND: "http://177.84.63.82:9090/attmonitor/api",
+    NMD: "http://168.195.5.254:9090/attmonitor/api",
+    NMG: "http://138.186.125.143:9090/attmonitor/api",
+  },
 };
 
 export const STORAGE_KEYS = {
@@ -14,7 +20,7 @@ export const STORAGE_KEYS = {
   CONTRATOS_CACHE: "contratosCache",
 };
 
-export const FILIAIS = ["LDA", "CHP"];
+export const FILIAIS = ["LDA", "CHP", "FND", "NMD", "NMG"];
 
 export const SERVICO_OPTIONS = [
   { key: "armazenagem", label: "Armazenagem" },
@@ -36,6 +42,20 @@ export const OP_PADRAO_LABELS = {
   outros: "Outros",
 };
 
+export const DEFAULT_FILTERS = {
+  servico: {
+    armazenagem: 1,
+    transbordo: 1,
+    pesagem: 0,
+  },
+  opPadrao: {
+    rodo_ferro: 1,
+    ferro_rodo: 1,
+    rodo_rodo: 1,
+    outros: 0,
+  },
+};
+
 export const COLORS = {
   primary: "#007AFF",
   success: "#28a745",
@@ -54,7 +74,8 @@ export const COLORS = {
 export const SCREEN_NAMES = {
   LOGIN: "Login",
   HOME: "Home",
-  CONTRATOS: "Contratos",
+  MONITOR_CORTE: "MonitorCorte",
+  CONTRATOS_DETALHES: "ContratosDetalhes",
   CARGAS_HOJE: "CargasHoje",
   DESCARGAS_HOJE: "DescargasHoje",
   TRANSITO: "Transito",

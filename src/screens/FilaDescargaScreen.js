@@ -15,7 +15,8 @@ const FilaDescargaScreen = ({ navigation, route }) => {
     filtroServico,
     setFiltroServico,
     filtroOpPadrao,
-    setFiltroOpPadrao
+    setFiltroOpPadrao,
+    applyFiltersAndRefresh
   } = useVehicleData("fila_descarga");
 
   React.useEffect(() => {
@@ -48,6 +49,7 @@ const FilaDescargaScreen = ({ navigation, route }) => {
       setFiltroServico={setFiltroServico}
       filtroOpPadrao={filtroOpPadrao}
       setFiltroOpPadrao={setFiltroOpPadrao}
+      onApplyFilters={applyFiltersAndRefresh}
     />
   );
 };

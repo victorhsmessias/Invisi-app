@@ -15,7 +15,8 @@ const TransitoScreen = ({ navigation, route }) => {
     filtroServico,
     setFiltroServico,
     filtroOpPadrao,
-    setFiltroOpPadrao
+    setFiltroOpPadrao,
+    applyFiltersAndRefresh
   } = useVehicleData("transito");
 
   React.useEffect(() => {
@@ -48,6 +49,8 @@ const TransitoScreen = ({ navigation, route }) => {
       setFiltroServico={setFiltroServico}
       filtroOpPadrao={filtroOpPadrao}
       setFiltroOpPadrao={setFiltroOpPadrao}
+      onRefresh={refresh}
+      onApplyFilters={applyFiltersAndRefresh}
     />
   );
 };

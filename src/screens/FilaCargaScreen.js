@@ -15,7 +15,8 @@ const FilaCargaScreen = ({ navigation, route }) => {
     filtroServico,
     setFiltroServico,
     filtroOpPadrao,
-    setFiltroOpPadrao
+    setFiltroOpPadrao,
+    applyFiltersAndRefresh
   } = useVehicleData("fila_carga");
 
   const fields = [
@@ -51,6 +52,7 @@ const FilaCargaScreen = ({ navigation, route }) => {
       setFiltroServico={setFiltroServico}
       filtroOpPadrao={filtroOpPadrao}
       setFiltroOpPadrao={setFiltroOpPadrao}
+      onApplyFilters={applyFiltersAndRefresh}
     />
   );
 };

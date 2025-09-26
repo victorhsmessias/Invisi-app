@@ -1,32 +1,75 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   RefreshControl,
   ActivityIndicator,
   Animated,
   Platform,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useApp } from "../context/AppContext";
 import { useTransportData } from "../hooks/useTransportData";
+import { useGlobalFilters } from "../hooks/useGlobalFilters";
+import { useFilterLoader } from "../hooks/useFilterLoader";
+import useSmartLoading from "../hooks/useSmartLoading";
 import {
   StatusCard,
   LoadingSpinner,
   ErrorMessage,
   SideMenu,
+  BackgroundLoadingIndicator,
+  HeaderLoadingIndicator,
 } from "../components";
 import { COLORS, FILIAIS, SCREEN_NAMES } from "../constants";
 
 const HomeScreen = ({ navigation }) => {
   const { state, actions } = useApp();
   const { data, loading, lastUpdate, refresh, error } = useTransportData();
-  const [refreshing, setRefreshing] = useState(false);
+  const { selectedFilters } = useGlobalFilters();
+  const { preloadAllFilters, hasValidCache } = useFilterLoader();
   const [menuVisible, setMenuVisible] = useState(false);
+  const [hasShownInitialData, setHasShownInitialData] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // Smart loading para controlar diferentes tipos de loading
+  const {
+    isInitialLoading,
+    isBackgroundLoading,
+    isRefreshing,
+    error: smartError,
+    startInitialLoading,
+    startManualRefresh,
+    startBackgroundLoading,
+    finishLoading,
+    showFullscreenLoader,
+    showBackgroundIndicator,
+  } = useSmartLoading();
+
+  // Função de refresh simplificada
+  const optimizedRefresh = useCallback(
+    async (loadingType = "manual") => {
+      try {
+        if (loadingType === "manual") {
+          startManualRefresh();
+        }
+
+        await refresh();
+        setHasShownInitialData(true);
+        finishLoading();
+      } catch (err) {
+        finishLoading("Erro ao carregar dados");
+      }
+    },
+    [refresh, startManualRefresh, finishLoading]
+  );
+
+  const updateActivity = useCallback(() => {
+    // placeholder de atividade
+  }, []);
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -36,14 +79,46 @@ const HomeScreen = ({ navigation }) => {
     }).start();
   }, []);
 
+  // Carregamento inicial
+  useEffect(() => {
+    if (state.isLoggedIn && data && Object.keys(data).length > 0) {
+      setHasShownInitialData(true);
+    }
+  }, [data, state.isLoggedIn]);
+
+  // Precarregamento inteligente de filtros
+  useEffect(() => {
+    if (state.isLoggedIn) {
+      // Precarregar filtros em background após login
+      const timer = setTimeout(() => {
+        if (__DEV__) {
+          console.log('[HomeScreen] Iniciando precarregamento de filtros em background');
+        }
+        preloadAllFilters().catch(error => {
+          if (__DEV__) {
+            console.log('[HomeScreen] Erro no precarregamento:', error);
+          }
+        });
+      }, 1500); // Delay de 1.5s para não interferir no carregamento inicial
+
+      return () => clearTimeout(timer);
+    }
+  }, [state.isLoggedIn, preloadAllFilters]);
+
   const onRefresh = async () => {
-    setRefreshing(true);
-    await refresh();
-    setRefreshing(false);
+    updateActivity();
+    await optimizedRefresh("manual");
   };
 
   const handleFilialChange = (filial) => {
     actions.setFilial(filial);
+
+    // Mostrar indicador se filtros não estão em cache
+    if (!hasValidCache(filial)) {
+      if (__DEV__) {
+        console.log(`[HomeScreen] Filtros não em cache para ${filial}, carregamento será automático`);
+      }
+    }
   };
 
   const transportCards = [
@@ -137,11 +212,20 @@ const HomeScreen = ({ navigation }) => {
     return <LoadingSpinner text="Carregando aplicação..." />;
   }
 
-  if (error && !loading) {
+  if (showFullscreenLoader && !hasShownInitialData) {
+    return <LoadingSpinner text="Carregando dashboard..." />;
+  }
+
+  if (
+    (error || smartError) &&
+    !hasShownInitialData &&
+    !loading &&
+    !isInitialLoading
+  ) {
     return (
       <ErrorMessage
-        message={error}
-        onRetry={refresh}
+        message={error || smartError}
+        onRetry={() => optimizedRefresh("initial")}
         retryText="Tentar novamente"
       />
     );
@@ -166,17 +250,20 @@ const HomeScreen = ({ navigation }) => {
             </Text>
           </View>
 
-          <TouchableOpacity
-            style={styles.refreshButton}
-            onPress={onRefresh}
-            disabled={refreshing}
-          >
-            {refreshing ? (
-              <ActivityIndicator size="small" color={COLORS.primary} />
-            ) : (
-              <Text style={styles.refreshIcon}>🔄</Text>
-            )}
-          </TouchableOpacity>
+          <View style={styles.headerRight}>
+            <HeaderLoadingIndicator visible={showBackgroundIndicator} />
+            <TouchableOpacity
+              style={styles.refreshButton}
+              onPress={onRefresh}
+              disabled={isRefreshing}
+            >
+              {isRefreshing ? (
+                <ActivityIndicator size="small" color={COLORS.primary} />
+              ) : (
+                <Text style={styles.refreshIcon}>🔄</Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Last Update */}
@@ -217,7 +304,7 @@ const HomeScreen = ({ navigation }) => {
           contentContainerStyle={styles.scrollContent}
           refreshControl={
             <RefreshControl
-              refreshing={refreshing}
+              refreshing={isRefreshing}
               onRefresh={onRefresh}
               colors={[COLORS.primary]}
               tintColor={COLORS.primary}
@@ -234,7 +321,7 @@ const HomeScreen = ({ navigation }) => {
                 icon={card.icon}
                 color={card.color}
                 subtitle={card.subtitle}
-                loading={loading}
+                loading={loading || isBackgroundLoading}
                 onPress={card.onPress}
               />
             ))}
@@ -247,6 +334,13 @@ const HomeScreen = ({ navigation }) => {
         visible={menuVisible}
         onClose={() => setMenuVisible(false)}
         navigation={navigation}
+      />
+
+      {/* Indicador de carregamento em background */}
+      <BackgroundLoadingIndicator
+        visible={showBackgroundIndicator}
+        text="Atualizando dashboard..."
+        position="bottom"
       />
     </SafeAreaView>
   );
@@ -300,6 +394,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.gray,
     marginTop: 2,
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   refreshButton: {
     padding: 8,

@@ -15,7 +15,8 @@ const PatioDescargaScreen = ({ navigation, route }) => {
     filtroServico,
     setFiltroServico,
     filtroOpPadrao,
-    setFiltroOpPadrao
+    setFiltroOpPadrao,
+    applyFiltersAndRefresh
   } = useVehicleData("patio_descarga");
 
   const fields = [
@@ -41,6 +42,7 @@ const PatioDescargaScreen = ({ navigation, route }) => {
       setFiltroServico={setFiltroServico}
       filtroOpPadrao={filtroOpPadrao}
       setFiltroOpPadrao={setFiltroOpPadrao}
+      onApplyFilters={applyFiltersAndRefresh}
     />
   );
 };
