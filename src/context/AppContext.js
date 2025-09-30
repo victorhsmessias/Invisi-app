@@ -2,18 +2,14 @@ import React, { createContext, useContext, useReducer, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { STORAGE_KEYS, FILIAIS } from "../constants";
 
-// Estados iniciais
 const initialState = {
-  // Auth
   isLoggedIn: false,
   isLoading: true,
   username: "",
   token: null,
 
-  // App State
   selectedFilial: FILIAIS[0],
 
-  // Transport Data
   transportData: {
     emTransito: 0,
     filaDescarga: 0,
@@ -26,12 +22,10 @@ const initialState = {
   transportLoading: false,
   transportLastUpdate: null,
 
-  // Contratos Data
   contratosData: [],
   contratosLoading: false,
   contratosLastUpdate: null,
 
-  // Filters
   filterOptions: {
     grupos: [],
     opPadrao: [],
@@ -42,11 +36,9 @@ const initialState = {
   filtersCache: {},
   filtersCacheExpiry: {},
 
-  // Error handling
   error: null,
 };
 
-// Action types
 const actionTypes = {
   SET_LOADING: "SET_LOADING",
   SET_AUTH: "SET_AUTH",
@@ -65,7 +57,6 @@ const actionTypes = {
   RESET_ERROR: "RESET_ERROR",
 };
 
-// Reducer
 const appReducer = (state, action) => {
   switch (action.type) {
     case actionTypes.SET_LOADING:
@@ -152,14 +143,11 @@ const appReducer = (state, action) => {
   }
 };
 
-// Context
 const AppContext = createContext();
 
-// Provider component
 export const AppProvider = ({ children }) => {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
-  // Actions
   const actions = {
     setLoading: (loading) =>
       dispatch({ type: actionTypes.SET_LOADING, payload: loading }),
@@ -167,7 +155,7 @@ export const AppProvider = ({ children }) => {
     setAuth: (isLoggedIn, token = null) =>
       dispatch({
         type: actionTypes.SET_AUTH,
-        payload: { isLoggedIn, token }
+        payload: { isLoggedIn, token },
       }),
 
     setUsername: (username) =>
@@ -201,7 +189,7 @@ export const AppProvider = ({ children }) => {
       dispatch({ type: actionTypes.SET_FILTERS_LOADING, payload: loading }),
 
     setFiltersCache: (filial, data) => {
-      const expiry = Date.now() + 5 * 60 * 1000; // 5 minutos
+      const expiry = Date.now() + 5 * 60 * 1000;
       dispatch({
         type: actionTypes.SET_FILTERS_CACHE,
         payload: { filial, data, expiry },
@@ -214,8 +202,7 @@ export const AppProvider = ({ children }) => {
     setError: (error) =>
       dispatch({ type: actionTypes.SET_ERROR, payload: error }),
 
-    resetError: () =>
-      dispatch({ type: actionTypes.RESET_ERROR }),
+    resetError: () => dispatch({ type: actionTypes.RESET_ERROR }),
 
     logout: async () => {
       try {
@@ -230,7 +217,6 @@ export const AppProvider = ({ children }) => {
     },
   };
 
-  // Check login status on app start
   useEffect(() => {
     const checkLoginStatus = async () => {
       try {
@@ -267,7 +253,6 @@ export const AppProvider = ({ children }) => {
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
 
-// Custom hook to use the context
 export const useApp = () => {
   const context = useContext(AppContext);
   if (!context) {

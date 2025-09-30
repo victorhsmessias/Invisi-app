@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { useApp } from "../context/AppContext";
 import { useGlobalFilters } from "../hooks/useGlobalFilters";
-import useSmartLoading from "../hooks/useSmartLoading";
+import { useFilterLoader } from "../hooks/useFilterLoader";
 import useAutoRefresh from "../hooks/useAutoRefresh";
 import {
   LoadingSpinner,
@@ -43,11 +43,19 @@ const MonitorCorteScreen = ({ navigation, route }) => {
     forceReload,
   } = useGlobalFilters();
 
+  const { loadFiltersForFilial } = useFilterLoader();
+
   const [data, setData] = useState([]);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [hasTriedLoading, setHasTriedLoading] = useState(false);
   const [isInitializingScreen, setIsInitializingScreen] = useState(true);
   const [hasShownInitialData, setHasShownInitialData] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
+  const [lastDataLoad, setLastDataLoad] = useState(null);
+  const lastFocusTime = useRef(null);
+  const navigationStartTime = useRef(null);
 
   React.useEffect(() => {
     const timeout = setTimeout(() => {
@@ -58,24 +66,11 @@ const MonitorCorteScreen = ({ navigation, route }) => {
           );
         }
         setHasShownInitialData(true);
-        finishLoading("Tempo limite excedido");
       }
     }, 15000);
 
     return () => clearTimeout(timeout);
-  }, [hasShownInitialData, finishLoading]);
-  const {
-    isInitialLoading,
-    isBackgroundLoading,
-    isRefreshing,
-    error,
-    startInitialLoading,
-    startManualRefresh,
-    startBackgroundLoading,
-    finishLoading,
-    showFullscreenLoader,
-    showBackgroundIndicator,
-  } = useSmartLoading();
+  }, [hasShownInitialData]);
   const [filtersVisible, setFiltersVisible] = useState(false);
   const [activeFilterTab, setActiveFilterTab] = useState("servicos");
 
@@ -86,6 +81,13 @@ const MonitorCorteScreen = ({ navigation, route }) => {
     adaptiveInterval: true,
   });
 
+  const initializeSelectedFilters = useCallback(() => {
+    // Função para inicializar filtros se necessário
+    if (__DEV__) {
+      console.log("[MonitorCorteScreen] Initializing selected filters");
+    }
+  }, []);
+
   const fetchContratosData = useCallback(
     async (loadingType = "background") => {
       if (!state.isLoggedIn || !state.selectedFilial) return;
@@ -93,12 +95,10 @@ const MonitorCorteScreen = ({ navigation, route }) => {
       try {
         setHasTriedLoading(true);
 
-        if (loadingType === "initial") {
-          startInitialLoading();
-        } else if (loadingType === "manual") {
-          startManualRefresh();
-        } else {
-          startBackgroundLoading();
+        if (loadingType === "manual") {
+          setRefreshing(true);
+        } else if (loadingType === "initial") {
+          setLoading(true);
         }
 
         if (__DEV__) {
@@ -201,6 +201,7 @@ const MonitorCorteScreen = ({ navigation, route }) => {
             );
           setData(response.dados.CortesFila);
           setLastUpdate(new Date());
+          setLastDataLoad(Date.now());
         } else {
           if (__DEV__) {
             console.log("[MonitorCorteScreen] No valid data received from API");
@@ -211,11 +212,7 @@ const MonitorCorteScreen = ({ navigation, route }) => {
           }
           setData([]);
           if (hasShownInitialData || loadingType === "manual") {
-            finishLoading(
-              "Nenhum monitor corte encontrado com os filtros aplicados"
-            );
-          } else {
-            finishLoading();
+            setError("Nenhum monitor corte encontrado com os filtros aplicados");
           }
         }
 
@@ -223,21 +220,18 @@ const MonitorCorteScreen = ({ navigation, route }) => {
       } catch (err) {
         console.error("[MonitorCorteScreen] Error:", err);
         setHasShownInitialData(true);
-        finishLoading("Erro ao carregar monitor corte");
+        setError("Erro ao carregar monitor corte");
         return;
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
-
-      finishLoading();
     },
     [
       state.isLoggedIn,
       state.selectedFilial,
       selectedFilters,
       getApiFilters,
-      startInitialLoading,
-      startManualRefresh,
-      startBackgroundLoading,
-      finishLoading,
     ]
   );
 
@@ -248,6 +242,44 @@ const MonitorCorteScreen = ({ navigation, route }) => {
       const loadData = async () => {
         try {
           if (isCancelled) return;
+
+          const currentTime = Date.now();
+          const timeSinceLastFocus = lastFocusTime.current ? currentTime - lastFocusTime.current : Infinity;
+
+          // Marcar tempo atual de foco
+          lastFocusTime.current = currentTime;
+
+          // Verificar se os dados são recentes (menos de 2 minutos)
+          const dataAge = lastDataLoad ? currentTime - lastDataLoad : Infinity;
+          const isDataFresh = dataAge < 2 * 60 * 1000; // 2 minutos
+
+          // Se voltou rapidamente (menos de 30 segundos) e dados são frescos, não recarregar
+          const isQuickReturn = timeSinceLastFocus < 30 * 1000; // 30 segundos
+          const timeAwayFromScreen = navigationStartTime.current ? currentTime - navigationStartTime.current : timeSinceLastFocus;
+          const isShortNavigation = timeAwayFromScreen < 2 * 60 * 1000; // 2 minutos de navegação
+
+          const shouldSkipReload = (isDataFresh && data.length > 0) ||
+                                  (isQuickReturn && data.length > 0 && dataAge < 5 * 60 * 1000) || // 5 minutos para retorno rápido
+                                  (isShortNavigation && data.length > 0 && dataAge < 10 * 60 * 1000); // 10 minutos para navegação curta
+
+          if (shouldSkipReload) {
+            if (__DEV__) {
+              console.log(
+                "[MonitorCorteScreen] Skipping reload - Data age:",
+                Math.round(dataAge / 1000),
+                "seconds, Time since last focus:",
+                Math.round(timeSinceLastFocus / 1000),
+                "seconds, Time away from screen:",
+                Math.round(timeAwayFromScreen / 1000),
+                "seconds"
+              );
+            }
+            // Reset navigation timer após pular reload com sucesso
+            navigationStartTime.current = null;
+            setIsInitializingScreen(false);
+            return;
+          }
+
           setIsInitializingScreen(true);
 
           const needsFilters = (filterOptions?.grupos?.length || 0) === 0;
@@ -301,11 +333,13 @@ const MonitorCorteScreen = ({ navigation, route }) => {
       return () => {
         isCancelled = true;
       };
-    }, [state.selectedFilial])
+    }, [state.selectedFilial, lastDataLoad, data.length, filterOptions?.grupos?.length])
   );
 
   const onRefresh = useCallback(async () => {
     updateActivity();
+    // Invalidar timestamp para forçar refresh na próxima navegação
+    setLastDataLoad(null);
     await fetchContratosData("manual");
   }, [fetchContratosData, updateActivity]);
 
@@ -327,6 +361,9 @@ const MonitorCorteScreen = ({ navigation, route }) => {
 
     updateActivity();
     setFiltersVisible(false);
+
+    // Invalidar timestamp para forçar refresh na próxima navegação
+    setLastDataLoad(null);
 
     try {
       await fetchContratosData("manual");
@@ -396,6 +433,8 @@ const MonitorCorteScreen = ({ navigation, route }) => {
   const ContratoCard = React.memo(({ item }) => {
     const handleGrupoPress = () => {
       updateActivity();
+      // Marcar tempo de navegação para otimizar retorno
+      navigationStartTime.current = Date.now();
       navigation.navigate(SCREEN_NAMES.CONTRATOS_DETALHES, {
         fila: item.fila,
         grupo: item.grupo,
@@ -619,7 +658,7 @@ const MonitorCorteScreen = ({ navigation, route }) => {
   const renderEmptyComponent = useCallback(() => {
     const isStillLoading =
       isInitializingScreen ||
-      isInitialLoading ||
+      loading ||
       (!hasShownInitialData && !error);
 
     if (isStillLoading) {
@@ -640,10 +679,10 @@ const MonitorCorteScreen = ({ navigation, route }) => {
         <Text style={styles.emptySubtext}>Verifique os filtros aplicados</Text>
       </View>
     );
-  }, [error, isInitializingScreen, isInitialLoading, hasShownInitialData]);
+  }, [error, isInitializingScreen, loading, hasShownInitialData]);
 
   const shouldShowLoading =
-    (isInitializingScreen || showFullscreenLoader || isInitialLoading) &&
+    (isInitializingScreen || loading) &&
     data.length === 0 &&
     !hasShownInitialData &&
     !error;
@@ -651,8 +690,7 @@ const MonitorCorteScreen = ({ navigation, route }) => {
   if (__DEV__ && shouldShowLoading) {
     console.log("[MonitorCorteScreen] Showing loading spinner:", {
       isInitializingScreen,
-      showFullscreenLoader,
-      isInitialLoading,
+      loading,
       dataLength: data.length,
       hasShownInitialData,
       error: !!error,
@@ -690,7 +728,7 @@ const MonitorCorteScreen = ({ navigation, route }) => {
         </View>
 
         <View style={styles.headerRight}>
-          <HeaderLoadingIndicator visible={showBackgroundIndicator} />
+          <HeaderLoadingIndicator visible={loading} />
         </View>
       </View>
 
@@ -704,7 +742,7 @@ const MonitorCorteScreen = ({ navigation, route }) => {
         }
         refreshControl={
           <RefreshControl
-            refreshing={isRefreshing}
+            refreshing={refreshing}
             onRefresh={onRefresh}
             colors={[COLORS.primary]}
             tintColor={COLORS.primary}
@@ -787,7 +825,7 @@ const MonitorCorteScreen = ({ navigation, route }) => {
 
       {/* Indicador de carregamento em background */}
       <BackgroundLoadingIndicator
-        visible={showBackgroundIndicator}
+        visible={loading && hasShownInitialData}
         text="Atualizando monitor corte..."
         position="bottom"
       />

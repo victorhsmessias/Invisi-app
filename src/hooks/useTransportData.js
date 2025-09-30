@@ -8,11 +8,16 @@ export const useTransportData = () => {
   const { state, actions } = useApp();
   const intervalRef = useRef(null);
 
-  const fetchTransportData = useCallback(async () => {
+  const fetchTransportData = useCallback(async (options = {}) => {
     if (!state.isLoggedIn) return;
 
+    const { silent = false, source = 'manual' } = options;
+
     try {
-      actions.setTransportLoading(true);
+      // Só mostrar loading se não for update silencioso
+      if (!silent) {
+        actions.setTransportLoading(true);
+      }
       actions.resetError();
 
       // Fetch all data in parallel
@@ -78,14 +83,25 @@ export const useTransportData = () => {
           filial: state.selectedFilial,
         })
       );
+
+      if (__DEV__ && source === 'background') {
+        console.log('[useTransportData] Background update completed silently');
+      }
     } catch (error) {
       console.error("Erro ao buscar dados de transporte:", error);
-      actions.setError("Erro ao carregar dados de transporte");
+
+      // Só mostrar erro se não for update em background
+      if (source !== 'background') {
+        actions.setError("Erro ao carregar dados de transporte");
+      }
 
       // Try to load from cache
       await loadFromCache();
     } finally {
-      actions.setTransportLoading(false);
+      // Só resetar loading se não for update silencioso
+      if (!silent) {
+        actions.setTransportLoading(false);
+      }
     }
   }, [state.selectedFilial, state.isLoggedIn]);
 
@@ -131,11 +147,10 @@ export const useTransportData = () => {
     if (state.isLoggedIn) {
       fetchTransportData();
 
-      // Set up auto-refresh
-      intervalRef.current = setInterval(
-        fetchTransportData,
-        API_CONFIG.AUTO_REFRESH
-      );
+      // Set up auto-refresh - usar modo silencioso para updates automáticos
+      intervalRef.current = setInterval(() => {
+        fetchTransportData({ silent: true, source: 'background' });
+      }, API_CONFIG.AUTO_REFRESH);
     }
 
     return () => {
@@ -152,8 +167,12 @@ export const useTransportData = () => {
     }
   }, [state.selectedFilial]);
 
-  const refresh = useCallback(async () => {
-    await fetchTransportData();
+  const refresh = useCallback(async (options = {}) => {
+    await fetchTransportData(options);
+  }, [fetchTransportData]);
+
+  const silentRefresh = useCallback(async () => {
+    await fetchTransportData({ silent: true, source: 'background' });
   }, [fetchTransportData]);
 
   return {
@@ -161,6 +180,7 @@ export const useTransportData = () => {
     loading: state.transportLoading,
     lastUpdate: state.transportLastUpdate,
     refresh,
+    silentRefresh,
     error: state.error,
   };
 };

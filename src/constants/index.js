@@ -1,9 +1,11 @@
 export const API_CONFIG = {
   CACHE_TIME: 2 * 60 * 1000,
   AUTO_REFRESH: 30 * 1000,
-  RETRY_ATTEMPTS: 3,
+  BACKGROUND_REFRESH: 45 * 1000, // Refresh mais espaçado para background
+  RETRY_ATTEMPTS: 1,
   RETRY_DELAY: 1000,
-  // URLs específicas por filial
+  STALE_TIME: 5 * 60 * 1000, // Dados ficam "stale" após 5 min
+  BACKGROUND_STALE_TIME: 10 * 60 * 1000, // Stale time maior para background
   FILIAL_URLS: {
     LDA: "http://192.168.10.201/attmonitor/api",
     CHP: "http://45.4.111.173:9090/attmonitor/api",

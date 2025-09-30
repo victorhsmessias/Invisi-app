@@ -20,7 +20,8 @@ export const useFilterLoader = () => {
     // Verificar cache válido primeiro (acessar diretamente do state atual)
     const currentCache = state.filtersCache[filial];
     const currentExpiry = state.filtersCacheExpiry[filial];
-    const isCacheValid = currentCache && currentExpiry && Date.now() < currentExpiry;
+    const isCacheValid =
+      currentCache && currentExpiry && Date.now() < currentExpiry;
 
     if (isCacheValid) {
       if (__DEV__) {
@@ -39,7 +40,9 @@ export const useFilterLoader = () => {
     const loadingKey = `filters_${filial}`;
     if (loadingRef.current.has(loadingKey)) {
       if (__DEV__) {
-        console.log(`[useFilterLoader] Carregamento já em progresso para ${filial}`);
+        console.log(
+          `[useFilterLoader] Carregamento já em progresso para ${filial}`
+        );
       }
       return null;
     }
@@ -49,7 +52,9 @@ export const useFilterLoader = () => {
       actions.setFiltersLoading(true);
 
       if (__DEV__) {
-        console.log(`[useFilterLoader] Carregando filtros para filial ${filial}`);
+        console.log(
+          `[useFilterLoader] Carregando filtros para filial ${filial}`
+        );
       }
 
       // Carregar todos os filtros em paralelo
@@ -67,10 +72,28 @@ export const useFilterLoader = () => {
 
       // Processar e estruturar dados
       const filterData = {
-        servicos: servicosResponse.dados?.servicos || ['armazenagem', 'transbordo', 'pesagem'],
-        opPadrao: opPadraoResponse.dados?.op_padrao || ['rodo_ferro', 'ferro_rodo', 'rodo_rodo', 'outros'],
-        grupos: gruposResponse.dados?.grupos || ['ADM-MGA', 'ATT', 'CARGILL', 'BTG PACTUAL S/A'],
-        produtos: produtosResponse.dados?.produtos || ['SOJA GRAOS', 'MILHO GRAOS', 'FARELO DE SOJA'],
+        servicos: servicosResponse.dados?.servicos || [
+          "armazenagem",
+          "transbordo",
+          "pesagem",
+        ],
+        opPadrao: opPadraoResponse.dados?.op_padrao || [
+          "rodo_ferro",
+          "ferro_rodo",
+          "rodo_rodo",
+          "outros",
+        ],
+        grupos: gruposResponse.dados?.grupos || [
+          "ADM-MGA",
+          "ATT",
+          "CARGILL",
+          "BTG PACTUAL S/A",
+        ],
+        produtos: produtosResponse.dados?.produtos || [
+          "SOJA GRAOS",
+          "MILHO GRAOS",
+          "FARELO DE SOJA",
+        ],
       };
 
       // Salvar no cache
@@ -91,16 +114,18 @@ export const useFilterLoader = () => {
       }
 
       return filterData;
-
     } catch (error) {
-      console.error(`[useFilterLoader] Erro ao carregar filtros para ${filial}:`, error);
+      console.error(
+        `[useFilterLoader] Erro ao carregar filtros para ${filial}:`,
+        error
+      );
 
       // Fallback para dados padrão
       const fallbackData = {
-        servicos: ['armazenagem', 'transbordo', 'pesagem'],
-        opPadrao: ['rodo_ferro', 'ferro_rodo', 'rodo_rodo', 'outros'],
-        grupos: ['ADM-MGA', 'ATT', 'CARGILL', 'BTG PACTUAL S/A'],
-        produtos: ['SOJA GRAOS', 'MILHO GRAOS', 'FARELO DE SOJA'],
+        servicos: ["armazenagem", "transbordo", "pesagem"],
+        opPadrao: ["rodo_ferro", "ferro_rodo", "rodo_rodo", "outros"],
+        grupos: ["ADM-MGA", "ATT", "CARGILL", "BTG PACTUAL S/A"],
+        produtos: ["SOJA GRAOS", "MILHO GRAOS", "FARELO DE SOJA"],
       };
 
       // Salvar fallback no cache com tempo menor
@@ -112,61 +137,66 @@ export const useFilterLoader = () => {
       }
 
       return fallbackData;
-
     } finally {
       loadingRef.current.delete(loadingKey);
       actions.setFiltersLoading(false);
     }
-  }, []); // Remover todas as dependências para evitar recriação
+  }, []);
 
-  // Precarregar filtros para ambas filiais
   const preloadAllFilters = useCallback(async () => {
     try {
-      const filiais = ['LDA', 'CHP', 'FND', 'NMD', 'NMG'];
+      const filiais = ["LDA", "CHP", "FND", "NMD", "NMG"];
 
       if (__DEV__) {
-        console.log('[useFilterLoader] Iniciando precarregamento inteligente de filtros');
+        console.log(
+          "[useFilterLoader] Iniciando precarregamento inteligente de filtros"
+        );
       }
 
-      // Carregar em paralelo apenas filiais sem cache válido
       const loadPromises = filiais
-        .filter(filial => {
+        .filter((filial) => {
           const currentCache = state.filtersCache[filial];
           const currentExpiry = state.filtersCacheExpiry[filial];
           return !(currentCache && currentExpiry && Date.now() < currentExpiry);
         })
-        .map(filial => loadFiltersForFilial(filial));
+        .map((filial) => loadFiltersForFilial(filial));
 
       if (loadPromises.length === 0) {
         if (__DEV__) {
-          console.log('[useFilterLoader] Todos os filtros já estão em cache válido');
+          console.log(
+            "[useFilterLoader] Todos os filtros já estão em cache válido"
+          );
         }
         return;
       }
 
       const results = await Promise.allSettled(loadPromises);
 
-      // Log do resultado
-      const successful = results.filter(r => r.status === 'fulfilled' && r.value).length;
-      const failed = results.filter(r => r.status === 'rejected').length;
+      const successful = results.filter(
+        (r) => r.status === "fulfilled" && r.value
+      ).length;
+      const failed = results.filter((r) => r.status === "rejected").length;
 
       if (__DEV__) {
-        console.log(`[useFilterLoader] Precarregamento completo: ${successful} sucessos, ${failed} falhas`);
+        console.log(
+          `[useFilterLoader] Precarregamento completo: ${successful} sucessos, ${failed} falhas`
+        );
       }
-
     } catch (error) {
-      console.error('[useFilterLoader] Erro no precarregamento de filtros:', error);
+      console.error(
+        "[useFilterLoader] Erro no precarregamento de filtros:",
+        error
+      );
     }
-  }, []); // Remover dependências para evitar recriação
+  }, []);
 
-  // Carregar filtros básicos (apenas servicos e opPadrao) para telas de veículos
   const loadBasicFilters = useCallback(async (filial) => {
     if (!filial) return null;
 
-    // Verificar se já tem os filtros básicos em cache
     const currentCache = state.filtersCache[filial];
     const currentExpiry = state.filtersCacheExpiry[filial];
-    const isCacheValid = currentCache && currentExpiry && Date.now() < currentExpiry;
+    const isCacheValid =
+      currentCache && currentExpiry && Date.now() < currentExpiry;
 
     if (isCacheValid) {
       return {
@@ -184,7 +214,9 @@ export const useFilterLoader = () => {
       loadingRef.current.add(loadingKey);
 
       if (__DEV__) {
-        console.log(`[useFilterLoader] Carregando filtros básicos para ${filial}`);
+        console.log(
+          `[useFilterLoader] Carregando filtros básicos para ${filial}`
+        );
       }
 
       const [servicosResponse, opPadraoResponse] = await Promise.all([
@@ -193,11 +225,19 @@ export const useFilterLoader = () => {
       ]);
 
       const basicFilters = {
-        servicos: servicosResponse.dados?.servicos || ['armazenagem', 'transbordo', 'pesagem'],
-        opPadrao: opPadraoResponse.dados?.op_padrao || ['rodo_ferro', 'ferro_rodo', 'rodo_rodo', 'outros'],
+        servicos: servicosResponse.dados?.servicos || [
+          "armazenagem",
+          "transbordo",
+          "pesagem",
+        ],
+        opPadrao: opPadraoResponse.dados?.op_padrao || [
+          "rodo_ferro",
+          "ferro_rodo",
+          "rodo_rodo",
+          "outros",
+        ],
       };
 
-      // Atualizar cache parcialmente (manter grupos e produtos se existirem)
       const existingCache = state.filtersCache[filial] || {};
       const updatedCache = {
         ...existingCache,
@@ -209,51 +249,45 @@ export const useFilterLoader = () => {
       actions.setFiltersCache(filial, updatedCache);
 
       return basicFilters;
-
     } catch (error) {
-      console.error(`[useFilterLoader] Erro ao carregar filtros básicos para ${filial}:`, error);
+      console.error(
+        `[useFilterLoader] Erro ao carregar filtros básicos para ${filial}:`,
+        error
+      );
 
       return {
-        servicos: ['armazenagem', 'transbordo', 'pesagem'],
-        opPadrao: ['rodo_ferro', 'ferro_rodo', 'rodo_rodo', 'outros'],
+        servicos: ["armazenagem", "transbordo", "pesagem"],
+        opPadrao: ["rodo_ferro", "ferro_rodo", "rodo_rodo", "outros"],
       };
-
     } finally {
       loadingRef.current.delete(loadingKey);
     }
-  }, []); // Remover dependências para evitar recriação
+  }, []);
 
-  // Auto-carregar filtros quando usuário faz login
   useEffect(() => {
     if (state.isLoggedIn && state.selectedFilial) {
-      // Carregar filtros da filial atual imediatamente
       loadFiltersForFilial(state.selectedFilial);
 
-      // Precarregar outras filiais em background após um delay
       const timer = setTimeout(() => {
         preloadAllFilters();
       }, 2000);
 
       return () => clearTimeout(timer);
     }
-  }, [state.isLoggedIn]); // Apenas isLoggedIn para evitar loop
+  }, [state.isLoggedIn]);
 
-  // Carregar filtros quando filial muda
   useEffect(() => {
     if (state.isLoggedIn && state.selectedFilial) {
       loadFiltersForFilial(state.selectedFilial);
     }
-  }, [state.selectedFilial]); // Apenas selectedFilial
+  }, [state.selectedFilial]);
 
   return {
-    // Carregamento completo
     loadFiltersForFilial,
     preloadAllFilters,
 
-    // Carregamento básico
     loadBasicFilters,
 
-    // Utilitários
     hasValidCache: (filial) => {
       const currentCache = state.filtersCache[filial];
       const currentExpiry = state.filtersCacheExpiry[filial];
@@ -262,7 +296,6 @@ export const useFilterLoader = () => {
     isLoading: state.filtersLoading,
     clearCache: actions.clearFiltersCache,
 
-    // Dados
     filterOptions: state.filterOptions,
   };
 };

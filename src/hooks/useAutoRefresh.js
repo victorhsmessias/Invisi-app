@@ -52,7 +52,7 @@ export const useAutoRefresh = (refreshCallback, options = {}) => {
 
     intervalRef.current = setInterval(() => {
       if (isActiveRef.current && refreshCallback) {
-        refreshCallback("background");
+        refreshCallback({ silent: true, source: "background" });
       }
     }, currentInterval);
   }, [enabled, refreshCallback, getAdaptiveInterval]);
@@ -86,9 +86,9 @@ export const useAutoRefresh = (refreshCallback, options = {}) => {
           updateActivity();
           startAutoRefresh();
 
-          // Fazer refresh imediato quando voltar
+          // Fazer refresh imediato quando voltar - mas silencioso
           if (refreshCallback) {
-            setTimeout(() => refreshCallback("background"), 500);
+            setTimeout(() => refreshCallback({ silent: true, source: "background" }), 500);
           }
         } else if (nextAppState.match(/inactive|background/)) {
           // App foi para background

@@ -15,7 +15,8 @@ import { useApp } from "../context/AppContext";
 import { useTransportData } from "../hooks/useTransportData";
 import { useGlobalFilters } from "../hooks/useGlobalFilters";
 import { useFilterLoader } from "../hooks/useFilterLoader";
-import useSmartLoading from "../hooks/useSmartLoading";
+import useBackgroundUpdates from "../hooks/useBackgroundUpdates";
+import useIntelligentRefresh from "../hooks/useIntelligentRefresh";
 import {
   StatusCard,
   LoadingSpinner,
@@ -35,41 +36,22 @@ const HomeScreen = ({ navigation }) => {
   const [hasShownInitialData, setHasShownInitialData] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  // Smart loading para controlar diferentes tipos de loading
+  // Background updates
   const {
-    isInitialLoading,
-    isBackgroundLoading,
-    isRefreshing,
-    error: smartError,
-    startInitialLoading,
-    startManualRefresh,
-    startBackgroundLoading,
-    finishLoading,
-    showFullscreenLoader,
-    showBackgroundIndicator,
-  } = useSmartLoading();
+    isUpdating: isBackgroundUpdating,
+    startBackgroundUpdate,
+    finishBackgroundUpdate,
+    shouldShowIndicator,
+  } = useBackgroundUpdates();
 
-  // Função de refresh simplificada
-  const optimizedRefresh = useCallback(
-    async (loadingType = "manual") => {
-      try {
-        if (loadingType === "manual") {
-          startManualRefresh();
-        }
+  // Refresh inteligente
+  const { manualRefresh, silentRefresh, updateActivity, isDataStale } =
+    useIntelligentRefresh(refresh, {
+      lastUpdate,
+      enabled: state.isLoggedIn,
+    });
 
-        await refresh();
-        setHasShownInitialData(true);
-        finishLoading();
-      } catch (err) {
-        finishLoading("Erro ao carregar dados");
-      }
-    },
-    [refresh, startManualRefresh, finishLoading]
-  );
-
-  const updateActivity = useCallback(() => {
-    // placeholder de atividade
-  }, []);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -79,27 +61,26 @@ const HomeScreen = ({ navigation }) => {
     }).start();
   }, []);
 
-  // Carregamento inicial
   useEffect(() => {
     if (state.isLoggedIn && data && Object.keys(data).length > 0) {
       setHasShownInitialData(true);
     }
   }, [data, state.isLoggedIn]);
 
-  // Precarregamento inteligente de filtros
   useEffect(() => {
     if (state.isLoggedIn) {
-      // Precarregar filtros em background após login
       const timer = setTimeout(() => {
         if (__DEV__) {
-          console.log('[HomeScreen] Iniciando precarregamento de filtros em background');
+          console.log(
+            "[HomeScreen] Iniciando precarregamento de filtros em background"
+          );
         }
-        preloadAllFilters().catch(error => {
+        preloadAllFilters().catch((error) => {
           if (__DEV__) {
-            console.log('[HomeScreen] Erro no precarregamento:', error);
+            console.log("[HomeScreen] Erro no precarregamento:", error);
           }
         });
-      }, 1500); // Delay de 1.5s para não interferir no carregamento inicial
+      }, 1500);
 
       return () => clearTimeout(timer);
     }
@@ -107,16 +88,25 @@ const HomeScreen = ({ navigation }) => {
 
   const onRefresh = async () => {
     updateActivity();
-    await optimizedRefresh("manual");
+    setIsRefreshing(true);
+    try {
+      await manualRefresh();
+      setHasShownInitialData(true);
+    } catch (err) {
+      console.error("Erro ao fazer refresh:", err);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const handleFilialChange = (filial) => {
     actions.setFilial(filial);
 
-    // Mostrar indicador se filtros não estão em cache
     if (!hasValidCache(filial)) {
       if (__DEV__) {
-        console.log(`[HomeScreen] Filtros não em cache para ${filial}, carregamento será automático`);
+        console.log(
+          `[HomeScreen] Filtros não em cache para ${filial}, carregamento será automático`
+        );
       }
     }
   };
@@ -212,20 +202,15 @@ const HomeScreen = ({ navigation }) => {
     return <LoadingSpinner text="Carregando aplicação..." />;
   }
 
-  if (showFullscreenLoader && !hasShownInitialData) {
+  if (loading && !hasShownInitialData) {
     return <LoadingSpinner text="Carregando dashboard..." />;
   }
 
-  if (
-    (error || smartError) &&
-    !hasShownInitialData &&
-    !loading &&
-    !isInitialLoading
-  ) {
+  if (error && !hasShownInitialData && !loading) {
     return (
       <ErrorMessage
-        message={error || smartError}
-        onRetry={() => optimizedRefresh("initial")}
+        message={error}
+        onRetry={manualRefresh}
         retryText="Tentar novamente"
       />
     );
@@ -233,6 +218,15 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Indicador discreto de updates em background */}
+      <BackgroundLoadingIndicator
+        visible={shouldShowIndicator()}
+        text="Atualizando dados..."
+        variant="discrete"
+        autoHide={true}
+        autoHideDuration={2000}
+      />
+
       <Animated.View style={[styles.mainContent, { opacity: fadeAnim }]}>
         {/* Header */}
         <View style={styles.header}>
@@ -251,7 +245,7 @@ const HomeScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.headerRight}>
-            <HeaderLoadingIndicator visible={showBackgroundIndicator} />
+            <HeaderLoadingIndicator visible={shouldShowIndicator()} />
             <TouchableOpacity
               style={styles.refreshButton}
               onPress={onRefresh}
@@ -321,7 +315,7 @@ const HomeScreen = ({ navigation }) => {
                 icon={card.icon}
                 color={card.color}
                 subtitle={card.subtitle}
-                loading={loading || isBackgroundLoading}
+                loading={false}
                 onPress={card.onPress}
               />
             ))}
@@ -338,7 +332,7 @@ const HomeScreen = ({ navigation }) => {
 
       {/* Indicador de carregamento em background */}
       <BackgroundLoadingIndicator
-        visible={showBackgroundIndicator}
+        visible={shouldShowIndicator()}
         text="Atualizando dashboard..."
         position="bottom"
       />

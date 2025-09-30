@@ -12,6 +12,9 @@ const BackgroundLoadingIndicator = ({
   visible,
   text = "Atualizando...",
   position = "top",
+  variant = "default", // 'default', 'discrete', 'minimal'
+  autoHide = false,
+  autoHideDuration = 3000,
 }) => {
   const [fadeAnim] = React.useState(new Animated.Value(0));
 
@@ -22,6 +25,18 @@ const BackgroundLoadingIndicator = ({
         duration: 300,
         useNativeDriver: true,
       }).start();
+
+      // Auto-hide se configurado
+      if (autoHide) {
+        const timer = setTimeout(() => {
+          Animated.timing(fadeAnim, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }).start();
+        }, autoHideDuration);
+        return () => clearTimeout(timer);
+      }
     } else {
       Animated.timing(fadeAnim, {
         toValue: 0,
@@ -29,25 +44,52 @@ const BackgroundLoadingIndicator = ({
         useNativeDriver: true,
       }).start();
     }
-  }, [visible, fadeAnim]);
+  }, [visible, fadeAnim, autoHide, autoHideDuration]);
 
   if (!visible) return null;
 
+  const getContainerStyle = () => {
+    const baseStyle = [
+      styles.container,
+      position === "bottom" ? styles.bottomPosition : styles.topPosition,
+      { opacity: fadeAnim },
+    ];
+
+    if (variant === 'discrete') {
+      baseStyle.push(styles.discreteContainer);
+    } else if (variant === 'minimal') {
+      baseStyle.push(styles.minimalContainer);
+    }
+
+    return baseStyle;
+  };
+
+  const getContentStyle = () => {
+    if (variant === 'discrete') return styles.discreteContent;
+    if (variant === 'minimal') return styles.minimalContent;
+    return styles.content;
+  };
+
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        position === "bottom" ? styles.bottomPosition : styles.topPosition,
-        { opacity: fadeAnim },
-      ]}
-    >
-      <View style={styles.content}>
-        <ActivityIndicator
-          size="small"
-          color={COLORS.white}
-          style={styles.spinner}
-        />
-        <Text style={styles.text}>{text}</Text>
+    <Animated.View style={getContainerStyle()}>
+      <View style={getContentStyle()}>
+        {variant !== 'minimal' && (
+          <ActivityIndicator
+            size="small"
+            color={variant === 'discrete' ? COLORS.success : COLORS.white}
+            style={styles.spinner}
+          />
+        )}
+        {variant === 'minimal' && (
+          <View style={styles.minimalDot} />
+        )}
+        <Text style={[
+          styles.text,
+          variant === 'discrete' && styles.discreteText,
+          variant === 'minimal' && styles.minimalText
+        ]}>
+          {text}
+        </Text>
       </View>
     </Animated.View>
   );
@@ -182,6 +224,57 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
+  },
+  // Estilos para variante discreta
+  discreteContainer: {
+    position: "absolute",
+    top: 60,
+    left: 16,
+    right: 16,
+    zIndex: 1000,
+  },
+  discreteContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    maxWidth: 200,
+  },
+  discreteText: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  // Estilos para variante minimal
+  minimalContainer: {
+    position: "absolute",
+    top: 10,
+    right: 16,
+    zIndex: 1000,
+  },
+  minimalContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 122, 255, 0.1)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(0, 122, 255, 0.2)",
+  },
+  minimalText: {
+    color: COLORS.primary,
+    fontSize: 10,
+    fontWeight: "500",
+  },
+  minimalDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.primary,
+    marginRight: 6,
   },
 });
 

@@ -6,7 +6,6 @@ class ApiService {
     // URLs agora são específicas por filial
   }
 
-  // Obter URL específica para a filial
   getFilialURL(filial) {
     return API_CONFIG.FILIAL_URLS[filial];
   }
@@ -28,7 +27,9 @@ class ApiService {
     const url = `${API_CONFIG.FILIAL_URLS[filial]}${endpoint}`;
 
     if (__DEV__) {
-      console.log(`[ApiService] Using filial-specific URL for ${filial}: ${url}`);
+      console.log(
+        `[ApiService] Using filial-specific URL for ${filial}: ${url}`
+      );
     }
 
     const headers = await this.getAuthHeaders();
@@ -72,68 +73,64 @@ class ApiService {
   async login(credentials) {
     const urls = Object.values(API_CONFIG.FILIAL_URLS);
     let lastError = null;
+    for (const url of urls) {
+      try {
+        const response = await fetch(`${url}/login.php`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            id_nome: credentials.username.trim().toUpperCase(),
+            senha: credentials.password.toUpperCase(),
+          }),
+        });
 
-    for (let attempt = 0; attempt < API_CONFIG.RETRY_ATTEMPTS; attempt++) {
-      for (const url of urls) {
-        try {
-          const response = await fetch(`${url}/login.php`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-            body: JSON.stringify({
-              id_nome: credentials.username.trim().toUpperCase(),
-              senha: credentials.password.toUpperCase(),
-            }),
-          });
+        const responseText = await response.text();
 
-          const responseText = await response.text();
+        if (
+          responseText.toLowerCase().includes("failed") ||
+          responseText.toLowerCase().includes("invalid") ||
+          responseText.toLowerCase().includes("error")
+        ) {
+          throw new Error("Credenciais inválidas");
+        }
 
-          if (
-            responseText.toLowerCase().includes("failed") ||
-            responseText.toLowerCase().includes("invalid") ||
-            responseText.toLowerCase().includes("error")
-          ) {
-            throw new Error("Credenciais inválidas");
-          }
+        let token =
+          response.headers.get("token") ||
+          response.headers.get("authorization") ||
+          response.headers.get("x-auth-token") ||
+          response.headers.get("x-access-token");
 
-          let token =
-            response.headers.get("token") ||
-            response.headers.get("authorization") ||
-            response.headers.get("x-auth-token") ||
-            response.headers.get("x-access-token");
+        if (!token) {
+          try {
+            const data = JSON.parse(responseText);
+            token =
+              data.token ||
+              data.jwt ||
+              data.access_token ||
+              data.accessToken ||
+              data.authToken;
+          } catch (parseError) {}
+        }
 
-          if (!token) {
-            try {
-              const data = JSON.parse(responseText);
-              token =
-                data.token ||
-                data.jwt ||
-                data.access_token ||
-                data.accessToken ||
-                data.authToken;
-            } catch (parseError) {}
-          }
+        if (!token && response.status === 200) {
+          token = "success_" + Date.now();
+        }
 
-          if (!token && response.status === 200) {
-            token = "success_" + Date.now();
-          }
-
-          if (token) {
-            return { token, success: true };
-          }
-        } catch (error) {
-          lastError = error;
-          if (attempt < API_CONFIG.RETRY_ATTEMPTS - 1) {
-            await new Promise((resolve) =>
-              setTimeout(resolve, API_CONFIG.RETRY_DELAY)
-            );
-          }
+        if (token) {
+          return { token, success: true };
+        }
+      } catch (error) {
+        lastError = error;
+        if (attempt < API_CONFIG.RETRY_ATTEMPTS - 1) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, API_CONFIG.RETRY_DELAY)
+          );
         }
       }
     }
-
     throw lastError;
   }
 
@@ -147,7 +144,11 @@ class ApiService {
 
     // Extrair filial dos filtros para usar URL específica
     const filial = filtros.filtro_filial || filtros.filial;
-    const result = await this.requestWithRetry("/monitor.php", requestBody, filial);
+    const result = await this.requestWithRetry(
+      "/monitor.php",
+      requestBody,
+      filial
+    );
 
     return result;
   }
@@ -448,7 +449,11 @@ class ApiService {
         produto,
       });
 
-      return this.requestWithRetry("/monitor_contratos_fila.php", requestBody, filial);
+      return this.requestWithRetry(
+        "/monitor_contratos_fila.php",
+        requestBody,
+        filial
+      );
     } catch (error) {
       console.error("[ApiService] Error in getContratosFilaData:", error);
       throw error;

@@ -16,7 +16,6 @@ import {
   BackgroundLoadingIndicator,
   HeaderLoadingIndicator,
 } from "../components";
-import useSmartLoading from "../hooks/useSmartLoading";
 import useAutoRefresh from "../hooks/useAutoRefresh";
 import { COLORS, SCREEN_NAMES } from "../constants";
 import {
@@ -33,24 +32,13 @@ const ContratosDetalhesScreen = ({ navigation, route }) => {
   const [data, setData] = useState([]);
   const [cortesData, setCortesData] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
 
-  const {
-    isInitialLoading,
-    isBackgroundLoading,
-    isRefreshing,
-    error,
-    startInitialLoading,
-    startManualRefresh,
-    startBackgroundLoading,
-    finishLoading,
-    showFullscreenLoader,
-    showBackgroundIndicator,
-  } = useSmartLoading();
-
-  // Auto-refresh inteligente
   const { updateActivity } = useAutoRefresh(fetchContratosDetalhes, {
     enabled: true,
-    interval: 45000, // 45 segundos (um pouco mais lento que a tela principal)
+    interval: 45000,
     pauseOnBackground: true,
     adaptiveInterval: true,
   });
@@ -60,13 +48,10 @@ const ContratosDetalhesScreen = ({ navigation, route }) => {
       if (!filial || !fila || !grupo || !produto) return;
 
       try {
-        // Escolher tipo de loading baseado no contexto
-        if (loadingType === "initial") {
-          startInitialLoading();
-        } else if (loadingType === "manual") {
-          startManualRefresh();
-        } else {
-          startBackgroundLoading();
+        if (loadingType === "manual") {
+          setRefreshing(true);
+        } else if (loadingType === "initial") {
+          setLoading(true);
         }
 
         const response = await apiService.getContratosFilaData(
@@ -87,28 +72,19 @@ const ContratosDetalhesScreen = ({ navigation, route }) => {
         } else {
           setData([]);
           setCortesData(null);
-          finishLoading("Nenhum contrato encontrado para esta fila");
+          setError("Nenhum contrato encontrado para esta fila");
           return;
         }
       } catch (err) {
         console.error("[ContratosDetalhesScreen] Error:", err);
-        finishLoading("Erro ao carregar detalhes dos contratos");
+        setError("Erro ao carregar detalhes dos contratos");
         return;
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
-
-      finishLoading(); // Sucesso
     },
-    [
-      filial,
-      fila,
-      grupo,
-      produto,
-      dadosCorte,
-      startInitialLoading,
-      startManualRefresh,
-      startBackgroundLoading,
-      finishLoading,
-    ]
+    [filial, fila, grupo, produto, dadosCorte]
   );
 
   useEffect(() => {
@@ -243,7 +219,7 @@ const ContratosDetalhesScreen = ({ navigation, route }) => {
     [error]
   );
 
-  if (showFullscreenLoader && data.length === 0) {
+  if (loading && data.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
@@ -288,7 +264,6 @@ const ContratosDetalhesScreen = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -303,18 +278,21 @@ const ContratosDetalhesScreen = ({ navigation, route }) => {
         </View>
 
         <View style={styles.headerRight}>
-          <HeaderLoadingIndicator visible={showBackgroundIndicator} />
+          <HeaderLoadingIndicator visible={loading} />
         </View>
       </View>
 
-      {/* Lista de Contratos */}
       <FlatList
         data={data}
         renderItem={({ item }) => <ContratoIndividualCard item={item} />}
-        keyExtractor={(item, index) => `${item.contrato || 'no-contrato'}-${item.grupo || 'no-grupo'}-idx-${index}`}
+        keyExtractor={(item, index) =>
+          `${item.contrato || "no-contrato"}-${
+            item.grupo || "no-grupo"
+          }-idx-${index}`
+        }
         refreshControl={
           <RefreshControl
-            refreshing={isRefreshing}
+            refreshing={refreshing}
             onRefresh={onRefresh}
             colors={[COLORS.primary]}
             tintColor={COLORS.primary}
@@ -329,9 +307,8 @@ const ContratosDetalhesScreen = ({ navigation, route }) => {
         initialNumToRender={5}
       />
 
-      {/* Indicador de carregamento em background */}
       <BackgroundLoadingIndicator
-        visible={showBackgroundIndicator}
+        visible={loading && data.length > 0}
         text="Atualizando contratos..."
         position="top"
       />
