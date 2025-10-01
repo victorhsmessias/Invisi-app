@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { SHORT_DELAY } from '../constants/timing';
 
 /**
  * Hook para gerenciar atualizações em background sem interferir na UX
@@ -17,6 +18,7 @@ export const useBackgroundUpdates = () => {
     // Limpar timeout anterior se existir
     if (updateTimeoutRef.current) {
       clearTimeout(updateTimeoutRef.current);
+      updateTimeoutRef.current = null;
     }
   }, []);
 
@@ -24,10 +26,16 @@ export const useBackgroundUpdates = () => {
   const finishBackgroundUpdate = useCallback(() => {
     setLastUpdateTime(new Date());
 
+    // Limpar timeout anterior antes de criar novo
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+
     // Mostrar indicador por um tempo mínimo para feedback visual
     updateTimeoutRef.current = setTimeout(() => {
       setIsUpdating(false);
-    }, 1500);
+      updateTimeoutRef.current = null;
+    }, SHORT_DELAY);
   }, []);
 
   // Cancelar update em andamento
@@ -44,11 +52,14 @@ export const useBackgroundUpdates = () => {
     return isUpdating && updateCount > 1; // Só mostrar após primeira atualização
   }, [isUpdating, updateCount]);
 
-  // Cleanup
-  const cleanup = useCallback(() => {
-    if (updateTimeoutRef.current) {
-      clearTimeout(updateTimeoutRef.current);
-    }
+  // Cleanup automático quando componente desmonta
+  useEffect(() => {
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+        updateTimeoutRef.current = null;
+      }
+    };
   }, []);
 
   return {
@@ -59,7 +70,6 @@ export const useBackgroundUpdates = () => {
     finishBackgroundUpdate,
     cancelBackgroundUpdate,
     shouldShowIndicator,
-    cleanup,
   };
 };
 

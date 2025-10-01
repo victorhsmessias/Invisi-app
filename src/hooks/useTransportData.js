@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useApp } from "../context/AppContext";
 import { API_CONFIG, STORAGE_KEYS } from "../constants";
 import apiService from "../services/apiService";
+import { processVehicleCount } from "../utils/apiAdapters";
 
 export const useTransportData = () => {
   const { state, actions } = useApp();
@@ -39,36 +40,15 @@ export const useTransportData = () => {
         apiService.getCargasHojeData(state.selectedFilial),
       ]);
 
-      // Process data
+      // Process data usando adaptadores
       const processedData = {
-        emTransito: processVehicleCount(
-          transitoData.dados?.listaTransito?.transitoVeiculos,
-          "t_veiculos"
-        ),
-        filaDescarga: processVehicleCount(
-          filaDescargaData.dados?.listaFilaDescarga?.filaDescargaVeiculos,
-          "fd_veiculos"
-        ),
-        filaCarga: processVehicleCount(
-          filaCargaData.dados?.listaFilaCarga?.filaCargaVeiculos,
-          "fc_veiculos"
-        ),
-        patioDescarregando: processVehicleCount(
-          patioDescargaData.dados?.listaPatioDescarga?.patioDescargaVeiculos,
-          "pd_veiculos"
-        ),
-        patioCarregando: processVehicleCount(
-          patioCargaData.dados?.listaPatioCarga?.patioCargaVeiculos,
-          "pc_veiculos"
-        ),
-        descargasHoje: processVehicleCount(
-          descargasHojeData.dados?.listaDescarga?.DescargaVeiculos,
-          "d_veiculos"
-        ),
-        cargasHoje: processVehicleCount(
-          cargasHojeData.dados?.listaCarga?.CargaVeiculos,
-          ["cargas_hoje", "c_veiculos"]
-        ),
+        emTransito: processVehicleCount(transitoData, 'transito'),
+        filaDescarga: processVehicleCount(filaDescargaData, 'filaDescarga'),
+        filaCarga: processVehicleCount(filaCargaData, 'filaCarga'),
+        patioDescarregando: processVehicleCount(patioDescargaData, 'patioDescarga'),
+        patioCarregando: processVehicleCount(patioCargaData, 'patioCarga'),
+        descargasHoje: processVehicleCount(descargasHojeData, 'descargasHoje'),
+        cargasHoje: processVehicleCount(cargasHojeData, 'cargasHoje'),
       };
 
       // Update state
@@ -124,23 +104,7 @@ export const useTransportData = () => {
     }
   };
 
-  const processVehicleCount = (vehicleArray, countFields) => {
-    if (!Array.isArray(vehicleArray)) return 0;
-
-    return vehicleArray.reduce((acc, item) => {
-      if (Array.isArray(countFields)) {
-        // Try multiple field names
-        for (const field of countFields) {
-          if (item[field] !== undefined) {
-            return acc + (item[field] || 0);
-          }
-        }
-        return acc;
-      } else {
-        return acc + (item[countFields] || 0);
-      }
-    }, 0);
-  };
+  // Função removida - agora usa apiAdapters.processVehicleCount
 
   // Auto-refresh effect
   useEffect(() => {
@@ -154,8 +118,10 @@ export const useTransportData = () => {
     }
 
     return () => {
+      // Limpar interval ao desmontar ou quando isLoggedIn mudar
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
     };
   }, [fetchTransportData, state.isLoggedIn]);
@@ -163,9 +129,27 @@ export const useTransportData = () => {
   // Refresh when filial changes
   useEffect(() => {
     if (state.isLoggedIn) {
+      // Limpar interval anterior antes de fazer novo fetch
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+
       fetchTransportData();
+
+      // Recriar interval após mudança de filial
+      intervalRef.current = setInterval(() => {
+        fetchTransportData({ silent: true, source: 'background' });
+      }, API_CONFIG.AUTO_REFRESH);
     }
-  }, [state.selectedFilial]);
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [state.selectedFilial, fetchTransportData, state.isLoggedIn]);
 
   const refresh = useCallback(async (options = {}) => {
     await fetchTransportData(options);

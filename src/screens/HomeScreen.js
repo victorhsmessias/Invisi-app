@@ -26,6 +26,7 @@ import {
   HeaderLoadingIndicator,
 } from "../components";
 import { COLORS, FILIAIS, SCREEN_NAMES } from "../constants";
+import { SHORT_DELAY, AUTO_HIDE_SHORT } from "../constants/timing";
 
 const HomeScreen = ({ navigation }) => {
   const { state, actions } = useApp();
@@ -80,7 +81,7 @@ const HomeScreen = ({ navigation }) => {
             console.log("[HomeScreen] Erro no precarregamento:", error);
           }
         });
-      }, 1500);
+      }, SHORT_DELAY);
 
       return () => clearTimeout(timer);
     }
@@ -218,13 +219,14 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Indicador discreto de updates em background */}
+      {/* Indicador consolidado de updates em background */}
       <BackgroundLoadingIndicator
         visible={shouldShowIndicator()}
-        text="Atualizando dados..."
+        text="Atualizando dashboard..."
         variant="discrete"
         autoHide={true}
-        autoHideDuration={2000}
+        autoHideDuration={AUTO_HIDE_SHORT}
+        position="bottom"
       />
 
       <Animated.View style={[styles.mainContent, { opacity: fadeAnim }]}>
@@ -328,13 +330,6 @@ const HomeScreen = ({ navigation }) => {
         visible={menuVisible}
         onClose={() => setMenuVisible(false)}
         navigation={navigation}
-      />
-
-      {/* Indicador de carregamento em background */}
-      <BackgroundLoadingIndicator
-        visible={shouldShowIndicator()}
-        text="Atualizando dashboard..."
-        position="bottom"
       />
     </SafeAreaView>
   );

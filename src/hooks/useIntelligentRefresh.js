@@ -1,10 +1,12 @@
 import { useCallback, useRef, useEffect } from 'react';
-import { AppState } from 'react-native';
 import { API_CONFIG } from '../constants';
+import useAppState from './useAppState';
+import useRefreshStrategy from './useRefreshStrategy';
+import useAdaptiveInterval from './useAdaptiveInterval';
 
 /**
- * Hook que determina inteligentemente quando fazer refresh silencioso
- * baseado na atividade do usuário e idade dos dados
+ * Hook refatorado que determina inteligentemente quando fazer refresh
+ * Agora composto de hooks menores e mais testáveis
  */
 export const useIntelligentRefresh = (refreshCallback, options = {}) => {
   const {
@@ -16,157 +18,119 @@ export const useIntelligentRefresh = (refreshCallback, options = {}) => {
     backgroundStaleTime = API_CONFIG.BACKGROUND_STALE_TIME,
   } = options;
 
-  const intervalRef = useRef(null);
-  const lastActivityRef = useRef(Date.now());
-  const appStateRef = useRef(AppState.currentState);
-  const isUserActiveRef = useRef(true);
+  const timeoutRef = useRef(null);
 
-  // Atualizar atividade do usuário
-  const updateActivity = useCallback(() => {
-    lastActivityRef.current = Date.now();
-    isUserActiveRef.current = true;
-  }, []);
+  // Usar hooks especializados
+  const appState = useAppState();
+  const strategy = useRefreshStrategy({ staleTime, backgroundStaleTime });
 
-  // Verificar se dados estão stale
-  const isDataStale = useCallback((source = 'manual') => {
-    if (!lastUpdate) return true;
-
-    const now = Date.now();
-    const updateTime = typeof lastUpdate === 'string'
-      ? new Date(lastUpdate).getTime()
-      : lastUpdate.getTime();
-
-    const ageMs = now - updateTime;
-    const threshold = source === 'background' ? backgroundStaleTime : staleTime;
-
-    return ageMs > threshold;
-  }, [lastUpdate, staleTime, backgroundStaleTime]);
-
-  // Determinar tipo de refresh baseado no contexto
-  const getRefreshStrategy = useCallback(() => {
-    const timeSinceActivity = Date.now() - lastActivityRef.current;
-    const isUserIdle = timeSinceActivity > 2 * 60 * 1000; // 2 minutos
-    const appInBackground = appStateRef.current !== 'active';
-
-    // Se app em background ou usuário inativo, usar refresh silencioso
-    if (appInBackground || isUserIdle) {
-      return {
-        silent: true,
-        source: 'background',
-        shouldRefresh: isDataStale('background'),
-        interval: backgroundInterval,
-      };
-    }
-
-    // Se usuário ativo e dados muito antigos, refresh normal
-    if (isDataStale('manual')) {
-      return {
-        silent: false,
-        source: 'manual',
-        shouldRefresh: true,
-        interval: interval,
-      };
-    }
-
-    // Se dados recentes e usuário ativo, refresh silencioso
-    return {
-      silent: true,
-      source: 'background',
-      shouldRefresh: isDataStale('background'),
-      interval: backgroundInterval,
-    };
-  }, [interval, backgroundInterval, isDataStale]);
+  // Delegar updateActivity para appState
+  const updateActivity = appState.updateActivity;
 
   // Executar refresh inteligente
   const executeIntelligentRefresh = useCallback(() => {
     if (!enabled || !refreshCallback) return;
 
-    const strategy = getRefreshStrategy();
+    // Obter estratégia baseada no contexto atual
+    const refreshStrategy = strategy.getRefreshStrategy({
+      isAppInBackground: appState.isAppInBackground(),
+      isUserIdle: appState.isUserIdle(),
+      lastUpdate,
+    });
 
-    if (strategy.shouldRefresh) {
+    if (refreshStrategy.shouldRefresh) {
       if (__DEV__) {
         console.log('[useIntelligentRefresh] Executing refresh:', {
-          silent: strategy.silent,
-          source: strategy.source,
-          dataAge: lastUpdate ? Date.now() - new Date(lastUpdate).getTime() : 'never',
+          silent: refreshStrategy.silent,
+          source: refreshStrategy.source,
+          reason: refreshStrategy.reason,
+          dataAge: strategy.getDataAge(lastUpdate),
         });
       }
 
       refreshCallback({
-        silent: strategy.silent,
-        source: strategy.source,
+        silent: refreshStrategy.silent,
+        source: refreshStrategy.source,
       });
     }
-  }, [enabled, refreshCallback, getRefreshStrategy, lastUpdate]);
+  }, [enabled, refreshCallback, strategy, appState, lastUpdate]);
 
-  // Configurar intervalo adaptativo
-  const setupInterval = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-    }
+  // Usar intervalo adaptativo
+  const adaptiveInterval = useAdaptiveInterval(executeIntelligentRefresh, {
+    baseInterval: interval,
+    backgroundInterval,
+    enabled,
+    pauseOnBackground: false, // Não pausar, apenas ajustar intervalo
+  });
 
-    if (!enabled) return;
-
-    const strategy = getRefreshStrategy();
-
-    intervalRef.current = setInterval(() => {
-      executeIntelligentRefresh();
-    }, strategy.interval);
-
-    if (__DEV__) {
-      console.log('[useIntelligentRefresh] Interval configured:', {
-        interval: strategy.interval,
-        mode: strategy.source,
-      });
-    }
-  }, [enabled, getRefreshStrategy, executeIntelligentRefresh]);
-
-  // Handle mudanças de estado da app
+  // Gerenciar mudanças de estado da app
   useEffect(() => {
-    const handleAppStateChange = (nextAppState) => {
-      appStateRef.current = nextAppState;
+    const cleanup = appState.onAppStateChange((stateChange) => {
+      const { isActive, didBecomeActive, isBackground } = stateChange;
 
-      if (nextAppState === 'active') {
+      if (didBecomeActive) {
         // App voltou ao foreground
-        isUserActiveRef.current = true;
         updateActivity();
 
-        // Reconfigurar intervalo para modo ativo
-        setupInterval();
+        // Reiniciar intervalo com contexto ativo
+        adaptiveInterval.restartInterval({
+          isAppInBackground: false,
+          isUserIdle: false,
+        });
 
         // Refresh imediato se dados muito antigos
-        if (isDataStale('manual')) {
-          setTimeout(() => {
+        if (strategy.shouldRefreshOnForeground(lastUpdate)) {
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+          }
+
+          timeoutRef.current = setTimeout(() => {
             refreshCallback?.({
               silent: false,
               source: 'foreground',
             });
+            timeoutRef.current = null;
           }, 500);
         }
-      } else {
-        // App foi para background
-        isUserActiveRef.current = false;
-        setupInterval(); // Reconfigurar para modo background
+      } else if (isBackground) {
+        // App foi para background - ajustar intervalo
+        adaptiveInterval.restartInterval({
+          isAppInBackground: true,
+          isUserIdle: appState.isUserIdle(),
+        });
       }
-    };
-
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    });
 
     return () => {
-      subscription?.remove();
-    };
-  }, [setupInterval, updateActivity, isDataStale, refreshCallback]);
+      cleanup();
 
-  // Configurar intervalo inicial
+      // Limpar timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, [appState, strategy, refreshCallback, lastUpdate, updateActivity, adaptiveInterval]);
+
+  // Iniciar intervalo adaptativo
   useEffect(() => {
-    setupInterval();
+    if (enabled) {
+      adaptiveInterval.startInterval({
+        isAppInBackground: appState.isAppInBackground(),
+        isUserIdle: appState.isUserIdle(),
+        timeSinceActivity: appState.getTimeSinceLastActivity(),
+      });
+    } else {
+      adaptiveInterval.stopInterval();
+    }
 
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
       }
     };
-  }, [setupInterval]);
+  }, [enabled, adaptiveInterval, appState]);
 
   // Refresh manual (sempre mostra loading)
   const manualRefresh = useCallback(() => {
@@ -185,13 +149,25 @@ export const useIntelligentRefresh = (refreshCallback, options = {}) => {
     });
   }, [refreshCallback]);
 
+  // Verificar se dados estão stale
+  const isDataStale = useCallback(() => {
+    return strategy.isDataStale(lastUpdate, 'manual');
+  }, [strategy, lastUpdate]);
+
   return {
+    // Funções principais
     manualRefresh,
     silentRefresh,
     updateActivity,
-    isDataStale: () => isDataStale('manual'),
-    isUserActive: isUserActiveRef.current,
-    currentInterval: getRefreshStrategy().interval,
+
+    // Estado e verificações
+    isDataStale,
+    isUserActive: appState.isUserActive,
+    currentInterval: adaptiveInterval.calculateInterval({
+      isAppInBackground: appState.isAppInBackground(),
+      isUserIdle: appState.isUserIdle(),
+      timeSinceActivity: appState.getTimeSinceLastActivity(),
+    }),
   };
 };
 

@@ -1,39 +1,62 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useApp } from "../context/AppContext";
 import apiService from "../services/apiService";
+import {
+  FALLBACK_SERVICOS,
+  FALLBACK_OP_PADRAO,
+  FALLBACK_GRUPOS,
+  FALLBACK_PRODUTOS,
+  getFallbackGruposStrings,
+  getFallbackProdutosStrings,
+  logFallbackUsage,
+} from "../constants/fallbacks";
+import { MEDIUM_DELAY } from "../constants/timing";
 
 export const useFilterLoader = () => {
   const { state, actions } = useApp();
   const loadingRef = useRef(new Set()); // Controla carregamentos em progresso
 
+  // Usar refs para acessar state atual sem causar re-renders
+  const stateRef = useRef(state);
+  const actionsRef = useRef(actions);
+
+  // Manter refs atualizadas
+  useEffect(() => {
+    stateRef.current = state;
+    actionsRef.current = actions;
+  }, [state, actions]);
+
+  // Helper para obter cache atual de forma segura
+  const getCurrentCache = useCallback((filial) => {
+    const cache = stateRef.current.filtersCache[filial];
+    const expiry = stateRef.current.filtersCacheExpiry[filial];
+    return { cache, expiry, isValid: cache && expiry && Date.now() < expiry };
+  }, []);
+
   // Verificar se filtros estão em cache válido
   const hasValidCache = useCallback((filial) => {
-    const cachedData = state.filtersCache[filial];
-    const cacheExpiry = state.filtersCacheExpiry[filial];
-    return cachedData && cacheExpiry && Date.now() < cacheExpiry;
-  }, []); // Remover dependências do cache para evitar loop
+    const { isValid } = getCurrentCache(filial);
+    return isValid;
+  }, [getCurrentCache]);
 
   // Carregar filtros completos para uma filial
   const loadFiltersForFilial = useCallback(async (filial) => {
     if (!filial) return null;
 
-    // Verificar cache válido primeiro (acessar diretamente do state atual)
-    const currentCache = state.filtersCache[filial];
-    const currentExpiry = state.filtersCacheExpiry[filial];
-    const isCacheValid =
-      currentCache && currentExpiry && Date.now() < currentExpiry;
+    // Verificar cache válido usando ref (evita dependência circular)
+    const { cache, isValid } = getCurrentCache(filial);
 
-    if (isCacheValid) {
+    if (isValid) {
       if (__DEV__) {
         console.log(`[useFilterLoader] Cache válido para filial ${filial}`);
       }
 
       // Atualizar filterOptions no contexto se necessário
-      if (filial === state.selectedFilial) {
-        actions.setFilterOptions(currentCache);
+      if (filial === stateRef.current.selectedFilial) {
+        actionsRef.current.setFilterOptions(cache);
       }
 
-      return currentCache;
+      return cache;
     }
 
     // Evitar múltiplas requisições simultâneas
@@ -49,7 +72,7 @@ export const useFilterLoader = () => {
 
     try {
       loadingRef.current.add(loadingKey);
-      actions.setFiltersLoading(true);
+      actionsRef.current.setFiltersLoading(true);
 
       if (__DEV__) {
         console.log(
@@ -72,36 +95,18 @@ export const useFilterLoader = () => {
 
       // Processar e estruturar dados
       const filterData = {
-        servicos: servicosResponse.dados?.servicos || [
-          "armazenagem",
-          "transbordo",
-          "pesagem",
-        ],
-        opPadrao: opPadraoResponse.dados?.op_padrao || [
-          "rodo_ferro",
-          "ferro_rodo",
-          "rodo_rodo",
-          "outros",
-        ],
-        grupos: gruposResponse.dados?.grupos || [
-          "ADM-MGA",
-          "ATT",
-          "CARGILL",
-          "BTG PACTUAL S/A",
-        ],
-        produtos: produtosResponse.dados?.produtos || [
-          "SOJA GRAOS",
-          "MILHO GRAOS",
-          "FARELO DE SOJA",
-        ],
+        servicos: servicosResponse.dados?.servicos || FALLBACK_SERVICOS,
+        opPadrao: opPadraoResponse.dados?.op_padrao || FALLBACK_OP_PADRAO,
+        grupos: gruposResponse.dados?.grupos || getFallbackGruposStrings(),
+        produtos: produtosResponse.dados?.produtos || getFallbackProdutosStrings(),
       };
 
-      // Salvar no cache
-      actions.setFiltersCache(filial, filterData);
+      // Salvar no cache usando ref
+      actionsRef.current.setFiltersCache(filial, filterData);
 
-      // Atualizar filterOptions se for a filial atual
-      if (filial === state.selectedFilial) {
-        actions.setFilterOptions(filterData);
+      // Atualizar filterOptions se for a filial atual (usando ref)
+      if (filial === stateRef.current.selectedFilial) {
+        actionsRef.current.setFilterOptions(filterData);
       }
 
       if (__DEV__) {
@@ -121,27 +126,27 @@ export const useFilterLoader = () => {
       );
 
       // Fallback para dados padrão
+      logFallbackUsage('filtros completos', `loadFiltersForFilial - Erro ao carregar filtros para ${filial}`);
       const fallbackData = {
-        servicos: ["armazenagem", "transbordo", "pesagem"],
-        opPadrao: ["rodo_ferro", "ferro_rodo", "rodo_rodo", "outros"],
-        grupos: ["ADM-MGA", "ATT", "CARGILL", "BTG PACTUAL S/A"],
-        produtos: ["SOJA GRAOS", "MILHO GRAOS", "FARELO DE SOJA"],
+        servicos: FALLBACK_SERVICOS,
+        opPadrao: FALLBACK_OP_PADRAO,
+        grupos: getFallbackGruposStrings(),
+        produtos: getFallbackProdutosStrings(),
       };
 
-      // Salvar fallback no cache com tempo menor
-      const tempExpiry = Date.now() + 1 * 60 * 1000; // 1 minuto para fallback
-      actions.setFiltersCache(filial, fallbackData);
+      // Salvar fallback no cache usando ref
+      actionsRef.current.setFiltersCache(filial, fallbackData);
 
-      if (filial === state.selectedFilial) {
-        actions.setFilterOptions(fallbackData);
+      if (filial === stateRef.current.selectedFilial) {
+        actionsRef.current.setFilterOptions(fallbackData);
       }
 
       return fallbackData;
     } finally {
       loadingRef.current.delete(loadingKey);
-      actions.setFiltersLoading(false);
+      actionsRef.current.setFiltersLoading(false);
     }
-  }, []);
+  }, [getCurrentCache]);
 
   const preloadAllFilters = useCallback(async () => {
     try {
@@ -153,15 +158,13 @@ export const useFilterLoader = () => {
         );
       }
 
-      const loadPromises = filiais
-        .filter((filial) => {
-          const currentCache = state.filtersCache[filial];
-          const currentExpiry = state.filtersCacheExpiry[filial];
-          return !(currentCache && currentExpiry && Date.now() < currentExpiry);
-        })
-        .map((filial) => loadFiltersForFilial(filial));
+      // Filtrar filiais que precisam de carregamento (usando getCurrentCache)
+      const filiaisToLoad = filiais.filter((filial) => {
+        const { isValid } = getCurrentCache(filial);
+        return !isValid;
+      });
 
-      if (loadPromises.length === 0) {
+      if (filiaisToLoad.length === 0) {
         if (__DEV__) {
           console.log(
             "[useFilterLoader] Todos os filtros já estão em cache válido"
@@ -169,6 +172,11 @@ export const useFilterLoader = () => {
         }
         return;
       }
+
+      // Carregar filtros usando loadFiltersForFilial
+      const loadPromises = filiaisToLoad.map((filial) =>
+        loadFiltersForFilial(filial)
+      );
 
       const results = await Promise.allSettled(loadPromises);
 
@@ -188,20 +196,18 @@ export const useFilterLoader = () => {
         error
       );
     }
-  }, []);
+  }, [getCurrentCache, loadFiltersForFilial]);
 
   const loadBasicFilters = useCallback(async (filial) => {
     if (!filial) return null;
 
-    const currentCache = state.filtersCache[filial];
-    const currentExpiry = state.filtersCacheExpiry[filial];
-    const isCacheValid =
-      currentCache && currentExpiry && Date.now() < currentExpiry;
+    // Usar getCurrentCache para verificar cache
+    const { cache, isValid } = getCurrentCache(filial);
 
-    if (isCacheValid) {
+    if (isValid && cache) {
       return {
-        servicos: currentCache.servicos,
-        opPadrao: currentCache.opPadrao,
+        servicos: cache.servicos,
+        opPadrao: cache.opPadrao,
       };
     }
 
@@ -225,20 +231,12 @@ export const useFilterLoader = () => {
       ]);
 
       const basicFilters = {
-        servicos: servicosResponse.dados?.servicos || [
-          "armazenagem",
-          "transbordo",
-          "pesagem",
-        ],
-        opPadrao: opPadraoResponse.dados?.op_padrao || [
-          "rodo_ferro",
-          "ferro_rodo",
-          "rodo_rodo",
-          "outros",
-        ],
+        servicos: servicosResponse.dados?.servicos || FALLBACK_SERVICOS,
+        opPadrao: opPadraoResponse.dados?.op_padrao || FALLBACK_OP_PADRAO,
       };
 
-      const existingCache = state.filtersCache[filial] || {};
+      // Acessar cache existente via ref
+      const existingCache = stateRef.current.filtersCache[filial] || {};
       const updatedCache = {
         ...existingCache,
         ...basicFilters,
@@ -246,7 +244,7 @@ export const useFilterLoader = () => {
         produtos: existingCache.produtos || [],
       };
 
-      actions.setFiltersCache(filial, updatedCache);
+      actionsRef.current.setFiltersCache(filial, updatedCache);
 
       return basicFilters;
     } catch (error) {
@@ -255,14 +253,15 @@ export const useFilterLoader = () => {
         error
       );
 
+      logFallbackUsage('filtros básicos', `loadBasicFilters - Erro ao carregar para ${filial}`);
       return {
-        servicos: ["armazenagem", "transbordo", "pesagem"],
-        opPadrao: ["rodo_ferro", "ferro_rodo", "rodo_rodo", "outros"],
+        servicos: FALLBACK_SERVICOS,
+        opPadrao: FALLBACK_OP_PADRAO,
       };
     } finally {
       loadingRef.current.delete(loadingKey);
     }
-  }, []);
+  }, [getCurrentCache]);
 
   useEffect(() => {
     if (state.isLoggedIn && state.selectedFilial) {
@@ -270,7 +269,7 @@ export const useFilterLoader = () => {
 
       const timer = setTimeout(() => {
         preloadAllFilters();
-      }, 2000);
+      }, MEDIUM_DELAY);
 
       return () => clearTimeout(timer);
     }
@@ -285,17 +284,16 @@ export const useFilterLoader = () => {
   return {
     loadFiltersForFilial,
     preloadAllFilters,
-
     loadBasicFilters,
 
-    hasValidCache: (filial) => {
-      const currentCache = state.filtersCache[filial];
-      const currentExpiry = state.filtersCacheExpiry[filial];
-      return currentCache && currentExpiry && Date.now() < currentExpiry;
-    },
-    isLoading: state.filtersLoading,
-    clearCache: actions.clearFiltersCache,
+    // Usar hasValidCache que já tem getCurrentCache como dependência
+    hasValidCache,
 
+    // Estado reativo
+    isLoading: state.filtersLoading,
     filterOptions: state.filterOptions,
+
+    // Ações
+    clearCache: actions.clearFiltersCache,
   };
 };

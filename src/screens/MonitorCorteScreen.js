@@ -29,6 +29,15 @@ import {
   formatNumber,
 } from "../utils/formatters";
 import apiService from "../services/apiService";
+import {
+  STABILITY_CHECK_TIMEOUT,
+  MONITOR_CORTE_REFRESH_INTERVAL,
+  CACHE_TIME,
+  QUICK_RETURN_THRESHOLD,
+  SHORT_NAVIGATION_THRESHOLD,
+  QUICK_RETURN_STALE_TIME,
+  SHORT_NAVIGATION_STALE_TIME,
+} from "../constants/timing";
 
 const MonitorCorteScreen = ({ navigation, route }) => {
   const { state } = useApp();
@@ -67,7 +76,7 @@ const MonitorCorteScreen = ({ navigation, route }) => {
         }
         setHasShownInitialData(true);
       }
-    }, 15000);
+    }, STABILITY_CHECK_TIMEOUT);
 
     return () => clearTimeout(timeout);
   }, [hasShownInitialData]);
@@ -76,7 +85,7 @@ const MonitorCorteScreen = ({ navigation, route }) => {
 
   const { updateActivity } = useAutoRefresh(fetchContratosData, {
     enabled: true,
-    interval: 30000,
+    interval: MONITOR_CORTE_REFRESH_INTERVAL,
     pauseOnBackground: true,
     adaptiveInterval: true,
   });
@@ -249,18 +258,18 @@ const MonitorCorteScreen = ({ navigation, route }) => {
           // Marcar tempo atual de foco
           lastFocusTime.current = currentTime;
 
-          // Verificar se os dados são recentes (menos de 2 minutos)
+          // Verificar se os dados são recentes
           const dataAge = lastDataLoad ? currentTime - lastDataLoad : Infinity;
-          const isDataFresh = dataAge < 2 * 60 * 1000; // 2 minutos
+          const isDataFresh = dataAge < CACHE_TIME;
 
-          // Se voltou rapidamente (menos de 30 segundos) e dados são frescos, não recarregar
-          const isQuickReturn = timeSinceLastFocus < 30 * 1000; // 30 segundos
+          // Se voltou rapidamente e dados são frescos, não recarregar
+          const isQuickReturn = timeSinceLastFocus < QUICK_RETURN_THRESHOLD;
           const timeAwayFromScreen = navigationStartTime.current ? currentTime - navigationStartTime.current : timeSinceLastFocus;
-          const isShortNavigation = timeAwayFromScreen < 2 * 60 * 1000; // 2 minutos de navegação
+          const isShortNavigation = timeAwayFromScreen < SHORT_NAVIGATION_THRESHOLD;
 
           const shouldSkipReload = (isDataFresh && data.length > 0) ||
-                                  (isQuickReturn && data.length > 0 && dataAge < 5 * 60 * 1000) || // 5 minutos para retorno rápido
-                                  (isShortNavigation && data.length > 0 && dataAge < 10 * 60 * 1000); // 10 minutos para navegação curta
+                                  (isQuickReturn && data.length > 0 && dataAge < QUICK_RETURN_STALE_TIME) ||
+                                  (isShortNavigation && data.length > 0 && dataAge < SHORT_NAVIGATION_STALE_TIME);
 
           if (shouldSkipReload) {
             if (__DEV__) {

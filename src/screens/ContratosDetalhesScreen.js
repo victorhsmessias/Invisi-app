@@ -24,6 +24,7 @@ import {
   formatNumber,
 } from "../utils/formatters";
 import apiService from "../services/apiService";
+import { CONTRATOS_REFRESH_INTERVAL } from "../constants/timing";
 
 const ContratosDetalhesScreen = ({ navigation, route }) => {
   const { state } = useApp();
@@ -38,7 +39,7 @@ const ContratosDetalhesScreen = ({ navigation, route }) => {
 
   const { updateActivity } = useAutoRefresh(fetchContratosDetalhes, {
     enabled: true,
-    interval: 45000,
+    interval: CONTRATOS_REFRESH_INTERVAL,
     pauseOnBackground: true,
     adaptiveInterval: true,
   });

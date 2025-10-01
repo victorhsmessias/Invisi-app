@@ -58,6 +58,32 @@ export const DEFAULT_FILTERS = {
   },
 };
 
+/**
+ * Filtros padrão para requisições da API
+ * Centralizados para evitar duplicação em múltiplos métodos
+ */
+export const DEFAULT_API_FILTERS = {
+  SERVICO: {
+    armazenagem: 1,
+    transbordo: 1,
+    pesagem: 0,
+  },
+  OP_PADRAO: {
+    rodo_ferro: 1,
+    ferro_rodo: 1,
+    rodo_rodo: 1,
+    outros: 0,
+  },
+};
+
+/**
+ * Helper para obter filtros padrão com possibilidade de override
+ */
+export const getDefaultFilters = (customFilters = {}) => ({
+  filtro_servico: customFilters.filtro_servico || DEFAULT_API_FILTERS.SERVICO,
+  filtro_op_padrao: customFilters.filtro_op_padrao || DEFAULT_API_FILTERS.OP_PADRAO,
+});
+
 export const COLORS = {
   primary: "#007AFF",
   success: "#28a745",

@@ -1,10 +1,22 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { API_CONFIG, STORAGE_KEYS } from "../constants";
+import { API_CONFIG, STORAGE_KEYS, DEFAULT_API_FILTERS } from "../constants";
+import {
+  FALLBACK_GRUPOS,
+  FALLBACK_PRODUTOS,
+  logFallbackUsage,
+} from "../constants/fallbacks";
+import {
+  AuthenticationError,
+  AUTH_ERROR_CODES,
+  rateLimiter,
+  validateAndSanitizeCredentials,
+  validateLoginResponse,
+  extractToken,
+  saveAuthData,
+} from "../utils/authUtils";
 
 class ApiService {
-  constructor() {
-    // URLs agora são específicas por filial
-  }
+  constructor() {}
 
   getFilialURL(filial) {
     return API_CONFIG.FILIAL_URLS[filial];
@@ -71,67 +83,107 @@ class ApiService {
     throw lastError;
   }
   async login(credentials) {
-    const urls = Object.values(API_CONFIG.FILIAL_URLS);
-    let lastError = null;
-    for (const url of urls) {
-      try {
-        const response = await fetch(`${url}/login.php`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({
-            id_nome: credentials.username.trim().toUpperCase(),
-            senha: credentials.password.toUpperCase(),
-          }),
-        });
+    try {
+      const sanitized = validateAndSanitizeCredentials(
+        credentials.username,
+        credentials.password
+      );
 
-        const responseText = await response.text();
+      await rateLimiter.checkRateLimit(sanitized.username);
 
-        if (
-          responseText.toLowerCase().includes("failed") ||
-          responseText.toLowerCase().includes("invalid") ||
-          responseText.toLowerCase().includes("error")
-        ) {
-          throw new Error("Credenciais inválidas");
-        }
+      const urls = Object.values(API_CONFIG.FILIAL_URLS);
+      let lastError = null;
+      let authenticatedUrl = null;
 
-        let token =
-          response.headers.get("token") ||
-          response.headers.get("authorization") ||
-          response.headers.get("x-auth-token") ||
-          response.headers.get("x-access-token");
+      const maxUrlAttempts = Math.min(urls.length, 2);
 
-        if (!token) {
-          try {
-            const data = JSON.parse(responseText);
-            token =
-              data.token ||
-              data.jwt ||
-              data.access_token ||
-              data.accessToken ||
-              data.authToken;
-          } catch (parseError) {}
-        }
+      for (let i = 0; i < maxUrlAttempts; i++) {
+        const url = urls[i];
 
-        if (!token && response.status === 200) {
-          token = "success_" + Date.now();
-        }
+        try {
+          if (__DEV__) {
+            console.log(`[ApiService] Tentando autenticação em: ${url}`);
+          }
 
-        if (token) {
-          return { token, success: true };
-        }
-      } catch (error) {
-        lastError = error;
-        if (attempt < API_CONFIG.RETRY_ATTEMPTS - 1) {
-          await new Promise((resolve) =>
-            setTimeout(resolve, API_CONFIG.RETRY_DELAY)
-          );
+          const response = await fetch(`${url}/login.php`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({
+              id_nome: sanitized.username,
+              senha: sanitized.password,
+            }),
+            timeout: 10000,
+          });
+
+          const responseText = await response.text();
+
+          validateLoginResponse(response, responseText);
+
+          const token = extractToken(response, responseText);
+
+          await saveAuthData(token, sanitized.username);
+
+          rateLimiter.resetAttempts(sanitized.username);
+
+          if (__DEV__) {
+            console.log("[ApiService] Autenticação bem-sucedida");
+          }
+
+          return {
+            token,
+            success: true,
+            username: sanitized.username,
+          };
+        } catch (error) {
+          lastError = error;
+
+          if (
+            error instanceof AuthenticationError &&
+            error.code === AUTH_ERROR_CODES.INVALID_CREDENTIALS
+          ) {
+            if (__DEV__) {
+              console.log(
+                "[ApiService] Credenciais inválidas, parando tentativas"
+              );
+            }
+            break;
+          }
+
+          if (__DEV__) {
+            console.warn(
+              `[ApiService] Erro ao autenticar em ${url}:`,
+              error.message
+            );
+          }
         }
       }
+
+      if (
+        lastError instanceof AuthenticationError &&
+        lastError.code === AUTH_ERROR_CODES.INVALID_CREDENTIALS
+      ) {
+        throw lastError;
+      }
+
+      throw new AuthenticationError(
+        "Não foi possível conectar ao servidor. Verifique sua conexão.",
+        AUTH_ERROR_CODES.NETWORK_ERROR,
+        { attemptedUrls: maxUrlAttempts }
+      );
+    } catch (error) {
+      if (error instanceof AuthenticationError) {
+        throw error;
+      }
+
+      throw new AuthenticationError(
+        error.message || "Erro desconhecido durante autenticação",
+        AUTH_ERROR_CODES.NETWORK_ERROR,
+        { originalError: error.name }
+      );
     }
-    throw lastError;
   }
 
   async getMonitorData(tipoOperacao, filtros) {
@@ -142,7 +194,6 @@ class ApiService {
       },
     };
 
-    // Extrair filial dos filtros para usar URL específica
     const filial = filtros.filtro_filial || filtros.filial;
     const result = await this.requestWithRetry(
       "/monitor.php",
@@ -156,17 +207,8 @@ class ApiService {
   async getTransitoData(filial, filtroServico = null, filtroOpPadrao = null) {
     return this.getMonitorData("monitor_transito", {
       filtro_filial: filial,
-      filtro_servico: filtroServico || {
-        armazenagem: 1,
-        transbordo: 1,
-        pesagem: 0,
-      },
-      filtro_op_padrao: filtroOpPadrao || {
-        rodo_ferro: 1,
-        ferro_rodo: 1,
-        rodo_rodo: 1,
-        outros: 0,
-      },
+      filtro_servico: filtroServico || DEFAULT_API_FILTERS.SERVICO,
+      filtro_op_padrao: filtroOpPadrao || DEFAULT_API_FILTERS.OP_PADRAO,
     });
   }
 
@@ -177,34 +219,16 @@ class ApiService {
   ) {
     return this.getMonitorData("monitor_fila_desc", {
       filtro_filial: filial,
-      filtro_servico: filtroServico || {
-        armazenagem: 1,
-        transbordo: 1,
-        pesagem: 0,
-      },
-      filtro_op_padrao: filtroOpPadrao || {
-        rodo_ferro: 1,
-        ferro_rodo: 1,
-        rodo_rodo: 1,
-        outros: 0,
-      },
+      filtro_servico: filtroServico || DEFAULT_API_FILTERS.SERVICO,
+      filtro_op_padrao: filtroOpPadrao || DEFAULT_API_FILTERS.OP_PADRAO,
     });
   }
 
   async getFilaCargaData(filial, filtroServico = null, filtroOpPadrao = null) {
     return this.getMonitorData("monitor_fila_carga", {
       filtro_filial: filial,
-      filtro_servico: filtroServico || {
-        armazenagem: 1,
-        transbordo: 1,
-        pesagem: 0,
-      },
-      filtro_op_padrao: filtroOpPadrao || {
-        rodo_ferro: 1,
-        ferro_rodo: 1,
-        rodo_rodo: 1,
-        outros: 0,
-      },
+      filtro_servico: filtroServico || DEFAULT_API_FILTERS.SERVICO,
+      filtro_op_padrao: filtroOpPadrao || DEFAULT_API_FILTERS.OP_PADRAO,
     });
   }
 
@@ -215,34 +239,16 @@ class ApiService {
   ) {
     return this.getMonitorData("monitor_patio_desc", {
       filtro_filial: filial,
-      filtro_servico: filtroServico || {
-        armazenagem: 1,
-        transbordo: 1,
-        pesagem: 0,
-      },
-      filtro_op_padrao: filtroOpPadrao || {
-        rodo_ferro: 1,
-        ferro_rodo: 1,
-        rodo_rodo: 1,
-        outros: 0,
-      },
+      filtro_servico: filtroServico || DEFAULT_API_FILTERS.SERVICO,
+      filtro_op_padrao: filtroOpPadrao || DEFAULT_API_FILTERS.OP_PADRAO,
     });
   }
 
   async getPatioCargaData(filial, filtroServico = null, filtroOpPadrao = null) {
     return this.getMonitorData("monitor_patio_carga", {
       filtro_filial: filial,
-      filtro_servico: filtroServico || {
-        armazenagem: 1,
-        transbordo: 1,
-        pesagem: 0,
-      },
-      filtro_op_padrao: filtroOpPadrao || {
-        rodo_ferro: 1,
-        ferro_rodo: 1,
-        rodo_rodo: 1,
-        outros: 0,
-      },
+      filtro_servico: filtroServico || DEFAULT_API_FILTERS.SERVICO,
+      filtro_op_padrao: filtroOpPadrao || DEFAULT_API_FILTERS.OP_PADRAO,
     });
   }
 
@@ -253,34 +259,16 @@ class ApiService {
   ) {
     return this.getMonitorData("monitor_descarga", {
       filtro_filial: filial,
-      filtro_servico: filtroServico || {
-        armazenagem: 1,
-        transbordo: 1,
-        pesagem: 0,
-      },
-      filtro_op_padrao: filtroOpPadrao || {
-        rodo_ferro: 1,
-        ferro_rodo: 1,
-        rodo_rodo: 1,
-        outros: 0,
-      },
+      filtro_servico: filtroServico || DEFAULT_API_FILTERS.SERVICO,
+      filtro_op_padrao: filtroOpPadrao || DEFAULT_API_FILTERS.OP_PADRAO,
     });
   }
 
   async getCargasHojeData(filial, filtroServico = null, filtroOpPadrao = null) {
     return this.getMonitorData("monitor_carga", {
       filtro_filial: filial,
-      filtro_servico: filtroServico || {
-        armazenagem: 1,
-        transbordo: 1,
-        pesagem: 0,
-      },
-      filtro_op_padrao: filtroOpPadrao || {
-        rodo_ferro: 1,
-        ferro_rodo: 1,
-        rodo_rodo: 1,
-        outros: 0,
-      },
+      filtro_servico: filtroServico || DEFAULT_API_FILTERS.SERVICO,
+      filtro_op_padrao: filtroOpPadrao || DEFAULT_API_FILTERS.OP_PADRAO,
     });
   }
 
@@ -321,39 +309,21 @@ class ApiService {
       }
 
       if (!grupos || grupos.length === 0) {
-        console.log("[ApiService] Using fallback grupos for contratos");
-        grupos = [
-          { grupo: "ADM-MGA" },
-          { grupo: "ATT" },
-          { grupo: "CARGILL" },
-          { grupo: "BTG PACTUAL S/A" },
-        ];
+        logFallbackUsage('grupos', 'getContratosData - grupos ausentes ou vazios');
+        grupos = FALLBACK_GRUPOS;
       }
 
       if (!produtos || produtos.length === 0) {
-        console.log("[ApiService] Using fallback produtos for contratos");
-        produtos = [
-          { tp_prod: "SOJA GRAOS" },
-          { tp_prod: "MILHO GRAOS" },
-          { tp_prod: "FARELO DE SOJA" },
-        ];
+        logFallbackUsage('produtos', 'getContratosData - produtos ausentes ou vazios');
+        produtos = FALLBACK_PRODUTOS;
       }
 
       const requestBody = {
         AttApi: {
           tipoOperacao: "monitor_corte",
           filtro_filial: filial,
-          filtro_servico: filtroServico || {
-            armazenagem: 1,
-            transbordo: 1,
-            pesagem: 0,
-          },
-          filtro_op_padrao: filtroOpPadrao || {
-            rodo_ferro: 1,
-            ferro_rodo: 1,
-            rodo_rodo: 1,
-            outros: 0,
-          },
+          filtro_servico: filtroServico || DEFAULT_API_FILTERS.SERVICO,
+          filtro_op_padrao: filtroOpPadrao || DEFAULT_API_FILTERS.OP_PADRAO,
           filtro_grupo: grupos,
           filtro_tp_prod: produtos,
         },

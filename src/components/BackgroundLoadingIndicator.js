@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { COLORS } from "../constants";
+import { AUTO_HIDE_DURATION, ANIMATION_SHORT, ANIMATION_DURATION } from "../constants/timing";
 
 const BackgroundLoadingIndicator = ({
   visible,
@@ -14,7 +15,7 @@ const BackgroundLoadingIndicator = ({
   position = "top",
   variant = "default", // 'default', 'discrete', 'minimal'
   autoHide = false,
-  autoHideDuration = 3000,
+  autoHideDuration = AUTO_HIDE_DURATION,
 }) => {
   const [fadeAnim] = React.useState(new Animated.Value(0));
 
@@ -22,7 +23,7 @@ const BackgroundLoadingIndicator = ({
     if (visible) {
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 300,
+        duration: ANIMATION_SHORT,
         useNativeDriver: true,
       }).start();
 
@@ -31,7 +32,7 @@ const BackgroundLoadingIndicator = ({
         const timer = setTimeout(() => {
           Animated.timing(fadeAnim, {
             toValue: 0,
-            duration: 300,
+            duration: ANIMATION_SHORT,
             useNativeDriver: true,
           }).start();
         }, autoHideDuration);
@@ -40,7 +41,7 @@ const BackgroundLoadingIndicator = ({
     } else {
       Animated.timing(fadeAnim, {
         toValue: 0,
-        duration: 300,
+        duration: ANIMATION_SHORT,
         useNativeDriver: true,
       }).start();
     }
@@ -103,7 +104,7 @@ export const HeaderLoadingIndicator = ({ visible }) => {
       const rotateAnimation = Animated.loop(
         Animated.timing(rotateAnim, {
           toValue: 1,
-          duration: 1000,
+          duration: ANIMATION_DURATION,
           useNativeDriver: true,
         })
       );

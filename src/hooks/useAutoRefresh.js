@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { AppState } from "react-native";
 import { API_CONFIG } from "../constants";
+import { USER_IDLE_MEDIUM, USER_IDLE_LONG, CHECK_INTERVAL } from "../constants/timing";
 
 export const useAutoRefresh = (refreshCallback, options = {}) => {
   const {
@@ -11,6 +12,8 @@ export const useAutoRefresh = (refreshCallback, options = {}) => {
   } = options;
 
   const intervalRef = useRef(null);
+  const adaptiveCheckIntervalRef = useRef(null);
+  const timeoutRef = useRef(null);
   const appStateRef = useRef(AppState.currentState);
   const lastActivityRef = useRef(Date.now());
   const isActiveRef = useRef(true);
@@ -20,15 +23,13 @@ export const useAutoRefresh = (refreshCallback, options = {}) => {
     if (!adaptiveInterval) return interval;
 
     const timeSinceLastActivity = Date.now() - lastActivityRef.current;
-    const fiveMinutes = 5 * 60 * 1000;
-    const tenMinutes = 10 * 60 * 1000;
 
     // Se usuário inativo por mais de 10 min, refresh mais lento
-    if (timeSinceLastActivity > tenMinutes) {
+    if (timeSinceLastActivity > USER_IDLE_LONG) {
       return interval * 3; // 3x mais lento
     }
     // Se usuário inativo por mais de 5 min, refresh um pouco mais lento
-    else if (timeSinceLastActivity > fiveMinutes) {
+    else if (timeSinceLastActivity > USER_IDLE_MEDIUM) {
       return interval * 2; // 2x mais lento
     }
     // Usuário ativo, usar intervalo normal
@@ -46,6 +47,7 @@ export const useAutoRefresh = (refreshCallback, options = {}) => {
 
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
+      intervalRef.current = null;
     }
 
     const currentInterval = getAdaptiveInterval();
@@ -62,6 +64,10 @@ export const useAutoRefresh = (refreshCallback, options = {}) => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
+    }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
     }
   }, []);
 
@@ -86,9 +92,17 @@ export const useAutoRefresh = (refreshCallback, options = {}) => {
           updateActivity();
           startAutoRefresh();
 
+          // Limpar timeout anterior se existir
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+          }
+
           // Fazer refresh imediato quando voltar - mas silencioso
           if (refreshCallback) {
-            setTimeout(() => refreshCallback({ silent: true, source: "background" }), 500);
+            timeoutRef.current = setTimeout(() => {
+              refreshCallback({ silent: true, source: "background" });
+              timeoutRef.current = null;
+            }, 500);
           }
         } else if (nextAppState.match(/inactive|background/)) {
           // App foi para background
@@ -108,6 +122,12 @@ export const useAutoRefresh = (refreshCallback, options = {}) => {
     return () => {
       if (subscription?.remove) {
         subscription.remove();
+      }
+
+      // Limpar timeout ao desmontar
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
       }
     };
   }, [
@@ -134,14 +154,19 @@ export const useAutoRefresh = (refreshCallback, options = {}) => {
   // Resetar quando intervalo adaptativo deve mudar
   useEffect(() => {
     if (adaptiveInterval) {
-      // Verificar a cada minuto se deve ajustar o intervalo
-      const adaptiveCheckInterval = setInterval(() => {
+      // Verificar periodicamente se deve ajustar o intervalo
+      adaptiveCheckIntervalRef.current = setInterval(() => {
         if (isActiveRef.current) {
           resetAutoRefresh();
         }
-      }, 60 * 1000); // Verificar a cada minuto
+      }, CHECK_INTERVAL);
 
-      return () => clearInterval(adaptiveCheckInterval);
+      return () => {
+        if (adaptiveCheckIntervalRef.current) {
+          clearInterval(adaptiveCheckIntervalRef.current);
+          adaptiveCheckIntervalRef.current = null;
+        }
+      };
     }
   }, [adaptiveInterval, resetAutoRefresh]);
 
