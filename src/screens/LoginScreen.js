@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,129 +6,56 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  ActivityIndicator,
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  Animated,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAuth } from "../hooks/useAuth";
+import { LoadingSpinner } from "../components";
+import { COLORS, SCREEN_NAMES } from "../constants";
+import { useFilterLoader } from "../hooks/useFilterLoader";
 
 const LoginScreen = ({ navigation }) => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const { login, loading, error, isLoggedIn } = useAuth();
+  const { preloadAllFilters } = useFilterLoader();
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
-  const API_URL = "http://192.168.10.201/attmonitor/api/login.php";
-  const BACKUP_URL = "http://45.4.111.173:9090/attmonitor/api/login.php";
+  useEffect(() => {
+    if (isLoggedIn) {
+      navigation.replace(SCREEN_NAMES.HOME);
+      return;
+    }
+
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start();
+  }, [isLoggedIn]);
 
   const handleLogin = async () => {
-    // Validação básica
-    if (!username.trim()) {
-      Alert.alert("Erro", "Por favor, insira o nome de usuário");
-      return;
-    } else if (!password.trim()) {
-      Alert.alert("Erro", "Por favor, insira sua senha");
-      return;
-    }
-
-    setLoading(true);
-
-    // Tentar login com retry
-    let success = false;
-    let lastError = null;
-    const urls = [API_URL, BACKUP_URL]; // Tentar URL principal e depois backup
-
-    for (let attempt = 0; attempt < 3; attempt++) {
-      // 3 tentativas
-      for (const url of urls) {
-        try {
-          const response = await fetch(url, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-            body: JSON.stringify({
-              id_nome: username.trim().toUpperCase(),
-              senha: password.toUpperCase(),
-            }),
-          });
-
-          const responseText = await response.text();
-          if (
-            responseText.toLowerCase().includes("failed") ||
-            responseText.toLowerCase().includes("invalid") ||
-            responseText.toLowerCase().includes("error")
-          ) {
-            throw new Error("Credenciais inválidas");
+    try {
+      const result = await login(username, password);
+      if (result.success) {
+        preloadAllFilters().catch((error) => {
+          if (__DEV__) {
+            console.log(
+              "[LoginScreen] Erro no precarregamento pós-login:",
+              error
+            );
           }
-
-          let token = null;
-
-          token =
-            response.headers.get("token") ||
-            response.headers.get("authorization") ||
-            response.headers.get("x-auth-token") ||
-            response.headers.get("x-access-token");
-
-          if (!token) {
-            try {
-              const data = JSON.parse(responseText);
-              token =
-                data.token ||
-                data.jwt ||
-                data.access_token ||
-                data.accessToken ||
-                data.authToken;
-            } catch (parseError) {
-              console.log("Resposta não é JSON");
-            }
-          }
-
-          if (!token && response.status === 200) {
-            token = "success_" + Date.now();
-          }
-
-          if (token) {
-            await AsyncStorage.setItem("userToken", token);
-            await AsyncStorage.setItem("username", username.trim());
-
-            Alert.alert("Sucesso", "Login realizado com sucesso!", [
-              {
-                text: "OK",
-                onPress: () => navigation.replace("Home"),
-              },
-            ]);
-
-            success = true;
-            break;
-          }
-        } catch (error) {
-          lastError = error;
-
-          if (attempt < 2) {
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-          }
-        }
+        });
+        navigation.replace(SCREEN_NAMES.HOME);
       }
-
-      if (success) break;
-    }
-
-    setLoading(false);
-
-    if (!success) {
-      let errorMessage = "Não foi possível fazer login";
-
-      if (lastError?.message.includes("Credenciais")) {
-        errorMessage = "Usuário ou senha incorretos";
-      } else if (lastError?.message.includes("Network")) {
-        errorMessage = "Erro de conexão. Verifique sua internet";
-      }
-
-      Alert.alert("Erro de Login", errorMessage);
+    } catch (err) {
+      Alert.alert("Erro de Login", err.message);
     }
   };
+
+  const isFormValid = username.trim().length > 0 && password.trim().length > 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -136,61 +63,71 @@ const LoginScreen = ({ navigation }) => {
         style={styles.keyboardAvoid}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <View style={styles.loginContainer}>
-          {/* Título */}
+        <Animated.View style={[styles.loginContainer, { opacity: fadeAnim }]}>
           <View style={styles.headerContainer}>
             <Text style={styles.title}>Invisi</Text>
-            <Text style={styles.subtitle}>Login </Text>
+            <Text style={styles.subtitle}>Login</Text>
           </View>
 
-          {/* Campo Usuário */}
+          {error && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Nome de Usuário</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, !isFormValid && styles.inputInvalid]}
               value={username}
               onChangeText={setUsername}
               placeholder="Digite seu nome de usuário"
-              placeholderTextColor="#999"
-              autoCapitalize="characters" // Já mostra teclado em maiúsculas
+              placeholderTextColor={COLORS.gray}
+              autoCapitalize="characters"
               autoCorrect={false}
               editable={!loading}
+              returnKeyType="next"
             />
           </View>
 
-          {/* Campo Senha */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Senha</Text>
-            <View style={styles.passwordContainer}>
-              <TextInput
-                style={[styles.input, styles.passwordInput]}
-                value={password}
-                onChangeText={setPassword}
-                placeholder="Digite sua senha"
-                placeholderTextColor="#999"
-                autoCorrect={false}
-                editable={!loading}
-                secureTextEntry={true}
-              />
-            </View>
+            <TextInput
+              style={[styles.input, !isFormValid && styles.inputInvalid]}
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Digite sua senha"
+              placeholderTextColor={COLORS.gray}
+              autoCorrect={false}
+              editable={!loading}
+              secureTextEntry={true}
+              returnKeyType="go"
+              onSubmitEditing={isFormValid ? handleLogin : null}
+            />
           </View>
 
-          {/* Botão de Login */}
           <TouchableOpacity
-            style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+            style={[
+              styles.loginButton,
+              loading && styles.loginButtonDisabled,
+              !isFormValid && styles.loginButtonInvalid,
+            ]}
             onPress={handleLogin}
-            disabled={loading}
+            disabled={loading || !isFormValid}
           >
             {loading ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator color="#FFF" size="small" />
-                <Text style={styles.loginButtonText}>Entrando...</Text>
+                <LoadingSpinner
+                  text="Entrando..."
+                  size="small"
+                  color={COLORS.white}
+                />
               </View>
             ) : (
               <Text style={styles.loginButtonText}>Entrar</Text>
             )}
           </TouchableOpacity>
-        </View>
+        </Animated.View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -199,7 +136,7 @@ const LoginScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: COLORS.lightGray,
   },
   keyboardAvoid: {
     flex: 1,
@@ -216,12 +153,25 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: "bold",
-    color: "#333",
+    color: COLORS.black,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: "#666",
+    color: COLORS.gray,
+  },
+  errorContainer: {
+    backgroundColor: "#ffe6e6",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.danger,
+  },
+  errorText: {
+    color: COLORS.danger,
+    fontSize: 14,
+    textAlign: "center",
   },
   inputContainer: {
     marginBottom: 20,
@@ -229,7 +179,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#333",
+    color: COLORS.black,
     marginBottom: 8,
   },
   input: {
@@ -238,28 +188,15 @@ const styles = StyleSheet.create({
     borderColor: "#ddd",
     borderRadius: 8,
     paddingHorizontal: 15,
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.white,
     fontSize: 16,
   },
-  passwordContainer: {
-    position: "relative",
-  },
-  passwordInput: {
-    paddingRight: 50,
-  },
-  eyeButton: {
-    position: "absolute",
-    right: 15,
-    top: 0,
-    height: 50,
-    justifyContent: "center",
-  },
-  eyeText: {
-    fontSize: 20,
+  inputInvalid: {
+    borderColor: "#ffcccc",
   },
   loginButton: {
     height: 50,
-    backgroundColor: "#007AFF",
+    backgroundColor: COLORS.primary,
     borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
@@ -269,39 +206,18 @@ const styles = StyleSheet.create({
   loginButtonDisabled: {
     opacity: 0.6,
   },
+  loginButtonInvalid: {
+    backgroundColor: "#cccccc",
+  },
   loginButtonText: {
-    color: "#fff",
+    color: COLORS.white,
     fontSize: 18,
     fontWeight: "600",
   },
   loadingContainer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-  },
-  infoText: {
-    fontSize: 12,
-    color: "#666",
-    textAlign: "center",
-    marginTop: 10,
-    fontStyle: "italic",
-  },
-  debugContainer: {
-    marginTop: 30,
-    padding: 15,
-    backgroundColor: "#f0f0f0",
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  debugText: {
-    fontSize: 12,
-    color: "#666",
-    marginBottom: 8,
-  },
-  debugLink: {
-    fontSize: 14,
-    color: "#007AFF",
-    textDecorationLine: "underline",
+    justifyContent: "center",
   },
 });
 
