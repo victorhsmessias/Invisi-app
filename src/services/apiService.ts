@@ -300,6 +300,66 @@ class ApiService {
     });
   }
 
+  /**
+   * Endpoint unificado para Dashboard - busca todos os dados em uma única requisição
+   * Mais eficiente que as 7 requisições paralelas anteriores
+   *
+   * @param filial - Filial a ser consultada
+   * @param filtroServico - Filtros de serviço (armazenagem, transbordo, pesagem)
+   * @param filtroOpPadrao - Filtros de operação padrão (rodo_ferro, ferro_rodo, etc)
+   * @param dataInicio - Data de início para filtro (formato YYYY-MM-DD)
+   * @param dataFim - Data de fim para filtro (formato YYYY-MM-DD)
+   * @returns Promise com todos os dados do dashboard em uma única resposta
+   */
+  async getAllDashboardData(
+    filial: Filial,
+    filtroServico: Record<string, 0 | 1> | null = null,
+    filtroOpPadrao: Record<string, 0 | 1> | null = null,
+    dataInicio?: string,
+    dataFim?: string
+  ): Promise<MonitorDataResponse> {
+    const hoje = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+    const requestBody: ApiRequestBody = {
+      AttApi: {
+        tipoOperacao: "monitor",
+        filtro_filial: filial,
+        filtro_servico: filtroServico || DEFAULT_API_FILTERS.SERVICO,
+        filtro_op_padrao: filtroOpPadrao || DEFAULT_API_FILTERS.OP_PADRAO,
+        filtro_data_inicio: dataInicio || hoje,
+        filtro_data_fim: dataFim || hoje,
+        filtro_acumulador: {
+          dia: 1,
+          mes: 0,
+          ano: 0,
+        },
+        filtro_grupo: "",
+        filtro_produto: "",
+      },
+    };
+
+    if (__DEV__) {
+      console.log('[ApiService] Fetching unified dashboard data:', {
+        filial,
+        tipoOperacao: 'monitor',
+        dataInicio: requestBody.AttApi.filtro_data_inicio,
+        dataFim: requestBody.AttApi.filtro_data_fim,
+      });
+    }
+
+    const result = await this.requestWithRetry<MonitorDataResponse>(
+      "/monitor.php",
+      requestBody,
+      filial
+    );
+
+    if (__DEV__) {
+      console.log('[ApiService] Unified dashboard data received successfully');
+    }
+
+    return result;
+  }
+
   async getContratosData(
     filial: Filial,
     filtroServico: Record<string, 0 | 1> | null = null,

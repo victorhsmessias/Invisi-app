@@ -1,5 +1,4 @@
 export const API_CONFIG = {
-  // URLs por filial
   FILIAL_URLS: {
     LDA: "http://192.168.10.201/attmonitor/api",
     CHP: "http://45.4.111.173:9090/attmonitor/api",
@@ -8,9 +7,9 @@ export const API_CONFIG = {
     NMG: "http://138.186.125.143:9090/attmonitor/api",
   } as const,
 
-  CACHE_TIME: 2 * 60 * 1000,
-  AUTO_REFRESH: 30 * 1000,
-  BACKGROUND_REFRESH: 45 * 1000,
+  CACHE_TIME: 3 * 60 * 1000,
+  AUTO_REFRESH: 60 * 1000,
+  BACKGROUND_REFRESH: 90 * 1000,
   STALE_TIME: 5 * 60 * 1000,
   BACKGROUND_STALE_TIME: 10 * 60 * 1000,
 
@@ -22,6 +21,8 @@ export const API_CONFIG = {
 } as const;
 
 export type Filial = keyof typeof API_CONFIG.FILIAL_URLS;
+
+export const FILIAIS: readonly Filial[] = ["LDA", "CHP", "FND", "NMD", "NMG"];
 
 export const BACKUP_URLS: Record<Filial, string | null> = {
   LDA: null,
@@ -149,9 +150,10 @@ export const API_ERROR_CODES = {
   NETWORK_ERROR: 0,
 } as const;
 
-export type ApiErrorCode = typeof API_ERROR_CODES[keyof typeof API_ERROR_CODES];
+export type ApiErrorCode =
+  (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES];
 
-export const API_ERROR_MESSAGES: Record<ApiErrorCode | 'DEFAULT', string> = {
+export const API_ERROR_MESSAGES: Record<ApiErrorCode | "DEFAULT", string> = {
   [API_ERROR_CODES.UNAUTHORIZED]: "Sessão expirada. Faça login novamente.",
   [API_ERROR_CODES.FORBIDDEN]:
     "Você não tem permissão para acessar este recurso.",
@@ -169,7 +171,9 @@ export const getFilialUrl = (filial: Filial): string => {
   return API_CONFIG.FILIAL_URLS[filial] || API_CONFIG.FILIAL_URLS.LDA;
 };
 
-export const getOperationType = (operationKey: string): OperationType | null => {
+export const getOperationType = (
+  operationKey: string
+): OperationType | null => {
   return (
     Object.values(OPERATION_TYPES).find((op) => op.key === operationKey) || null
   );
@@ -181,5 +185,7 @@ export const getOperationEndpoint = (operationKey: string): string => {
 };
 
 export const getErrorMessage = (errorCode: number): string => {
-  return API_ERROR_MESSAGES[errorCode as ApiErrorCode] || API_ERROR_MESSAGES.DEFAULT;
+  return (
+    API_ERROR_MESSAGES[errorCode as ApiErrorCode] || API_ERROR_MESSAGES.DEFAULT
+  );
 };

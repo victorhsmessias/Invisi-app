@@ -1,9 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { STORAGE_KEYS } from "../constants";
 
-/**
- * Códigos de erro de autenticação
- */
 export const AUTH_ERROR_CODES = {
   INVALID_CREDENTIALS: "INVALID_CREDENTIALS",
   NETWORK_ERROR: "NETWORK_ERROR",
@@ -14,17 +11,19 @@ export const AUTH_ERROR_CODES = {
   SERVER_ERROR: "SERVER_ERROR",
 } as const;
 
-export type AuthErrorCode = typeof AUTH_ERROR_CODES[keyof typeof AUTH_ERROR_CODES];
+export type AuthErrorCode =
+  (typeof AUTH_ERROR_CODES)[keyof typeof AUTH_ERROR_CODES];
 
-/**
- * Classe de erro customizada para autenticação
- */
 export class AuthenticationError extends Error {
   code: AuthErrorCode;
   details: Record<string, any>;
   timestamp: string;
 
-  constructor(message: string, code: AuthErrorCode, details: Record<string, any> = {}) {
+  constructor(
+    message: string,
+    code: AuthErrorCode,
+    details: Record<string, any> = {}
+  ) {
     super(message);
     this.name = "AuthenticationError";
     this.code = code;
@@ -38,9 +37,6 @@ interface RateLimitResult {
   remaining: number;
 }
 
-/**
- * Rate limiter para tentativas de login
- */
 class LoginRateLimiter {
   private attempts: Map<string, number[]>;
   private maxAttempts: number;
@@ -50,8 +46,8 @@ class LoginRateLimiter {
   constructor() {
     this.attempts = new Map();
     this.maxAttempts = 5;
-    this.windowMs = 15 * 60 * 1000; // 15 minutos
-    this.lockoutMs = 30 * 60 * 1000; // 30 minutos de bloqueio
+    this.windowMs = 15 * 60 * 1000;
+    this.lockoutMs = 30 * 60 * 1000;
   }
 
   async checkRateLimit(identifier: string): Promise<RateLimitResult> {
@@ -63,14 +59,11 @@ class LoginRateLimiter {
     }
 
     const userAttempts = this.attempts.get(key)!;
-
-    // Remover tentativas antigas
     const recentAttempts = userAttempts.filter(
       (timestamp) => now - timestamp < this.windowMs
     );
     this.attempts.set(key, recentAttempts);
 
-    // Verificar se está em lockout
     if (recentAttempts.length > 0) {
       const lastAttempt = Math.max(...recentAttempts);
       if (
@@ -88,7 +81,6 @@ class LoginRateLimiter {
       }
     }
 
-    // Registrar nova tentativa
     recentAttempts.push(now);
     this.attempts.set(key, recentAttempts);
 
@@ -120,22 +112,17 @@ class LoginRateLimiter {
 
 export const rateLimiter = new LoginRateLimiter();
 
-// Cleanup periódico do rate limiter
-setInterval(() => rateLimiter.cleanup(), 5 * 60 * 1000); // A cada 5 minutos
+setInterval(() => rateLimiter.cleanup(), 5 * 60 * 1000);
 
 interface SanitizedCredentials {
   username: string;
   password: string;
 }
 
-/**
- * Valida e sanitiza credenciais de entrada
- */
 export const validateAndSanitizeCredentials = (
   username: string,
   password: string
 ): SanitizedCredentials => {
-  // Validar comprimento
   if (!username || username.trim().length === 0) {
     throw new AuthenticationError(
       "Nome de usuário não pode estar vazio",
@@ -164,11 +151,9 @@ export const validateAndSanitizeCredentials = (
     );
   }
 
-  // Remover espaços e limitar tamanho
   const sanitizedUsername = username.trim().substring(0, 50).toUpperCase();
   const sanitizedPassword = password.trim().substring(0, 100).toUpperCase();
 
-  // Validar caracteres especiais perigosos
   const dangerousPattern = /[<>;"'`\\]/;
   if (dangerousPattern.test(sanitizedUsername)) {
     throw new AuthenticationError(
@@ -183,11 +168,10 @@ export const validateAndSanitizeCredentials = (
   };
 };
 
-/**
- * Valida resposta da API de login
- */
-export const validateLoginResponse = (response: Response, responseText: string): boolean => {
-  // Verificar status HTTP
+export const validateLoginResponse = (
+  response: Response,
+  responseText: string
+): boolean => {
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
       throw new AuthenticationError(
@@ -212,7 +196,6 @@ export const validateLoginResponse = (response: Response, responseText: string):
     );
   }
 
-  // Validar conteúdo da resposta
   if (!responseText || responseText.trim().length === 0) {
     throw new AuthenticationError(
       "Resposta vazia do servidor",
@@ -220,7 +203,6 @@ export const validateLoginResponse = (response: Response, responseText: string):
     );
   }
 
-  // Verificar mensagens de erro conhecidas
   const lowerText = responseText.toLowerCase();
   const errorPatterns = [
     "failed",
@@ -242,11 +224,10 @@ export const validateLoginResponse = (response: Response, responseText: string):
   return true;
 };
 
-/**
- * Extrai token da resposta de forma segura
- */
-export const extractToken = (response: Response, responseText: string): string => {
-  // Tentar extrair dos headers primeiro (mais seguro)
+export const extractToken = (
+  response: Response,
+  responseText: string
+): string => {
   const headerToken =
     response.headers.get("authorization")?.replace("Bearer ", "") ||
     response.headers.get("x-auth-token") ||
@@ -257,7 +238,6 @@ export const extractToken = (response: Response, responseText: string): string =
     return headerToken;
   }
 
-  // Tentar parse do JSON
   try {
     const data = JSON.parse(responseText);
 
@@ -278,7 +258,6 @@ export const extractToken = (response: Response, responseText: string): string =
     }
   }
 
-  // Se chegou aqui sem token válido, lançar erro
   throw new AuthenticationError(
     "Token de autenticação não recebido do servidor",
     AUTH_ERROR_CODES.NO_TOKEN_RECEIVED,
@@ -286,25 +265,19 @@ export const extractToken = (response: Response, responseText: string): string =
   );
 };
 
-/**
- * Valida formato e conteúdo do token
- */
 export const validateToken = (token: string | null | undefined): boolean => {
   if (!token || typeof token !== "string") {
     return false;
   }
 
-  // Token não pode ser muito curto
   if (token.length < 10) {
     return false;
   }
 
-  // Token não pode ser apenas espaços
   if (token.trim().length === 0) {
     return false;
   }
 
-  // Não aceitar tokens gerados artificialmente
   if (token.startsWith("success_")) {
     return false;
   }
@@ -312,10 +285,10 @@ export const validateToken = (token: string | null | undefined): boolean => {
   return true;
 };
 
-/**
- * Salva credenciais de forma segura
- */
-export const saveAuthData = async (token: string, username: string): Promise<boolean> => {
+export const saveAuthData = async (
+  token: string,
+  username: string
+): Promise<boolean> => {
   try {
     if (!validateToken(token)) {
       throw new AuthenticationError(
@@ -336,9 +309,6 @@ export const saveAuthData = async (token: string, username: string): Promise<boo
   }
 };
 
-/**
- * Remove credenciais salvas
- */
 export const clearAuthData = async (): Promise<boolean> => {
   try {
     await AsyncStorage.multiRemove([
@@ -352,9 +322,6 @@ export const clearAuthData = async (): Promise<boolean> => {
   }
 };
 
-/**
- * Verifica se o token ainda é válido (básico)
- */
 export const isTokenValid = async (): Promise<boolean> => {
   try {
     const token = await AsyncStorage.getItem(STORAGE_KEYS.USER_TOKEN);

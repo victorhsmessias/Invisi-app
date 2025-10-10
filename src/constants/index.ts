@@ -1,30 +1,5 @@
-import type { Filial } from './api';
-
-export const API_CONFIG = {
-  CACHE_TIME: 2 * 60 * 1000,
-  AUTO_REFRESH: 30 * 1000,
-  BACKGROUND_REFRESH: 45 * 1000, // Refresh mais espaçado para background
-  RETRY_ATTEMPTS: 1,
-  RETRY_DELAY: 1000,
-  STALE_TIME: 5 * 60 * 1000, // Dados ficam "stale" após 5 min
-  BACKGROUND_STALE_TIME: 10 * 60 * 1000, // Stale time maior para background
-  FILIAL_URLS: {
-    LDA: "http://192.168.10.201/attmonitor/api",
-    CHP: "http://45.4.111.173:9090/attmonitor/api",
-    FND: "http://177.84.63.82:9090/attmonitor/api",
-    NMD: "http://168.195.5.254:9090/attmonitor/api",
-    NMG: "http://138.186.125.143:9090/attmonitor/api",
-  } as const,
-} as const;
-
-export const STORAGE_KEYS = {
-  USER_TOKEN: "userToken",
-  USERNAME: "username",
-  TRANSPORT_CACHE: "transportCache",
-  CONTRATOS_CACHE: "contratosCache",
-} as const;
-
-export const FILIAIS: readonly Filial[] = ["LDA", "CHP", "FND", "NMD", "NMG"];
+export { API_CONFIG, STORAGE_KEYS, FILIAIS } from "./api";
+export type { Filial } from "./api";
 
 export interface FilterOption {
   key: string;
@@ -60,7 +35,7 @@ export const DEFAULT_FILTERS: ApiFilters = {
   servico: {
     armazenagem: 1,
     transbordo: 1,
-    pesagem: 0,
+    pesagem: 1,
   },
   opPadrao: {
     rodo_ferro: 1,
@@ -70,15 +45,11 @@ export const DEFAULT_FILTERS: ApiFilters = {
   },
 };
 
-/**
- * Filtros padrão para requisições da API
- * Centralizados para evitar duplicação em múltiplos métodos
- */
 export const DEFAULT_API_FILTERS = {
   SERVICO: {
     armazenagem: 1,
     transbordo: 1,
-    pesagem: 0,
+    pesagem: 1,
   } as const,
   OP_PADRAO: {
     rodo_ferro: 1,
@@ -88,15 +59,15 @@ export const DEFAULT_API_FILTERS = {
   } as const,
 } as const;
 
-/**
- * Helper para obter filtros padrão com possibilidade de override
- */
-export const getDefaultFilters = (customFilters: Partial<{
-  filtro_servico: Record<string, 0 | 1>;
-  filtro_op_padrao: Record<string, 0 | 1>;
-}> = {}) => ({
+export const getDefaultFilters = (
+  customFilters: Partial<{
+    filtro_servico: Record<string, 0 | 1>;
+    filtro_op_padrao: Record<string, 0 | 1>;
+  }> = {}
+) => ({
   filtro_servico: customFilters.filtro_servico || DEFAULT_API_FILTERS.SERVICO,
-  filtro_op_padrao: customFilters.filtro_op_padrao || DEFAULT_API_FILTERS.OP_PADRAO,
+  filtro_op_padrao:
+    customFilters.filtro_op_padrao || DEFAULT_API_FILTERS.OP_PADRAO,
 });
 
 export const COLORS = {
@@ -128,4 +99,4 @@ export const SCREEN_NAMES = {
   PATIO_CARGA: "PatioCarga",
 } as const;
 
-export type ScreenName = typeof SCREEN_NAMES[keyof typeof SCREEN_NAMES];
+export type ScreenName = (typeof SCREEN_NAMES)[keyof typeof SCREEN_NAMES];

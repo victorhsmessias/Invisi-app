@@ -1,6 +1,9 @@
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
-import { createStackNavigator } from "@react-navigation/stack";
+import {
+  createStackNavigator,
+  CardStyleInterpolators,
+} from "@react-navigation/stack";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AppProvider, useApp } from "./src/context/AppContext";
 import { LoadingSpinner } from "./src/components";
@@ -36,6 +39,8 @@ const AppNavigator: React.FC = () => {
         }
         screenOptions={{
           headerShown: false,
+          cardStyleInterpolator:
+            CardStyleInterpolators.forFadeFromBottomAndroid,
         }}
       >
         <Stack.Screen name={SCREEN_NAMES.LOGIN} component={LoginScreen} />
@@ -43,13 +48,12 @@ const AppNavigator: React.FC = () => {
         <Stack.Screen
           name={SCREEN_NAMES.MONITOR_CORTE}
           component={MonitorCorteScreen}
-          options={{ headerShown: false }}
         />
         <Stack.Screen
           name={SCREEN_NAMES.CONTRATOS_DETALHES}
           component={ContratosDetalhesScreen}
-          options={{ headerShown: false }}
         />
+
         <Stack.Screen
           name={SCREEN_NAMES.CARGAS_HOJE}
           component={CargasHojeScreen}

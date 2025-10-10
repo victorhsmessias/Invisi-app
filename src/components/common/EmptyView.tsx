@@ -1,18 +1,17 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from "react-native";
 import { COLORS } from "../../constants";
 
-/**
- *
- * @param {Object} props
- * @param {string} props.icon
- * @param {string} props.message
- * @param {string} props.subMessage
- * @param {string} props.actionText
- * @param {Function} props.onActionPress
- * @param {Object} props.containerStyle
- */
-const EmptyView = React.memo(
+interface EmptyViewProps {
+  icon?: string;
+  message?: string;
+  subMessage?: string;
+  actionText?: string;
+  onActionPress?: () => void;
+  containerStyle?: ViewStyle;
+}
+
+const EmptyView = React.memo<EmptyViewProps>(
   ({
     icon = "📋",
     message = "Nenhum dado encontrado",
@@ -35,6 +34,8 @@ const EmptyView = React.memo(
     );
   }
 );
+
+EmptyView.displayName = "EmptyView";
 
 const styles = StyleSheet.create({
   emptyContainer: {

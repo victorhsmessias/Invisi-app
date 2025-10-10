@@ -229,7 +229,6 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
   },
-  // Estilos para variante discreta
   discreteContainer: {
     position: "absolute",
     top: 60,
@@ -251,7 +250,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "500",
   },
-  // Estilos para variante minimal
   minimalContainer: {
     position: "absolute",
     top: 10,

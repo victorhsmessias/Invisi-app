@@ -1,30 +1,15 @@
 import { useState, useCallback, useRef } from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { STORAGE_KEYS } from "../constants";
+import apiService from "../services/apiService";
+import type { Filial } from "../constants/api";
 
-/**
- * Hook customizado para gerenciar dados do monitor
- * Centraliza toda lógica de fetch, normalização e cálculo de totais
- *
- * @param {string} tipoOperacao - Tipo de operação do monitor
- * @param {string} filial - Código da filial
- * @param {Object} filters - Filtros opcionais { filtroServico, filtroOpPadrao }
- * @returns {Object} { data, loading, refreshing, totals, error, refresh }
- */
 export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [totals, setTotals] = useState({ veiculos: 0, peso: 0 });
   const [error, setError] = useState(null);
-
-  // Ref para prevenir múltiplas requisições simultâneas
   const isRequestInProgress = useRef(false);
-
-  /**
-   * Mapeamento de tipos de operação para caminhos de dados na resposta
-   */
   const DATA_PATH_MAP = {
     monitor_transito: "dados.listaTransito.transitoVeiculos",
     monitor_fila_desc: "dados.listaFilaDescarga.filaDescargaVeiculos",
@@ -35,9 +20,6 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
     monitor_carga: "dados.listaCarga.CargaVeiculos",
   };
 
-  /**
-   * Prefixos de campos por tipo de operação
-   */
   const FIELD_PREFIXES = {
     monitor_transito: "t_",
     monitor_fila_desc: "fd_",
@@ -48,9 +30,6 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
     monitor_carga: "c_",
   };
 
-  /**
-   * Extrai dados da resposta da API usando o caminho correto
-   */
   const extractDataFromResponse = useCallback(
     (response) => {
       if (!response || !response.dados) {
@@ -73,7 +52,6 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
         return [];
       }
 
-      // Navegar pelo caminho de dados
       const pathParts = dataPath.split(".");
       let extractedData = response;
 
@@ -81,21 +59,15 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
         extractedData = extractedData[part];
         if (!extractedData) {
           if (__DEV__) {
-            console.log(
-              `[useMonitorData] Data not found at path: ${dataPath}`
-            );
+            console.log(`[useMonitorData] Data not found at path: ${dataPath}`);
           }
           return [];
         }
       }
 
-      // Garantir que retornamos um array
       if (!Array.isArray(extractedData)) {
         if (__DEV__) {
-          console.log(
-            `[useMonitorData] Data is not an array:`,
-            extractedData
-          );
+          console.log(`[useMonitorData] Data is not an array:`, extractedData);
         }
         return [];
       }
@@ -105,9 +77,6 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
     [tipoOperacao]
   );
 
-  /**
-   * Normaliza dados removendo prefixos específicos de cada tipo de operação
-   */
   const normalizeData = useCallback(
     (rawData) => {
       const prefix = FIELD_PREFIXES[tipoOperacao];
@@ -116,14 +85,11 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
       return rawData.map((item) => {
         const normalizedItem = {};
 
-        // Criar versão normalizada sem prefixo
         Object.keys(item).forEach((key) => {
           if (key.startsWith(prefix)) {
-            // Remover prefixo
             const normalizedKey = key.substring(prefix.length);
             normalizedItem[normalizedKey] = item[key];
           }
-          // Manter chave original também
           normalizedItem[key] = item[key];
         });
 
@@ -133,16 +99,12 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
     [tipoOperacao]
   );
 
-  /**
-   * Calcula totais de veículos e peso
-   */
   const calculateTotals = useCallback((dataArray) => {
     if (!Array.isArray(dataArray) || dataArray.length === 0) {
       return { veiculos: 0, peso: 0, grupos: 0 };
     }
 
     const totalVehicles = dataArray.reduce((sum, item) => {
-      // Tentar diferentes campos de veículos
       const veiculosValue =
         item.veiculos ||
         item.t_veiculos ||
@@ -158,7 +120,6 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
     }, 0);
 
     const totalWeight = dataArray.reduce((sum, item) => {
-      // Tentar diferentes campos de peso
       const pesoValue =
         item.peso ||
         item.t_peso ||
@@ -182,12 +143,8 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
     };
   }, []);
 
-  /**
-   * Faz fetch dos dados do monitor
-   */
   const fetchData = useCallback(
     async (isRefreshing = false) => {
-      // Prevenir múltiplas requisições simultâneas
       if (isRequestInProgress.current) {
         if (__DEV__) {
           console.log(
@@ -207,45 +164,65 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
         }
         setError(null);
 
-        // Buscar token do AsyncStorage
-        const token = await AsyncStorage.getItem(STORAGE_KEYS.USER_TOKEN);
-        if (!token) {
-          throw new Error("Token de autenticação não encontrado");
-        }
-
-        // Preparar body da requisição
-        const requestBody = {
-          filial: filial,
-          filtroServico: filters.filtroServico || "T",
-          filtroOpPadrao: filters.filtroOpPadrao || "T",
-        };
-
         if (__DEV__) {
-          console.log(`[useMonitorData] Fetching ${tipoOperacao}:`, {
-            url: "http://192.168.10.201/attmonitor/api/monitor.php",
-            body: requestBody,
-          });
+          console.log(`[useMonitorData] Fetching ${tipoOperacao} for filial ${filial}`);
         }
 
-        // Fazer requisição
-        const response = await fetch(
-          "http://192.168.10.201/attmonitor/api/monitor.php",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-              token: token,
-            },
-            body: JSON.stringify(requestBody),
-          }
-        );
+        let jsonResponse;
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+        switch (tipoOperacao) {
+          case "monitor_transito":
+            jsonResponse = await apiService.getTransitoData(
+              filial as Filial,
+              filters.filtroServico,
+              filters.filtroOpPadrao
+            );
+            break;
+          case "monitor_fila_desc":
+            jsonResponse = await apiService.getFilaDescargaData(
+              filial as Filial,
+              filters.filtroServico,
+              filters.filtroOpPadrao
+            );
+            break;
+          case "monitor_fila_carga":
+            jsonResponse = await apiService.getFilaCargaData(
+              filial as Filial,
+              filters.filtroServico,
+              filters.filtroOpPadrao
+            );
+            break;
+          case "monitor_patio_desc":
+            jsonResponse = await apiService.getPatioDescargaData(
+              filial as Filial,
+              filters.filtroServico,
+              filters.filtroOpPadrao
+            );
+            break;
+          case "monitor_patio_carga":
+            jsonResponse = await apiService.getPatioCargaData(
+              filial as Filial,
+              filters.filtroServico,
+              filters.filtroOpPadrao
+            );
+            break;
+          case "monitor_descarga":
+            jsonResponse = await apiService.getDescargasHojeData(
+              filial as Filial,
+              filters.filtroServico,
+              filters.filtroOpPadrao
+            );
+            break;
+          case "monitor_carga":
+            jsonResponse = await apiService.getCargasHojeData(
+              filial as Filial,
+              filters.filtroServico,
+              filters.filtroOpPadrao
+            );
+            break;
+          default:
+            throw new Error(`Tipo de operação desconhecido: ${tipoOperacao}`);
         }
-
-        const jsonResponse = await response.json();
 
         if (__DEV__) {
           console.log(
@@ -254,23 +231,17 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
           );
         }
 
-        // Extrair dados da resposta
         const extractedData = extractDataFromResponse(jsonResponse);
 
-        // Normalizar dados (remover prefixos)
         const normalizedData = normalizeData(extractedData);
 
-        // Calcular totais
         const calculatedTotals = calculateTotals(normalizedData);
 
-        // Atualizar estados
         setData(normalizedData);
         setTotals(calculatedTotals);
       } catch (err) {
         console.error(`[useMonitorData] Error for ${tipoOperacao}:`, err);
-        setError(
-          err.message || "Erro ao carregar dados. Tente novamente."
-        );
+        setError(err.message || "Erro ao carregar dados. Tente novamente.");
         setData([]);
         setTotals({ veiculos: 0, peso: 0, grupos: 0 });
       } finally {
@@ -290,16 +261,10 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
     ]
   );
 
-  /**
-   * Função de refresh manual
-   */
   const refresh = useCallback(async () => {
     await fetchData(true);
   }, [fetchData]);
 
-  /**
-   * Buscar dados automaticamente ao focar na tela
-   */
   useFocusEffect(
     useCallback(() => {
       fetchData();

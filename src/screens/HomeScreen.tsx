@@ -1,10 +1,10 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
+  FlatList,
   RefreshControl,
   ActivityIndicator,
   Animated,
@@ -56,12 +56,13 @@ const HomeScreen = ({ navigation }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
+    // Animação mais rápida para melhor performance
     Animated.timing(fadeAnim, {
       toValue: 1,
-      duration: 600,
+      duration: 300, // Reduzido de 600ms para 300ms
       useNativeDriver: true,
     }).start();
-  }, []);
+  }, [fadeAnim]);
 
   useEffect(() => {
     if (state.isLoggedIn && data && Object.keys(data).length > 0) {
@@ -101,7 +102,7 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  const handleFilialChange = (filial) => {
+  const handleFilialChange = useCallback((filial) => {
     actions.setFilial(filial);
 
     if (!hasValidCache(filial)) {
@@ -111,9 +112,10 @@ const HomeScreen = ({ navigation }) => {
         );
       }
     }
-  };
+  }, [actions, hasValidCache]);
 
-  const transportCards = [
+  // Memoizar cards para evitar recriação a cada render
+  const transportCards = useMemo(() => [
     {
       id: "transito",
       title: "Em Trânsito",
@@ -198,7 +200,7 @@ const HomeScreen = ({ navigation }) => {
           filial: state.selectedFilial,
         }),
     },
-  ];
+  ], [data, state.selectedFilial, navigation]);
 
   if (state.isLoading) {
     return <LoadingSpinner text="Carregando aplicação..." />;
@@ -270,9 +272,20 @@ const HomeScreen = ({ navigation }) => {
           ))}
         </View>
 
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
+        <FlatList
+          data={transportCards}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <StatusCard
+              title={item.title}
+              value={item.value}
+              icon={item.icon}
+              color={item.color}
+              subtitle={item.subtitle}
+              loading={false}
+              onPress={item.onPress}
+            />
+          )}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
@@ -281,23 +294,18 @@ const HomeScreen = ({ navigation }) => {
               tintColor={COLORS.primary}
             />
           }
+          contentContainerStyle={styles.cardsContainer}
           showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.cardsContainer}>
-            {transportCards.map((card) => (
-              <StatusCard
-                key={card.id}
-                title={card.title}
-                value={card.value}
-                icon={card.icon}
-                color={card.color}
-                subtitle={card.subtitle}
-                loading={false}
-                onPress={card.onPress}
-              />
-            ))}
-          </View>
-        </ScrollView>
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={4}
+          windowSize={5}
+          initialNumToRender={7}
+          getItemLayout={(data, index) => ({
+            length: 120,
+            offset: 120 * index,
+            index,
+          })}
+        />
       </Animated.View>
 
       <SideMenu

@@ -3,7 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useApp } from "../context/AppContext";
 import { API_CONFIG, STORAGE_KEYS } from "../constants";
 import apiService from "../services/apiService";
-import { processVehicleCount } from "../utils/apiAdapters";
+import { processUnifiedDashboardResponse } from "../utils/apiAdapters";
 import type { TransportData } from "../types";
 
 interface FetchOptions {
@@ -64,32 +64,24 @@ export const useTransportData = (): UseTransportDataReturn => {
       }
       actionsRef.current.resetError();
 
-      const [
-        transitoData,
-        filaDescargaData,
-        filaCargaData,
-        patioDescargaData,
-        patioCargaData,
-        descargasHojeData,
-        cargasHojeData,
-      ] = await Promise.all([
-        apiService.getTransitoData(state.selectedFilial),
-        apiService.getFilaDescargaData(state.selectedFilial),
-        apiService.getFilaCargaData(state.selectedFilial),
-        apiService.getPatioDescargaData(state.selectedFilial),
-        apiService.getPatioCargaData(state.selectedFilial),
-        apiService.getDescargasHojeData(state.selectedFilial),
-        apiService.getCargasHojeData(state.selectedFilial),
-      ]);
+      if (__DEV__) {
+        console.log('[useTransportData] Fetching unified dashboard data...');
+      }
+
+      // NOVA IMPLEMENTAÇÃO: 1 requisição unificada ao invés de 7 paralelas
+      const response = await apiService.getAllDashboardData(state.selectedFilial);
+
+      // Processa a resposta unificada
+      const counts = processUnifiedDashboardResponse(response);
 
       const processedData: TransportData = {
-        emTransito: processVehicleCount(transitoData, 'transito'),
-        filaDescarga: processVehicleCount(filaDescargaData, 'filaDescarga'),
-        filaCarga: processVehicleCount(filaCargaData, 'filaCarga'),
-        patioDescarregando: processVehicleCount(patioDescargaData, 'patioDescarga'),
-        patioCarregando: processVehicleCount(patioCargaData, 'patioCarga'),
-        descargasHoje: processVehicleCount(descargasHojeData, 'descargasHoje'),
-        cargasHoje: processVehicleCount(cargasHojeData, 'cargasHoje'),
+        emTransito: counts.transito,
+        filaDescarga: counts.filaDescarga,
+        filaCarga: counts.filaCarga,
+        patioDescarregando: counts.patioDescarga,
+        patioCarregando: counts.patioCarga,
+        descargasHoje: counts.descargasHoje,
+        cargasHoje: counts.cargasHoje,
       };
 
       actionsRef.current.setTransportData(processedData);
@@ -103,8 +95,12 @@ export const useTransportData = (): UseTransportDataReturn => {
         })
       );
 
-      if (__DEV__ && source === 'background') {
-        console.log('[useTransportData] Background update completed silently');
+      if (__DEV__) {
+        if (source === 'background') {
+          console.log('[useTransportData] Background update completed silently');
+        } else {
+          console.log('[useTransportData] Dashboard data loaded successfully:', processedData);
+        }
       }
     } catch (error) {
       console.error("Erro ao buscar dados de transporte:", error);

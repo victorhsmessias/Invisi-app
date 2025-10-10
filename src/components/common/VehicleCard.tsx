@@ -9,34 +9,6 @@ import {
 import { COLORS } from "../../constants";
 import InfoRow from "./InfoRow";
 
-/**
- * Card reutilizável para exibir informações de veículos
- *
- * @param {Object} props
- * @param {Object} props.item - Objeto com dados do veículo
- * @param {string} props.item.grupo - Nome do grupo
- * @param {string} props.item.fila - Número da fila
- * @param {string} props.item.produto - Nome do produto
- * @param {number} props.item.peso - Peso em kg
- * @param {number} props.item.veiculos - Quantidade de veículos
- * @param {string} props.badgeColor - Cor personalizada do badge (opcional)
- * @param {Function} props.onPress - Callback ao pressionar o card (opcional)
- * @param {Array} props.additionalFields - Campos adicionais para exibir (opcional)
- * @param {Object} props.containerStyle - Estilo customizado do container
- *
- * @example
- * <VehicleCard
- *   item={{
- *     grupo: "GRUPO A",
- *     fila: "1",
- *     produto: "Soja",
- *     peso: 25000,
- *     veiculos: 5
- *   }}
- *   badgeColor="#ffc107"
- *   onPress={() => handleCardPress()}
- * />
- */
 const VehicleCard = React.memo(
   ({
     item,
@@ -45,7 +17,6 @@ const VehicleCard = React.memo(
     additionalFields = [],
     containerStyle,
   }) => {
-    // Função para formatar peso
     const formatPeso = (peso) => {
       if (!peso || peso === 0) return "0kg";
       if (peso >= 1000) {
@@ -54,7 +25,6 @@ const VehicleCard = React.memo(
       return `${peso.toLocaleString("pt-BR")}kg`;
     };
 
-    // Extrair dados com fallbacks
     const grupo = item?.grupo || "N/A";
     const fila = item?.fila || "N/A";
     const produto = item?.produto || "Não informado";
@@ -63,7 +33,6 @@ const VehicleCard = React.memo(
 
     const CardContent = (
       <View style={[styles.card, containerStyle]}>
-        {/* Header do Card */}
         <View style={styles.cardHeader}>
           <View style={styles.headerLeft}>
             <Text style={styles.grupoText}>{grupo}</Text>
@@ -72,7 +41,6 @@ const VehicleCard = React.memo(
             )}
           </View>
 
-          {/* Badge com quantidade de veículos */}
           <View style={[styles.badge, { backgroundColor: badgeColor }]}>
             <Text style={styles.badgeText}>
               {veiculos} {veiculos === 1 ? "veículo" : "veículos"}
@@ -80,12 +48,10 @@ const VehicleCard = React.memo(
           </View>
         </View>
 
-        {/* Conteúdo do Card */}
         <View style={styles.cardContent}>
           <InfoRow label="Produto:" value={produto} />
           <InfoRow label="Peso:" value={formatPeso(peso)} />
 
-          {/* Campos adicionais opcionais */}
           {additionalFields.map((field, index) => (
             <InfoRow
               key={index}
@@ -101,7 +67,6 @@ const VehicleCard = React.memo(
       </View>
     );
 
-    // Se houver onPress, tornar o card clicável
     if (onPress) {
       return (
         <TouchableOpacity onPress={onPress} activeOpacity={0.7}>

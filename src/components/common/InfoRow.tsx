@@ -1,22 +1,20 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, TextStyle } from "react-native";
 import { COLORS } from "../../constants";
 
-/**
- * Componente reutilizável para exibir linha de informação (label + valor)
- *
- * @param {Object} props
- * @param {string} props.label - Label do campo
- * @param {string|number} props.value - Valor do campo
- * @param {boolean} props.isPercentage - Se é percentual, aplica cor baseada no valor
- * @param {number} props.percentageValue - Valor numérico para comparação (positivo/negativo)
- * @param {boolean} props.isBalance - Se é saldo, aplica cor baseada no valor
- * @param {number} props.balanceValue - Valor numérico do saldo
- * @param {Object} props.labelStyle - Estilo customizado para label
- * @param {Object} props.valueStyle - Estilo customizado para valor
- * @param {boolean} props.bold - Label em negrito
- */
-const InfoRow = React.memo(
+interface InfoRowProps {
+  label: string;
+  value: string | number;
+  isPercentage?: boolean;
+  percentageValue?: number;
+  isBalance?: boolean;
+  balanceValue?: number;
+  labelStyle?: TextStyle;
+  valueStyle?: TextStyle;
+  bold?: boolean;
+}
+
+const InfoRow = React.memo<InfoRowProps>(
   ({
     label,
     value,
@@ -28,7 +26,6 @@ const InfoRow = React.memo(
     valueStyle,
     bold = false,
   }) => {
-    // Determinar estilo do valor baseado em condições
     const getValueStyle = () => {
       const baseStyles = [styles.infoValue, valueStyle];
 
@@ -55,26 +52,18 @@ const InfoRow = React.memo(
 
     return (
       <View style={styles.infoRow}>
-        <Text
-          style={[
-            styles.infoLabel,
-            bold && styles.boldLabel,
-            labelStyle,
-          ]}
-        >
+        <Text style={[styles.infoLabel, bold && styles.boldLabel, labelStyle]}>
           {label}
         </Text>
-        <Text
-          style={getValueStyle()}
-          numberOfLines={1}
-          ellipsizeMode="tail"
-        >
+        <Text style={getValueStyle()} numberOfLines={1} ellipsizeMode="tail">
           {value || "N/A"}
         </Text>
       </View>
     );
   }
 );
+
+InfoRow.displayName = "InfoRow";
 
 const styles = StyleSheet.create({
   infoRow: {

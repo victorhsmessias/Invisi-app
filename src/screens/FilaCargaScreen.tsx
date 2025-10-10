@@ -218,9 +218,15 @@ const FilaCargaScreen = ({ navigation }) => {
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmptyComponent}
         removeClippedSubviews={true}
-        maxToRenderPerBatch={10}
-        windowSize={10}
-        initialNumToRender={5}
+        maxToRenderPerBatch={8}
+        windowSize={8}
+        initialNumToRender={6}
+        updateCellsBatchingPeriod={50}
+        getItemLayout={(data, index) => ({
+          length: 140,
+          offset: 140 * index,
+          index,
+        })}
       />
 
       {/* Modal de Filtros */}

@@ -1,14 +1,5 @@
-/**
- * Tipos específicos para respostas da API
- */
-
-import type { Filial } from '../constants/api';
-import type { GrupoItem, ProdutoItem } from '../constants/fallbacks';
-
-// ============================================
-// TIPOS DE REQUEST
-// ============================================
-
+import type { Filial } from "../constants/api";
+import type { GrupoItem, ProdutoItem } from "../constants/fallbacks";
 export interface LoginCredentials {
   username: string;
   password: string;
@@ -35,11 +26,6 @@ export interface ApiRequestBody {
     [key: string]: any;
   };
 }
-
-// ============================================
-// TIPOS DE RESPONSE
-// ============================================
-
 export interface ApiResponse<T = any> {
   dados: T;
   [key: string]: any;
@@ -71,7 +57,8 @@ export interface MonitorDataResponse {
 
 export interface ContratosResponse {
   dados: {
-    contratos: any[];
+    contratos?: any[];
+    CortesFila?: any[];
   };
 }
 
@@ -84,11 +71,6 @@ export interface FilterResponse {
     [key: string]: any;
   };
 }
-
-// ============================================
-// TIPOS DE FILTROS
-// ============================================
-
 export interface MonitorFilters {
   filtro_filial: Filial;
   filtro_servico?: Record<string, 0 | 1>;

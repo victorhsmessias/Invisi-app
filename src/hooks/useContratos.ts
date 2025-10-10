@@ -39,8 +39,6 @@ export const useContratos = () => {
       };
 
       actions.setFilterOptions(processedOptions);
-
-      // Set all op_padrao as selected by default
       setFilters((prev) => ({
         ...prev,
         selectedOpPadrao: opPadrao,
@@ -60,10 +58,11 @@ export const useContratos = () => {
       actions.setContratosLoading(true);
       actions.resetError();
 
-      // Prepare filters
       const filtroOpPadrao = {};
       state.filterOptions.opPadrao.forEach((op) => {
-        filtroOpPadrao[op.key] = filters.selectedOpPadrao.includes(op.key) ? 1 : 0;
+        filtroOpPadrao[op.key] = filters.selectedOpPadrao.includes(op.key)
+          ? 1
+          : 0;
       });
 
       const filtroServico = {
@@ -95,8 +94,6 @@ export const useContratos = () => {
       } else if (data.dados?.CortesFila) {
         const contratosData = data.dados.CortesFila;
         actions.setContratosData(contratosData, new Date());
-
-        // Save to cache
         await AsyncStorage.setItem(
           STORAGE_KEYS.CONTRATOS_CACHE,
           JSON.stringify({
@@ -114,7 +111,6 @@ export const useContratos = () => {
       console.error("Erro ao buscar dados de contratos:", error);
       actions.setError("Erro ao carregar dados");
 
-      // Try to load from cache
       await loadFromCache();
     } finally {
       actions.setContratosLoading(false);
@@ -140,7 +136,6 @@ export const useContratos = () => {
     }
   };
 
-  // Filter management functions
   const toggleFilter = useCallback((filterType, value) => {
     setFilters((prev) => {
       const currentValues = prev[filterType];
@@ -181,7 +176,6 @@ export const useContratos = () => {
     });
   }, [state.filterOptions.opPadrao]);
 
-  // Load filter options when component mounts or filial changes
   useEffect(() => {
     if (state.isLoggedIn) {
       fetchFilterOptions();

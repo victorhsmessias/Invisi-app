@@ -45,7 +45,6 @@ const FilterModal = ({
     setFiltroServico(tempFiltroServico);
     setFiltroOpPadrao(tempFiltroOpPadrao);
 
-    // Chamar onApply com os filtros específicos para sincronização imediata
     if (onApply) {
       onApply(tempFiltroServico, tempFiltroOpPadrao);
     }

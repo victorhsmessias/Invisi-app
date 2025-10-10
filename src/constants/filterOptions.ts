@@ -1,7 +1,3 @@
-/**
- * Opções de filtros para uso com FilterModal e useFilters
- */
-
 export interface FilterOption {
   key: string;
   label: string;
@@ -21,14 +17,12 @@ export interface FilterHook {
   toggleOpPadraoFilter: (key: string) => void;
 }
 
-// Opções de Tipos de Serviço
 export const SERVICO_FILTER_OPTIONS: FilterOption[] = [
   { key: "armazenagem", label: "Armazenagem" },
   { key: "transbordo", label: "Transbordo" },
   { key: "pesagem", label: "Pesagem" },
 ];
 
-// Opções de Tipos de Operação Padrão
 export const OP_PADRAO_FILTER_OPTIONS: FilterOption[] = [
   { key: "rodo_ferro", label: "Rodo/Ferro" },
   { key: "ferro_rodo", label: "Ferro/Rodo" },
@@ -36,19 +30,6 @@ export const OP_PADRAO_FILTER_OPTIONS: FilterOption[] = [
   { key: "outros", label: "Outros" },
 ];
 
-/**
- * Helper para criar filterGroups padrão
- * Usado em múltiplas telas para manter consistência
- *
- * @example
- * const filterHook = useFilters();
- * const filterGroups = createStandardFilterGroups(filterHook);
- *
- * <FilterModal
- *   filterGroups={filterGroups}
- *   // ...
- * />
- */
 export const createStandardFilterGroups = ({
   selectedServicos,
   selectedOpPadrao,
@@ -71,13 +52,13 @@ export const createStandardFilterGroups = ({
   ];
 };
 
-/**
- * Helper para criar filterGroups com apenas serviços
- */
 export const createServiceFilterGroups = ({
   selectedServicos,
   toggleServicoFilter,
-}: Pick<FilterHook, 'selectedServicos' | 'toggleServicoFilter'>): FilterGroup[] => {
+}: Pick<
+  FilterHook,
+  "selectedServicos" | "toggleServicoFilter"
+>): FilterGroup[] => {
   return [
     {
       title: "Tipos de Serviço",
@@ -88,13 +69,13 @@ export const createServiceFilterGroups = ({
   ];
 };
 
-/**
- * Helper para criar filterGroups com apenas operações
- */
 export const createOperationFilterGroups = ({
   selectedOpPadrao,
   toggleOpPadraoFilter,
-}: Pick<FilterHook, 'selectedOpPadrao' | 'toggleOpPadraoFilter'>): FilterGroup[] => {
+}: Pick<
+  FilterHook,
+  "selectedOpPadrao" | "toggleOpPadraoFilter"
+>): FilterGroup[] => {
   return [
     {
       title: "Tipos de Operação",

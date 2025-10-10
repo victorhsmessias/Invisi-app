@@ -2,17 +2,15 @@ import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { COLORS } from "../../constants";
 
-/**
- * Banner de última atualização com botão de filtro
- *
- * @param {Object} props
- * @param {Date} props.lastUpdate - Data/hora da última atualização
- * @param {Function} props.onFilterPress - Callback quando pressionar botão filtro
- * @param {boolean} props.showFilterButton - Mostrar botão de filtro
- * @param {boolean} props.hasActiveFilters - Indica se há filtros ativos
- * @param {string} props.filterButtonText - Texto do botão de filtro
- */
-const UpdateBanner = React.memo(
+interface UpdateBannerProps {
+  lastUpdate: Date | null;
+  onFilterPress?: () => void;
+  showFilterButton?: boolean;
+  hasActiveFilters?: boolean;
+  filterButtonText?: string;
+}
+
+const UpdateBanner = React.memo<UpdateBannerProps>(
   ({
     lastUpdate,
     onFilterPress,
@@ -22,7 +20,7 @@ const UpdateBanner = React.memo(
   }) => {
     if (!lastUpdate) return null;
 
-    const formatTime = (date) => {
+    const formatTime = (date: Date) => {
       return date.toLocaleTimeString("pt-BR").substring(0, 5);
     };
 
@@ -49,6 +47,8 @@ const UpdateBanner = React.memo(
     );
   }
 );
+
+UpdateBanner.displayName = "UpdateBanner";
 
 const styles = StyleSheet.create({
   updateContainer: {

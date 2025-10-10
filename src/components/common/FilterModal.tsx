@@ -10,38 +10,6 @@ import {
 } from "react-native";
 import { COLORS } from "../../constants";
 
-/**
- * Modal reutilizável para filtros
- *
- * @param {Object} props
- * @param {boolean} props.visible - Controla visibilidade do modal
- * @param {Function} props.onClose - Callback ao fechar o modal
- * @param {Array} props.filterGroups - Array de grupos de filtros
- * @param {Function} props.onApply - Callback ao aplicar filtros
- * @param {Function} props.onReset - Callback ao resetar filtros (opcional)
- * @param {boolean} props.hasActiveFilters - Indica se há filtros ativos (opcional)
- *
- * @example
- * <FilterModal
- *   visible={modalVisible}
- *   onClose={() => setModalVisible(false)}
- *   filterGroups={[
- *     {
- *       title: "Tipos de Serviço",
- *       options: [
- *         { key: "armazenagem", label: "Armazenagem" },
- *         { key: "transbordo", label: "Transbordo" },
- *         { key: "pesagem", label: "Pesagem" }
- *       ],
- *       selected: selectedServicos,
- *       onToggle: toggleServicoFilter
- *     }
- *   ]}
- *   onApply={handleApplyFilters}
- *   onReset={resetFilters}
- *   hasActiveFilters={hasActiveFilters}
- * />
- */
 const FilterModal = ({
   visible,
   onClose,

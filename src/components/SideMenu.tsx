@@ -18,7 +18,31 @@ import { COLORS, SCREEN_NAMES } from "../constants";
 
 const { width: screenWidth } = Dimensions.get("window");
 
-const SideMenu = memo(({ visible, onClose, navigation }) => {
+interface NavigationHelpers {
+  navigate: (screen: string, params?: object) => void;
+  replace: (screen: string, params?: object) => void;
+  goBack: () => void;
+  [key: string]: unknown;
+}
+
+interface SideMenuProps {
+  visible: boolean;
+  onClose: () => void;
+  navigation: NavigationHelpers;
+}
+
+interface MenuItem {
+  id: string;
+  title?: string;
+  icon?: string;
+  screen?: string;
+  description?: string;
+  isDivider?: boolean;
+  isLogout?: boolean;
+  onPress?: () => void;
+}
+
+const SideMenu = memo<SideMenuProps>(({ visible, onClose, navigation }) => {
   const { state } = useApp();
   const { logout } = useAuth();
   const slideAnim = useRef(new Animated.Value(-screenWidth * 0.75)).current;
@@ -31,7 +55,7 @@ const SideMenu = memo(({ visible, onClose, navigation }) => {
     }).start();
   }, [visible]);
 
-  const menuItems = [
+  const menuItems: MenuItem[] = [
     {
       id: "inicio",
       title: "Início",
@@ -61,7 +85,7 @@ const SideMenu = memo(({ visible, onClose, navigation }) => {
     },
   ];
 
-  const handleMenuPress = (item) => {
+  const handleMenuPress = (item: MenuItem) => {
     onClose();
 
     if (item.isLogout) {
@@ -97,7 +121,6 @@ const SideMenu = memo(({ visible, onClose, navigation }) => {
                 { transform: [{ translateX: slideAnim }] },
               ]}
             >
-              {/* Header */}
               <View style={styles.header}>
                 <View style={styles.userAvatar}>
                   <Text style={styles.avatarText}>

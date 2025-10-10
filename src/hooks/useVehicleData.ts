@@ -11,13 +11,13 @@ export const useVehicleData = (screenType) => {
   const [lastUpdate, setLastUpdate] = useState(null);
   const [error, setError] = useState(null);
   const [filtroServico, setFiltroServico] = useState(DEFAULT_FILTERS.servico);
-  const [filtroOpPadrao, setFiltroOpPadrao] = useState(DEFAULT_FILTERS.opPadrao);
+  const [filtroOpPadrao, setFiltroOpPadrao] = useState(
+    DEFAULT_FILTERS.opPadrao
+  );
 
-  // Ref para prevenir múltiplas requisições simultâneas
   const isRequestInProgress = useRef(false);
 
   const extractDataFromResponse = (response, screenType) => {
-    // Verificar se a resposta tem a estrutura esperada
     if (!response || !response.dados) {
       if (__DEV__) {
         console.log(
@@ -63,7 +63,6 @@ export const useVehicleData = (screenType) => {
       }
     }
 
-    // Garantir que retornamos um array
     if (!Array.isArray(data)) {
       if (__DEV__) {
         console.log(`[${screenType}] Data is not an array:`, data);
@@ -77,129 +76,133 @@ export const useVehicleData = (screenType) => {
     return data;
   };
 
-  const fetchData = useCallback(async (overrideFilters = null) => {
-    if (!state.isLoggedIn) return;
+  const fetchData = useCallback(
+    async (overrideFilters = null) => {
+      if (!state.isLoggedIn) return;
 
-    // Prevenir múltiplas requisições simultâneas
-    if (isRequestInProgress.current) {
-      if (__DEV__) {
-        console.log(`[useVehicleData] Request already in progress for ${screenType}, skipping...`);
-      }
-      return;
-    }
-
-    // Usar filtros atuais ou override fornecido
-    const currentFiltroServico = overrideFilters?.filtroServico || filtroServico;
-    const currentFiltroOpPadrao = overrideFilters?.filtroOpPadrao || filtroOpPadrao;
-
-    if (__DEV__) {
-      console.log(
-        `[useVehicleData] Fetching data for ${screenType} with filters:`,
-        {
-          filtroServico: currentFiltroServico,
-          filtroOpPadrao: currentFiltroOpPadrao,
-          isOverride: !!overrideFilters
+      if (isRequestInProgress.current) {
+        if (__DEV__) {
+          console.log(
+            `[useVehicleData] Request already in progress for ${screenType}, skipping...`
+          );
         }
-      );
-    }
-
-    try {
-      isRequestInProgress.current = true;
-      setLoading(true);
-      setError(null);
-
-      let response;
-
-      switch (screenType) {
-        case "transito":
-          response = await apiService.getTransitoData(
-            state.selectedFilial,
-            currentFiltroServico,
-            currentFiltroOpPadrao
-          );
-          break;
-
-        case "fila_descarga":
-          response = await apiService.getFilaDescargaData(
-            state.selectedFilial,
-            currentFiltroServico,
-            currentFiltroOpPadrao
-          );
-          break;
-
-        case "fila_carga":
-          response = await apiService.getFilaCargaData(
-            state.selectedFilial,
-            currentFiltroServico,
-            currentFiltroOpPadrao
-          );
-          break;
-
-        case "patio_descarga":
-          response = await apiService.getPatioDescargaData(
-            state.selectedFilial,
-            currentFiltroServico,
-            currentFiltroOpPadrao
-          );
-          break;
-
-        case "patio_carga":
-          response = await apiService.getPatioCargaData(
-            state.selectedFilial,
-            currentFiltroServico,
-            currentFiltroOpPadrao
-          );
-          break;
-
-        case "descargas_hoje":
-          response = await apiService.getDescargasHojeData(
-            state.selectedFilial,
-            currentFiltroServico,
-            currentFiltroOpPadrao
-          );
-          break;
-
-        case "cargas_hoje":
-          response = await apiService.getCargasHojeData(
-            state.selectedFilial,
-            currentFiltroServico,
-            currentFiltroOpPadrao
-          );
-          break;
-
-        case "contratos":
-          response = await apiService.getContratosData(
-            state.selectedFilial,
-            currentFiltroServico,
-            currentFiltroOpPadrao
-          );
-          break;
-
-        default:
-          throw new Error("Tipo de tela inválido");
+        return;
       }
+
+      const currentFiltroServico =
+        overrideFilters?.filtroServico || filtroServico;
+      const currentFiltroOpPadrao =
+        overrideFilters?.filtroOpPadrao || filtroOpPadrao;
 
       if (__DEV__) {
-        console.log(`[${screenType}] Full API Response:`, response);
+        console.log(
+          `[useVehicleData] Fetching data for ${screenType} with filters:`,
+          {
+            filtroServico: currentFiltroServico,
+            filtroOpPadrao: currentFiltroOpPadrao,
+            isOverride: !!overrideFilters,
+          }
+        );
       }
 
-      // Extrair dados da estrutura aninhada
-      const extractedData = extractDataFromResponse(response, screenType);
+      try {
+        isRequestInProgress.current = true;
+        setLoading(true);
+        setError(null);
 
-      setResponseData(extractedData);
-      setLastUpdate(new Date());
-    } catch (err) {
-      console.error(`[${screenType}] Error:`, err);
-      const errorResult = handleError(err, {
-        showAlert: false,
-        context: `carregamento de dados de ${screenType}`,
-      });
-      setError(errorResult.message);
-    } finally {
-      setLoading(false);
-      isRequestInProgress.current = false;
-    }
-  }, [screenType, state.selectedFilial, state.isLoggedIn]); // Removidas dependências dos filtros
+        let response;
+
+        switch (screenType) {
+          case "transito":
+            response = await apiService.getTransitoData(
+              state.selectedFilial,
+              currentFiltroServico,
+              currentFiltroOpPadrao
+            );
+            break;
+
+          case "fila_descarga":
+            response = await apiService.getFilaDescargaData(
+              state.selectedFilial,
+              currentFiltroServico,
+              currentFiltroOpPadrao
+            );
+            break;
+
+          case "fila_carga":
+            response = await apiService.getFilaCargaData(
+              state.selectedFilial,
+              currentFiltroServico,
+              currentFiltroOpPadrao
+            );
+            break;
+
+          case "patio_descarga":
+            response = await apiService.getPatioDescargaData(
+              state.selectedFilial,
+              currentFiltroServico,
+              currentFiltroOpPadrao
+            );
+            break;
+
+          case "patio_carga":
+            response = await apiService.getPatioCargaData(
+              state.selectedFilial,
+              currentFiltroServico,
+              currentFiltroOpPadrao
+            );
+            break;
+
+          case "descargas_hoje":
+            response = await apiService.getDescargasHojeData(
+              state.selectedFilial,
+              currentFiltroServico,
+              currentFiltroOpPadrao
+            );
+            break;
+
+          case "cargas_hoje":
+            response = await apiService.getCargasHojeData(
+              state.selectedFilial,
+              currentFiltroServico,
+              currentFiltroOpPadrao
+            );
+            break;
+
+          case "contratos":
+            response = await apiService.getContratosData(
+              state.selectedFilial,
+              currentFiltroServico,
+              currentFiltroOpPadrao
+            );
+            break;
+
+          default:
+            throw new Error("Tipo de tela inválido");
+        }
+
+        if (__DEV__) {
+          console.log(`[${screenType}] Full API Response:`, response);
+        }
+
+        const extractedData = extractDataFromResponse(response, screenType);
+
+        setResponseData(extractedData);
+        setLastUpdate(new Date());
+      } catch (err) {
+        console.error(`[${screenType}] Error:`, err);
+        const errorResult = handleError(err, {
+          showAlert: false,
+          context: `carregamento de dados de ${screenType}`,
+        });
+        setError(errorResult.message);
+      } finally {
+        setLoading(false);
+        isRequestInProgress.current = false;
+      }
+    },
+    [screenType, state.selectedFilial, state.isLoggedIn]
+  );
 
   useEffect(() => {
     if (state.isLoggedIn) {
@@ -211,25 +214,28 @@ export const useVehicleData = (screenType) => {
     await fetchData();
   }, [fetchData]);
 
-  // Função para aplicar filtros e fazer refresh imediato
-  const applyFiltersAndRefresh = useCallback(async (newFiltroServico, newFiltroOpPadrao) => {
-    if (__DEV__) {
-      console.log(`[useVehicleData] Applying new filters for ${screenType}:`, {
-        newFiltroServico,
-        newFiltroOpPadrao
+  const applyFiltersAndRefresh = useCallback(
+    async (newFiltroServico, newFiltroOpPadrao) => {
+      if (__DEV__) {
+        console.log(
+          `[useVehicleData] Applying new filters for ${screenType}:`,
+          {
+            newFiltroServico,
+            newFiltroOpPadrao,
+          }
+        );
+      }
+
+      setFiltroServico(newFiltroServico);
+      setFiltroOpPadrao(newFiltroOpPadrao);
+
+      await fetchData({
+        filtroServico: newFiltroServico,
+        filtroOpPadrao: newFiltroOpPadrao,
       });
-    }
-
-    // Primeiro atualizar os states
-    setFiltroServico(newFiltroServico);
-    setFiltroOpPadrao(newFiltroOpPadrao);
-
-    // Depois fazer fetch com os novos filtros imediatamente
-    await fetchData({
-      filtroServico: newFiltroServico,
-      filtroOpPadrao: newFiltroOpPadrao
-    });
-  }, [fetchData, screenType]);
+    },
+    [fetchData, screenType]
+  );
 
   return {
     data: responseData,

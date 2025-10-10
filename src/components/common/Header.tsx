@@ -7,25 +7,25 @@ import {
   Platform,
   ActivityIndicator,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants";
 import { HeaderLoadingIndicator } from "../BackgroundLoadingIndicator";
 
-/**
- * @param {Object} props
- * @param {string} props.title
- * @param {string} props.subtitle
- * @param {Function} props.onBackPress
- * @param {Function} props.onMenuPress
- * @param {Function} props.onRefreshPress
- * @param {boolean} props.isRefreshing
- * @param {boolean} props.showBackButton
- * @param {boolean} props.showRefreshButton
- * @param {boolean} props.showLoadingIndicator
- * @param {React.ReactNode} props.leftComponent
- * @param {React.ReactNode} props.rightComponent
- */
+interface HeaderProps {
+  title: string;
+  subtitle?: string;
+  onBackPress?: () => void;
+  onMenuPress?: () => void;
+  onRefreshPress?: () => void;
+  isRefreshing?: boolean;
+  showBackButton?: boolean;
+  showRefreshButton?: boolean;
+  showLoadingIndicator?: boolean;
+  leftComponent?: React.ReactNode;
+  rightComponent?: React.ReactNode;
+}
 
-const Header = ({
+const Header: React.FC<HeaderProps> = ({
   title,
   subtitle,
   onBackPress,
@@ -44,12 +44,22 @@ const Header = ({
         {leftComponent ? (
           leftComponent
         ) : showBackButton && onBackPress ? (
-          <TouchableOpacity style={styles.iconButton} onPress={onBackPress}>
-            <Text style={styles.backIcon}>←</Text>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={onBackPress}
+            accessibilityRole="button"
+            accessibilityLabel="Voltar"
+          >
+            <Ionicons name="arrow-back" size={24} color={COLORS.black} />
           </TouchableOpacity>
         ) : onMenuPress ? (
-          <TouchableOpacity style={styles.iconButton} onPress={onMenuPress}>
-            <Text style={styles.menuIcon}>☰</Text>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={onMenuPress}
+            accessibilityRole="button"
+            accessibilityLabel="Abrir menu"
+          >
+            <Ionicons name="menu" size={26} color={COLORS.black} />
           </TouchableOpacity>
         ) : (
           <View style={styles.iconButton} />
@@ -74,11 +84,13 @@ const Header = ({
                 style={styles.iconButton}
                 onPress={onRefreshPress}
                 disabled={isRefreshing}
+                accessibilityRole="button"
+                accessibilityLabel="Atualizar"
               >
                 {isRefreshing ? (
                   <ActivityIndicator size="small" color={COLORS.primary} />
                 ) : (
-                  <Text style={styles.refreshIcon}>🔄</Text>
+                  <Ionicons name="refresh" size={22} color={COLORS.black} />
                 )}
               </TouchableOpacity>
             )}
@@ -110,33 +122,23 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  headerLeft: {
-    width: 40,
-    alignItems: "flex-start",
-  },
   headerCenter: {
     flex: 1,
     alignItems: "center",
+    justifyContent: "center",
+  },
+  headerLeft: {
+    width: 60,
+    alignItems: "flex-start",
   },
   headerRight: {
-    width: 80,
+    width: 60,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-end",
   },
   iconButton: {
     padding: 8,
-  },
-  menuIcon: {
-    fontSize: 24,
-    color: "#333",
-  },
-  backIcon: {
-    fontSize: 24,
-    color: "#333",
-  },
-  refreshIcon: {
-    fontSize: 20,
   },
   headerTitle: {
     fontSize: 18,

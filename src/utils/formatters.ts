@@ -1,21 +1,29 @@
-import type { DateTimeFormatOptions } from '../types';
+import type { DateTimeFormatOptions } from "../types";
 
-export const formatPeso = (peso: number | string | null | undefined): string => {
+export const formatPeso = (
+  peso: number | string | null | undefined
+): string => {
   if (!peso || isNaN(Number(peso))) return "0 kg";
   return Number(peso).toLocaleString("pt-BR") + " kg";
 };
 
-export const formatPercentual = (valor: number | string | null | undefined): string => {
+export const formatPercentual = (
+  valor: number | string | null | undefined
+): string => {
   if (!valor || isNaN(Number(valor))) return "0%";
   return `${Number(valor).toFixed(2)}%`;
 };
 
-export const formatNumber = (valor: number | string | null | undefined): string => {
+export const formatNumber = (
+  valor: number | string | null | undefined
+): string => {
   if (!valor || isNaN(Number(valor))) return "0";
   return Number(valor).toLocaleString("pt-BR");
 };
 
-export const formatCurrency = (valor: number | string | null | undefined): string => {
+export const formatCurrency = (
+  valor: number | string | null | undefined
+): string => {
   if (!valor || isNaN(Number(valor))) return "R$ 0,00";
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -29,11 +37,7 @@ export const formatDateTime = (
 ): string => {
   if (!date) return "";
 
-  const {
-    includeTime = true,
-    includeDate = true,
-    format = "pt-BR"
-  } = options;
+  const { includeTime = true, includeDate = true, format = "pt-BR" } = options;
 
   const dateObj = typeof date === "string" ? new Date(date) : date;
 
@@ -48,7 +52,9 @@ export const formatDateTime = (
   return dateObj.toLocaleString(format);
 };
 
-export const formatTimeAgo = (date: string | Date | null | undefined): string => {
+export const formatTimeAgo = (
+  date: string | Date | null | undefined
+): string => {
   if (!date) return "";
 
   const now = new Date();
@@ -73,7 +79,10 @@ export const formatTimeAgo = (date: string | Date | null | undefined): string =>
   return `há ${diffInDays} dias`;
 };
 
-export const truncateText = (text: string | null | undefined, maxLength: number = 50): string => {
+export const truncateText = (
+  text: string | null | undefined,
+  maxLength: number = 50
+): string => {
   if (!text || text.length <= maxLength) return text || "";
   return text.substring(0, maxLength - 3) + "...";
 };
@@ -86,10 +95,8 @@ export const capitalizeFirst = (text: string | null | undefined): string => {
 export const formatPhoneNumber = (phone: string | null | undefined): string => {
   if (!phone) return "";
 
-  // Remove all non-numeric characters
   const cleaned = phone.replace(/\D/g, "");
 
-  // Format based on length
   if (cleaned.length === 10) {
     return cleaned.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3");
   } else if (cleaned.length === 11) {

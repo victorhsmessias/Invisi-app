@@ -1,9 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_CONFIG } from "../constants";
-import type { CacheData } from '../types';
+import type { CacheData } from "../types";
 
 export class CacheManager {
-  static async set<T = any>(key: string, data: T, ttl: number = API_CONFIG.CACHE_TIME): Promise<boolean> {
+  static async set<T = any>(
+    key: string,
+    data: T,
+    ttl: number = API_CONFIG.CACHE_TIME
+  ): Promise<boolean> {
     try {
       const cacheData: CacheData<T> = {
         data,
@@ -26,7 +30,6 @@ export class CacheManager {
 
       const { data, timestamp, ttl }: CacheData<T> = JSON.parse(cached);
 
-      // Check if cache is expired
       if (Date.now() - timestamp > ttl) {
         await this.remove(key);
         return null;
@@ -99,7 +102,12 @@ export class CacheManager {
       const expiredKeys: string[] = [];
 
       Object.entries(all).forEach(([key, value]) => {
-        if (value && typeof value === "object" && value.timestamp && value.ttl) {
+        if (
+          value &&
+          typeof value === "object" &&
+          value.timestamp &&
+          value.ttl
+        ) {
           if (now - value.timestamp > value.ttl) {
             expiredKeys.push(key);
           }

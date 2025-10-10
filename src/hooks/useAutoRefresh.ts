@@ -1,7 +1,11 @@
 import { useEffect, useRef, useCallback } from "react";
 import { AppState } from "react-native";
 import { API_CONFIG } from "../constants";
-import { USER_IDLE_MEDIUM, USER_IDLE_LONG, CHECK_INTERVAL } from "../constants/timing";
+import {
+  USER_IDLE_MEDIUM,
+  USER_IDLE_LONG,
+  CHECK_INTERVAL,
+} from "../constants/timing";
 
 export const useAutoRefresh = (refreshCallback, options = {}) => {
   const {
@@ -18,30 +22,23 @@ export const useAutoRefresh = (refreshCallback, options = {}) => {
   const lastActivityRef = useRef(Date.now());
   const isActiveRef = useRef(true);
 
-  // Calcular intervalo adaptativo baseado na atividade do usuário
   const getAdaptiveInterval = useCallback(() => {
     if (!adaptiveInterval) return interval;
 
     const timeSinceLastActivity = Date.now() - lastActivityRef.current;
 
-    // Se usuário inativo por mais de 10 min, refresh mais lento
     if (timeSinceLastActivity > USER_IDLE_LONG) {
-      return interval * 3; // 3x mais lento
+      return interval * 3;
+    } else if (timeSinceLastActivity > USER_IDLE_MEDIUM) {
+      return interval * 2;
     }
-    // Se usuário inativo por mais de 5 min, refresh um pouco mais lento
-    else if (timeSinceLastActivity > USER_IDLE_MEDIUM) {
-      return interval * 2; // 2x mais lento
-    }
-    // Usuário ativo, usar intervalo normal
     return interval;
   }, [interval, adaptiveInterval]);
 
-  // Atualizar atividade do usuário
   const updateActivity = useCallback(() => {
     lastActivityRef.current = Date.now();
   }, []);
 
-  // Iniciar auto-refresh
   const startAutoRefresh = useCallback(() => {
     if (!enabled || !isActiveRef.current) return;
 
@@ -59,7 +56,6 @@ export const useAutoRefresh = (refreshCallback, options = {}) => {
     }, currentInterval);
   }, [enabled, refreshCallback, getAdaptiveInterval]);
 
-  // Parar auto-refresh
   const stopAutoRefresh = useCallback(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
@@ -71,7 +67,6 @@ export const useAutoRefresh = (refreshCallback, options = {}) => {
     }
   }, []);
 
-  // Resetar auto-refresh (útil quando muda intervalo adaptativo)
   const resetAutoRefresh = useCallback(() => {
     stopAutoRefresh();
     if (enabled && isActiveRef.current) {
@@ -79,7 +74,6 @@ export const useAutoRefresh = (refreshCallback, options = {}) => {
     }
   }, [stopAutoRefresh, startAutoRefresh, enabled]);
 
-  // Handle mudanças de estado da app
   useEffect(() => {
     const handleAppStateChange = (nextAppState) => {
       if (pauseOnBackground) {
@@ -87,17 +81,14 @@ export const useAutoRefresh = (refreshCallback, options = {}) => {
           appStateRef.current.match(/inactive|background/) &&
           nextAppState === "active"
         ) {
-          // App voltou ao foreground
           isActiveRef.current = true;
           updateActivity();
           startAutoRefresh();
 
-          // Limpar timeout anterior se existir
           if (timeoutRef.current) {
             clearTimeout(timeoutRef.current);
           }
 
-          // Fazer refresh imediato quando voltar - mas silencioso
           if (refreshCallback) {
             timeoutRef.current = setTimeout(() => {
               refreshCallback({ silent: true, source: "background" });
@@ -105,7 +96,6 @@ export const useAutoRefresh = (refreshCallback, options = {}) => {
             }, 500);
           }
         } else if (nextAppState.match(/inactive|background/)) {
-          // App foi para background
           isActiveRef.current = false;
           stopAutoRefresh();
         }
@@ -124,7 +114,6 @@ export const useAutoRefresh = (refreshCallback, options = {}) => {
         subscription.remove();
       }
 
-      // Limpar timeout ao desmontar
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
@@ -138,7 +127,6 @@ export const useAutoRefresh = (refreshCallback, options = {}) => {
     updateActivity,
   ]);
 
-  // Inicializar auto-refresh
   useEffect(() => {
     if (enabled) {
       startAutoRefresh();
@@ -151,10 +139,8 @@ export const useAutoRefresh = (refreshCallback, options = {}) => {
     };
   }, [enabled, startAutoRefresh, stopAutoRefresh]);
 
-  // Resetar quando intervalo adaptativo deve mudar
   useEffect(() => {
     if (adaptiveInterval) {
-      // Verificar periodicamente se deve ajustar o intervalo
       adaptiveCheckIntervalRef.current = setInterval(() => {
         if (isActiveRef.current) {
           resetAutoRefresh();
@@ -174,7 +160,7 @@ export const useAutoRefresh = (refreshCallback, options = {}) => {
     startAutoRefresh,
     stopAutoRefresh,
     resetAutoRefresh,
-    updateActivity, // Chamar isso em interações do usuário
+    updateActivity,
     isActive: isActiveRef.current,
     currentInterval: getAdaptiveInterval(),
   };

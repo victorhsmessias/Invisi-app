@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
+import type { StackScreenProps } from "@react-navigation/stack";
 import { useApp } from "../context/AppContext";
 import { useGlobalFilters } from "../hooks/useGlobalFilters";
 import { useFilterLoader } from "../hooks/useFilterLoader";
@@ -24,8 +25,9 @@ import {
   InfoRow,
   UpdateBanner,
   EmptyView,
+  SideMenu,
 } from "../components";
-import { COLORS, SCREEN_NAMES } from "../constants";
+import { COLORS, SCREEN_NAMES, DEFAULT_API_FILTERS } from "../constants";
 import {
   formatPeso,
   formatPercentual,
@@ -41,8 +43,29 @@ import {
   QUICK_RETURN_STALE_TIME,
   SHORT_NAVIGATION_STALE_TIME,
 } from "../constants/timing";
+import type { RootStackParamList, ContratoData } from "../types";
 
-const MonitorCorteScreen = ({ navigation, route }) => {
+type MonitorCorteScreenProps = StackScreenProps<
+  RootStackParamList,
+  "MonitorCorte"
+>;
+
+interface ContratoCardProps {
+  item: ContratoData;
+}
+
+interface FilterOptionProps {
+  option: string;
+  isSelected: boolean;
+  onToggle: (value: string) => void;
+}
+
+type LoadingType = "background" | "manual" | "initial";
+
+const MonitorCorteScreen: React.FC<MonitorCorteScreenProps> = ({
+  navigation,
+  route,
+}) => {
   const { state } = useApp();
   const {
     filterOptions,
@@ -51,23 +74,102 @@ const MonitorCorteScreen = ({ navigation, route }) => {
     toggleFilter,
     resetFilters,
     getApiFilters,
-    hasValidCache,
-    forceReload,
   } = useGlobalFilters();
 
   const { loadFiltersForFilial } = useFilterLoader();
 
-  const [data, setData] = useState([]);
-  const [lastUpdate, setLastUpdate] = useState(null);
-  const [hasTriedLoading, setHasTriedLoading] = useState(false);
-  const [isInitializingScreen, setIsInitializingScreen] = useState(true);
-  const [hasShownInitialData, setHasShownInitialData] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState(null);
-  const [lastDataLoad, setLastDataLoad] = useState(null);
-  const lastFocusTime = useRef(null);
-  const navigationStartTime = useRef(null);
+  const [data, setData] = useState<ContratoData[]>([]);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [hasShownInitialData, setHasShownInitialData] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [isInitializingScreen, setIsInitializingScreen] = useState<boolean>(true);
+  const [lastDataLoad, setLastDataLoad] = useState<number | null>(null);
+  const lastFocusTime = useRef<number | null>(null);
+  const navigationStartTime = useRef<number | null>(null);
+
+  const [menuVisible, setMenuVisible] = useState<boolean>(false);
+  const [filtersVisible, setFiltersVisible] = useState<boolean>(false);
+  const [activeFilterTab, setActiveFilterTab] = useState<
+    "servicos" | "operacao" | "grupos" | "produtos"
+  >("servicos");
+
+  const fetchContratosData = useCallback(
+    async (loadingType: LoadingType = "background") => {
+      if (!state.isLoggedIn || !state.selectedFilial) return;
+
+      try {
+        if (loadingType === "manual") {
+          setRefreshing(true);
+        } else if (loadingType === "initial") {
+          setLoading(true);
+        }
+
+        if (__DEV__) {
+          console.log(`[MonitorCorteScreen] Fetching data (${loadingType})`);
+        }
+
+        let apiFilters;
+        try {
+          apiFilters = getApiFilters();
+        } catch (error) {
+          apiFilters = {
+            filtroServico: { ...DEFAULT_API_FILTERS.SERVICO } as Record<string, 0 | 1>,
+            filtroOpPadrao: { ...DEFAULT_API_FILTERS.OP_PADRAO } as Record<string, 0 | 1>,
+            filtroGrupo: null,
+            filtroTpProd: null,
+          };
+        }
+
+        const { filtroServico, filtroOpPadrao, filtroGrupo, filtroTpProd } =
+          apiFilters;
+
+        const response = await apiService.getContratosData(
+          state.selectedFilial,
+          filtroServico as Record<string, 0 | 1>,
+          filtroOpPadrao as Record<string, 0 | 1>,
+          filtroGrupo,
+          filtroTpProd
+        );
+
+        if (
+          response.dados?.CortesFila &&
+          Array.isArray(response.dados.CortesFila) &&
+          response.dados.CortesFila.length > 0
+        ) {
+          setData(response.dados.CortesFila);
+          setLastUpdate(new Date());
+          setLastDataLoad(Date.now());
+          setError(null);
+        } else {
+          setData([]);
+          if (hasShownInitialData || loadingType === "manual") {
+            setError(
+              "Nenhum monitor corte encontrado com os filtros aplicados"
+            );
+          }
+        }
+
+        setHasShownInitialData(true);
+      } catch (err) {
+        console.error("[MonitorCorteScreen] Error:", err);
+        setHasShownInitialData(true);
+        setError("Erro ao carregar monitor corte");
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [
+      state.isLoggedIn,
+      state.selectedFilial,
+      selectedFilters,
+      getApiFilters,
+      hasShownInitialData,
+    ]
+  );
 
   React.useEffect(() => {
     const timeout = setTimeout(() => {
@@ -83,8 +185,6 @@ const MonitorCorteScreen = ({ navigation, route }) => {
 
     return () => clearTimeout(timeout);
   }, [hasShownInitialData]);
-  const [filtersVisible, setFiltersVisible] = useState(false);
-  const [activeFilterTab, setActiveFilterTab] = useState("servicos");
 
   const { updateActivity } = useAutoRefresh(fetchContratosData, {
     enabled: true,
@@ -92,160 +192,6 @@ const MonitorCorteScreen = ({ navigation, route }) => {
     pauseOnBackground: true,
     adaptiveInterval: true,
   });
-
-  const initializeSelectedFilters = useCallback(() => {
-    // Função para inicializar filtros se necessário
-    if (__DEV__) {
-      console.log("[MonitorCorteScreen] Initializing selected filters");
-    }
-  }, []);
-
-  const fetchContratosData = useCallback(
-    async (loadingType = "background") => {
-      if (!state.isLoggedIn || !state.selectedFilial) return;
-
-      try {
-        setHasTriedLoading(true);
-
-        if (loadingType === "manual") {
-          setRefreshing(true);
-        } else if (loadingType === "initial") {
-          setLoading(true);
-        }
-
-        if (__DEV__) {
-          console.log(
-            "[MonitorCorteScreen] ====== FETCH CONTRATOS DATA ======"
-          );
-          console.log("[MonitorCorteScreen] loadingType:", loadingType);
-          console.log(
-            "[MonitorCorteScreen] selectedFilters atual:",
-            selectedFilters
-          );
-          console.log("[MonitorCorteScreen] filterOptions disponíveis:", {
-            servicos: filterOptions.servicos,
-            opPadrao: filterOptions.opPadrao,
-            gruposLength: filterOptions.grupos?.length || 0,
-            produtosLength: filterOptions.produtos?.length || 0,
-          });
-        }
-
-        let apiFilters;
-        try {
-          apiFilters = getApiFilters();
-
-          if (__DEV__) {
-            console.log(
-              "[MonitorCorteScreen] Generated API filters:",
-              apiFilters
-            );
-          }
-        } catch (error) {
-          if (__DEV__) {
-            console.log(
-              "[MonitorCorteScreen] Error generating filters, using defaults:",
-              error
-            );
-          }
-          apiFilters = {
-            filtroServico: { armazenagem: 1, transbordo: 1, pesagem: 0 },
-            filtroOpPadrao: {
-              rodo_ferro: 1,
-              ferro_rodo: 1,
-              rodo_rodo: 1,
-              outros: 0,
-            },
-            filtroGrupo: null,
-            filtroTpProd: null,
-          };
-        }
-
-        const { filtroServico, filtroOpPadrao, filtroGrupo, filtroTpProd } =
-          apiFilters;
-
-        if (__DEV__) {
-          console.log("[MonitorCorteScreen] Fetching data with filters:", {
-            servicos: Object.keys(filtroServico).filter(
-              (key) => filtroServico[key] === 1
-            ),
-            opPadrao: Object.keys(filtroOpPadrao).filter(
-              (key) => filtroOpPadrao[key] === 1
-            ),
-            grupos: filtroGrupo ? filtroGrupo.length : 0,
-            produtos: filtroTpProd ? filtroTpProd.length : 0,
-          });
-        }
-
-        const response = await apiService.getContratosData(
-          state.selectedFilial,
-          filtroServico,
-          filtroOpPadrao,
-          filtroGrupo,
-          filtroTpProd
-        );
-
-        if (__DEV__) {
-          console.log(
-            "[MonitorCorteScreen] API Response:",
-            JSON.stringify(response, null, 2)
-          );
-          console.log("[MonitorCorteScreen] Response structure:", {
-            hasDados: !!response.dados,
-            hasCortesFila: !!response.dados?.CortesFila,
-            cortesFilaType: typeof response.dados?.CortesFila,
-            cortesFilaLength: Array.isArray(response.dados?.CortesFila)
-              ? response.dados.CortesFila.length
-              : "not array",
-            allKeys: response.dados ? Object.keys(response.dados) : "no dados",
-          });
-        }
-
-        if (
-          response.dados?.CortesFila &&
-          Array.isArray(response.dados.CortesFila) &&
-          response.dados.CortesFila.length > 0
-        ) {
-          if (__DEV__)
-            console.log(
-              "[MonitorCorteScreen] Data loaded successfully:",
-              response.dados.CortesFila.length,
-              "items"
-            );
-          setData(response.dados.CortesFila);
-          setLastUpdate(new Date());
-          setLastDataLoad(Date.now());
-        } else {
-          if (__DEV__) {
-            console.log("[MonitorCorteScreen] No valid data received from API");
-            console.log(
-              "[MonitorCorteScreen] CortesFila value:",
-              response.dados?.CortesFila
-            );
-          }
-          setData([]);
-          if (hasShownInitialData || loadingType === "manual") {
-            setError("Nenhum monitor corte encontrado com os filtros aplicados");
-          }
-        }
-
-        setHasShownInitialData(true);
-      } catch (err) {
-        console.error("[MonitorCorteScreen] Error:", err);
-        setHasShownInitialData(true);
-        setError("Erro ao carregar monitor corte");
-        return;
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [
-      state.isLoggedIn,
-      state.selectedFilial,
-      selectedFilters,
-      getApiFilters,
-    ]
-  );
 
   useFocusEffect(
     useCallback(() => {
@@ -256,37 +202,33 @@ const MonitorCorteScreen = ({ navigation, route }) => {
           if (isCancelled) return;
 
           const currentTime = Date.now();
-          const timeSinceLastFocus = lastFocusTime.current ? currentTime - lastFocusTime.current : Infinity;
-
-          // Marcar tempo atual de foco
+          const timeSinceLastFocus = lastFocusTime.current
+            ? currentTime - lastFocusTime.current
+            : Infinity;
           lastFocusTime.current = currentTime;
 
-          // Verificar se os dados são recentes
           const dataAge = lastDataLoad ? currentTime - lastDataLoad : Infinity;
-          const isDataFresh = dataAge < CACHE_TIME;
+          const timeAwayFromScreen = navigationStartTime.current
+            ? currentTime - navigationStartTime.current
+            : timeSinceLastFocus;
 
-          // Se voltou rapidamente e dados são frescos, não recarregar
-          const isQuickReturn = timeSinceLastFocus < QUICK_RETURN_THRESHOLD;
-          const timeAwayFromScreen = navigationStartTime.current ? currentTime - navigationStartTime.current : timeSinceLastFocus;
-          const isShortNavigation = timeAwayFromScreen < SHORT_NAVIGATION_THRESHOLD;
-
-          const shouldSkipReload = (isDataFresh && data.length > 0) ||
-                                  (isQuickReturn && data.length > 0 && dataAge < QUICK_RETURN_STALE_TIME) ||
-                                  (isShortNavigation && data.length > 0 && dataAge < SHORT_NAVIGATION_STALE_TIME);
+          const shouldSkipReload =
+            (dataAge < CACHE_TIME && data.length > 0) ||
+            (timeSinceLastFocus < QUICK_RETURN_THRESHOLD &&
+              data.length > 0 &&
+              dataAge < QUICK_RETURN_STALE_TIME) ||
+            (timeAwayFromScreen < SHORT_NAVIGATION_THRESHOLD &&
+              data.length > 0 &&
+              dataAge < SHORT_NAVIGATION_STALE_TIME);
 
           if (shouldSkipReload) {
             if (__DEV__) {
               console.log(
-                "[MonitorCorteScreen] Skipping reload - Data age:",
-                Math.round(dataAge / 1000),
-                "seconds, Time since last focus:",
-                Math.round(timeSinceLastFocus / 1000),
-                "seconds, Time away from screen:",
-                Math.round(timeAwayFromScreen / 1000),
-                "seconds"
+                `[MonitorCorteScreen] Skipping reload - Data age: ${Math.round(
+                  dataAge / 1000
+                )}s`
               );
             }
-            // Reset navigation timer após pular reload com sucesso
             navigationStartTime.current = null;
             setIsInitializingScreen(false);
             return;
@@ -294,44 +236,22 @@ const MonitorCorteScreen = ({ navigation, route }) => {
 
           setIsInitializingScreen(true);
 
-          const needsFilters = (filterOptions?.grupos?.length || 0) === 0;
+          const needsFilters =
+            (filterOptions?.grupos?.length || 0) === 0 ||
+            (filterOptions?.servicos?.length || 0) === 0 ||
+            (filterOptions?.opPadrao?.length || 0) === 0 ||
+            (filterOptions?.produtos?.length || 0) === 0;
           const needsData = (data?.length || 0) === 0;
 
           if (needsFilters && needsData) {
-            const hasPreloadedFilters =
-              (filterOptions?.grupos?.length || 0) > 0 ||
-              (state.filtersCache &&
-                Object.keys(state.filtersCache).length > 0);
-
-            if (hasPreloadedFilters) {
-              if (__DEV__)
-                console.log(
-                  "[MonitorCorteScreen] Using preloaded filters, loading data only..."
-                );
-              await fetchContratosData("initial");
-            } else {
-              if (__DEV__)
-                console.log(
-                  "[MonitorCorteScreen] Loading filters and data in parallel..."
-                );
-              await Promise.all([
-                loadFiltersForFilial(state.selectedFilial),
-                fetchContratosData("initial"),
-              ]);
-            }
-
-            if (!isCancelled) {
-              initializeSelectedFilters();
-            }
+            await Promise.all([
+              loadFiltersForFilial(state.selectedFilial),
+              fetchContratosData("initial"),
+            ]);
           } else if (needsFilters) {
             await loadFiltersForFilial(state.selectedFilial);
-            if (!isCancelled) {
-              initializeSelectedFilters();
-            }
           } else if (needsData) {
             await fetchContratosData("initial");
-          } else {
-            initializeSelectedFilters();
           }
         } finally {
           if (!isCancelled) {
@@ -345,48 +265,40 @@ const MonitorCorteScreen = ({ navigation, route }) => {
       return () => {
         isCancelled = true;
       };
-    }, [state.selectedFilial, lastDataLoad, data.length, filterOptions?.grupos?.length])
+    }, [
+      state.selectedFilial,
+      lastDataLoad,
+      data.length,
+      filterOptions?.grupos?.length,
+      filterOptions?.servicos?.length,
+      filterOptions?.opPadrao?.length,
+      filterOptions?.produtos?.length,
+      loadFiltersForFilial,
+      fetchContratosData,
+    ])
   );
 
   const onRefresh = useCallback(async () => {
     updateActivity();
-    // Invalidar timestamp para forçar refresh na próxima navegação
     setLastDataLoad(null);
     await fetchContratosData("manual");
   }, [fetchContratosData, updateActivity]);
 
   const handleApplyFilters = useCallback(async () => {
-    if (__DEV__) {
-      console.log("[MonitorCorteScreen] ====== APLICANDO FILTROS ======");
-      console.log(
-        "[MonitorCorteScreen] selectedFilters antes de aplicar:",
-        selectedFilters
-      );
-
-      try {
-        const apiFilters = getApiFilters();
-        console.log("[MonitorCorteScreen] ApiFilters gerados:", apiFilters);
-      } catch (error) {
-        console.error("[MonitorCorteScreen] Erro ao gerar apiFilters:", error);
-      }
-    }
-
     updateActivity();
     setFiltersVisible(false);
-
-    // Invalidar timestamp para forçar refresh na próxima navegação
     setLastDataLoad(null);
 
     try {
       await fetchContratosData("manual");
       if (__DEV__)
-        console.log("[MonitorCorteScreen] Filters applied successfully");
+        console.log("[MonitorCorteScreen] Filtros aplicados com sucesso");
     } catch (error) {
-      console.error("[MonitorCorteScreen] Error applying filters:", error);
+      console.error("[MonitorCorteScreen] Erro ao aplicar filtros:", error);
     }
-  }, [fetchContratosData, updateActivity, selectedFilters, getApiFilters]);
+  }, [fetchContratosData, updateActivity]);
 
-  const hasActiveFilters = useCallback(() => {
+  const hasActiveFilters = useMemo(() => {
     const servicos = selectedFilters?.servicos || [];
     const opPadrao = selectedFilters?.opPadrao || [];
     const grupos = selectedFilters?.grupos || [];
@@ -397,56 +309,23 @@ const MonitorCorteScreen = ({ navigation, route }) => {
     const gruposOptions = filterOptions?.grupos || [];
     const produtosOptions = filterOptions?.produtos || [];
 
-    const servicosFiltered =
-      servicos.length < servicosOptions.length && servicosOptions.length > 0;
-    const opPadraoFiltered =
-      opPadrao.length < opPadraoOptions.length && opPadraoOptions.length > 0;
-    const gruposFiltered =
-      grupos.length < gruposOptions.length && gruposOptions.length > 0;
-    const produtosFiltered =
-      produtos.length < produtosOptions.length && produtosOptions.length > 0;
-
-    const isFiltered =
-      servicosFiltered ||
-      opPadraoFiltered ||
-      gruposFiltered ||
-      produtosFiltered;
-
-    if (__DEV__) {
-      console.log("[MonitorCorteScreen] Filter status:", {
-        servicosFiltered,
-        opPadraoFiltered,
-        gruposFiltered,
-        produtosFiltered,
-        isFiltered,
-        selectedFiltersLength: {
-          servicos: servicos.length,
-          opPadrao: opPadrao.length,
-          grupos: grupos.length,
-          produtos: produtos.length,
-        },
-        filterOptionsLength: {
-          servicos: servicosOptions.length,
-          opPadrao: opPadraoOptions.length,
-          grupos: gruposOptions.length,
-          produtos: produtosOptions.length,
-        },
-      });
-    }
-
-    return isFiltered;
+    return (
+      (servicos.length < servicosOptions.length &&
+        servicosOptions.length > 0) ||
+      (opPadrao.length < opPadraoOptions.length &&
+        opPadraoOptions.length > 0) ||
+      (grupos.length < gruposOptions.length && gruposOptions.length > 0) ||
+      (produtos.length < produtosOptions.length && produtosOptions.length > 0)
+    );
   }, [selectedFilters, filterOptions]);
 
-  React.useEffect(() => {
-    if (data && data.length > 0) {
-    }
-  }, [data]);
-
-  const ContratoCard = React.memo(({ item }) => {
-    const handleGrupoPress = () => {
+  const ContratoCard = React.memo<ContratoCardProps>(({ item }) => {
+    const handleCardPress = () => {
       updateActivity();
-      // Marcar tempo de navegação para otimizar retorno
       navigationStartTime.current = Date.now();
+
+      const apiFilters = getApiFilters();
+
       navigation.navigate(SCREEN_NAMES.CONTRATOS_DETALHES, {
         fila: item.fila,
         grupo: item.grupo,
@@ -471,14 +350,14 @@ const MonitorCorteScreen = ({ navigation, route }) => {
           veiculos_carga_med: item.veiculos_carga_med,
           veiculos_meia_carga: item.veiculos_meia_carga || 0,
         },
-        filtroServico: getApiFilters().filtroServico,
-        filtroOpPadrao: getApiFilters().filtroOpPadrao,
+        filtroServico: apiFilters.filtroServico,
+        filtroOpPadrao: apiFilters.filtroOpPadrao,
       });
     };
 
     return (
       <View style={styles.contratoCard}>
-        <TouchableOpacity onPress={handleGrupoPress}>
+        <TouchableOpacity onPress={handleCardPress}>
           <View style={styles.cardHeader}>
             <Text style={styles.filaText}>Fila {item.fila}</Text>
             <Text style={[styles.grupoText, styles.grupoBadge]}>
@@ -523,33 +402,41 @@ const MonitorCorteScreen = ({ navigation, route }) => {
     );
   });
 
-  // InfoRow agora é um componente importado
+  ContratoCard.displayName = "ContratoCard";
 
-  const FilterOption = React.memo(({ option, isSelected, onToggle }) => (
-    <TouchableOpacity
-      style={[
-        styles.filterOptionButton,
-        isSelected && styles.filterOptionButtonActive,
-      ]}
-      onPress={() => onToggle(option)}
-    >
-      <Text
+  const FilterOption = React.memo<FilterOptionProps>(
+    ({ option, isSelected, onToggle }) => (
+      <TouchableOpacity
         style={[
-          styles.filterOptionText,
-          isSelected && styles.filterOptionTextActive,
+          styles.filterOptionButton,
+          isSelected && styles.filterOptionButtonActive,
         ]}
+        onPress={() => onToggle(option)}
       >
-        {option}
-      </Text>
-    </TouchableOpacity>
-  ));
+        <Text
+          style={[
+            styles.filterOptionText,
+            isSelected && styles.filterOptionTextActive,
+          ]}
+        >
+          {option}
+        </Text>
+      </TouchableOpacity>
+    )
+  );
+
+  FilterOption.displayName = "FilterOption";
 
   const renderFilterTab = useCallback(() => {
     if (filtersLoading) {
       return <LoadingSpinner text="Carregando Monitor Corte..." size="small" />;
     }
 
-    const renderFilterOptions = (options, selectedItems, filterType) => (
+    const renderFilterOptions = (
+      options: string[],
+      selectedItems: string[],
+      filterType: string
+    ) => (
       <View style={styles.filterOptions}>
         {options.map((option) => (
           <FilterOption
@@ -607,24 +494,17 @@ const MonitorCorteScreen = ({ navigation, route }) => {
           setFiltersVisible(true);
         }}
         showFilterButton={true}
-        hasActiveFilters={hasActiveFilters()}
+        hasActiveFilters={hasActiveFilters}
       />
     );
   }, [lastUpdate, hasActiveFilters]);
 
   const renderEmptyComponent = useCallback(() => {
     const isStillLoading =
-      isInitializingScreen ||
-      loading ||
-      (!hasShownInitialData && !error);
+      isInitializingScreen || loading || (!hasShownInitialData && !error);
 
     if (isStillLoading) {
-      return (
-        <EmptyView
-          icon="⏳"
-          message="Carregando monitor corte..."
-        />
-      );
+      return <EmptyView icon="⏳" message="Carregando monitor corte..." />;
     }
 
     return (
@@ -670,8 +550,10 @@ const MonitorCorteScreen = ({ navigation, route }) => {
       <Header
         title="Monitor Corte"
         subtitle={`Filial: ${state.selectedFilial}`}
-        showBackButton={true}
-        onBackPress={() => navigation.navigate(SCREEN_NAMES.HOME)}
+        onMenuPress={() => setMenuVisible(true)}
+        onRefreshPress={onRefresh}
+        isRefreshing={refreshing}
+        showRefreshButton={true}
         showLoadingIndicator={loading}
       />
 
@@ -679,9 +561,9 @@ const MonitorCorteScreen = ({ navigation, route }) => {
         data={data}
         renderItem={({ item }) => <ContratoCard item={item} />}
         keyExtractor={(item, index) =>
-          `${item.fila || "no-fila"}-${item.grupo || "no-grupo"}-${
-            item.prod || "no-prod"
-          }-idx-${index}`
+          item.fila && item.grupo && item.prod
+            ? `${item.fila}-${item.grupo}-${item.prod}`
+            : `fallback-${index}`
         }
         refreshControl={
           <RefreshControl
@@ -695,9 +577,15 @@ const MonitorCorteScreen = ({ navigation, route }) => {
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmptyComponent}
         removeClippedSubviews={true}
-        maxToRenderPerBatch={10}
-        windowSize={10}
-        initialNumToRender={5}
+        maxToRenderPerBatch={6}
+        windowSize={7}
+        initialNumToRender={4}
+        updateCellsBatchingPeriod={50}
+        getItemLayout={(data, index) => ({
+          length: 200,
+          offset: 200 * index,
+          index,
+        })}
       />
       <Modal
         visible={filtersVisible}
@@ -730,7 +618,11 @@ const MonitorCorteScreen = ({ navigation, route }) => {
                     styles.filterTab,
                     activeFilterTab === tab.key && styles.filterTabActive,
                   ]}
-                  onPress={() => setActiveFilterTab(tab.key)}
+                  onPress={() =>
+                    setActiveFilterTab(
+                      tab.key as "servicos" | "operacao" | "grupos" | "produtos"
+                    )
+                  }
                 >
                   <Text
                     style={[
@@ -766,11 +658,16 @@ const MonitorCorteScreen = ({ navigation, route }) => {
         </View>
       </Modal>
 
-      {/* Indicador de carregamento em background */}
       <BackgroundLoadingIndicator
         visible={loading && hasShownInitialData}
         text="Atualizando monitor corte..."
         position="bottom"
+      />
+
+      <SideMenu
+        visible={menuVisible}
+        onClose={() => setMenuVisible(false)}
+        navigation={navigation}
       />
     </SafeAreaView>
   );

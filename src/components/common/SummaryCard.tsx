@@ -2,13 +2,6 @@ import React from "react";
 import { View, Text, StyleSheet, Platform } from "react-native";
 import { COLORS } from "../../constants";
 
-/**
- * Card de resumo com totais (veículos, grupos, peso, etc)
- *
- * @param {Object} props
- * @param {Array} props.items - Array de itens do resumo [{label, value, icon}]
- * @param {Object} props.containerStyle - Estilo customizado para o container
- */
 const SummaryCard = React.memo(({ items = [], containerStyle }) => {
   if (!items || items.length === 0) return null;
 
