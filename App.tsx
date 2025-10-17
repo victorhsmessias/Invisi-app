@@ -5,9 +5,11 @@ import {
   CardStyleInterpolators,
 } from "@react-navigation/stack";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { PaperProvider } from "react-native-paper";
 import { AppProvider, useApp } from "./src/context/AppContext";
 import { LoadingSpinner } from "./src/components";
 import { SCREEN_NAMES } from "./src/constants";
+import { lightTheme } from "./src/constants/theme";
 import type { RootStackParamList } from "./src/types";
 
 import LoginScreen from "./src/screens/LoginScreen";
@@ -97,9 +99,11 @@ const AppNavigator: React.FC = () => {
 const App: React.FC = () => {
   return (
     <SafeAreaProvider>
-      <AppProvider>
-        <AppNavigator />
-      </AppProvider>
+      <PaperProvider theme={lightTheme}>
+        <AppProvider>
+          <AppNavigator />
+        </AppProvider>
+      </PaperProvider>
     </SafeAreaProvider>
   );
 };

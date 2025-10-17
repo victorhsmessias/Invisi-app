@@ -3,6 +3,7 @@ import { View, FlatList, RefreshControl, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useApp } from "../context/AppContext";
 import { useMonitorData } from "../hooks/useMonitorData";
+import { useFilters } from "../hooks/useFilters";
 import {
   Header,
   VehicleCard,
@@ -12,35 +13,67 @@ import {
   ErrorMessage,
   UpdateBanner,
   BackgroundLoadingIndicator,
+  FilterModal,
 } from "../components";
-import FilterModal from "../components/FilterModal";
+import { SERVICO_OPTIONS, OP_PADRAO_OPTIONS } from "../constants/filters";
 import { BADGE_COLORS } from "../constants/colors";
 import { COLORS } from "../constants";
 
 const FilaDescargaScreen = ({ navigation }) => {
   const { state } = useApp();
 
-  const [filtroServico, setFiltroServico] = useState("T");
-  const [filtroOpPadrao, setFiltroOpPadrao] = useState("T");
+  const {
+    selectedServicos,
+    selectedOpPadrao,
+    toggleServicoFilter,
+    toggleOpPadraoFilter,
+    getFilters,
+    resetFilters,
+    hasActiveFilters,
+  } = useFilters();
+
   const [filterModalVisible, setFilterModalVisible] = useState(false);
+
+  const apiFilters = useMemo(() => {
+    const filters = getFilters();
+    return {
+      filtro_servico: filters.filtro_servico,
+      filtro_op_padrao: filters.filtro_op_padrao,
+    };
+  }, [getFilters]);
 
   const { data, loading, refreshing, totals, error, refresh } = useMonitorData(
     "monitor_fila_desc",
     state.selectedFilial,
-    {
-      filtroServico,
-      filtroOpPadrao,
-    }
+    apiFilters
   );
 
-  const handleFilterApply = useCallback(
-    (newFiltroServico, newFiltroOpPadrao) => {
-      setFilterModalVisible(false);
-      setFiltroServico(newFiltroServico);
-      setFiltroOpPadrao(newFiltroOpPadrao);
-    },
-    []
+  const filterGroups = useMemo(
+    () => [
+      {
+        title: "Tipos de Serviço",
+        options: SERVICO_OPTIONS,
+        selected: selectedServicos,
+        onToggle: toggleServicoFilter,
+      },
+      {
+        title: "Tipos de Operação",
+        options: OP_PADRAO_OPTIONS,
+        selected: selectedOpPadrao,
+        onToggle: toggleOpPadraoFilter,
+      },
+    ],
+    [
+      selectedServicos,
+      selectedOpPadrao,
+      toggleServicoFilter,
+      toggleOpPadraoFilter,
+    ]
   );
+
+  const handleApplyFilters = useCallback(() => {
+    setFilterModalVisible(false);
+  }, []);
 
   const formatWeight = useCallback((weight) => {
     if (weight >= 1000) {
@@ -73,11 +106,12 @@ const FilaDescargaScreen = ({ navigation }) => {
           lastUpdate={new Date()}
           onFilterPress={() => setFilterModalVisible(true)}
           showFilterButton={true}
+          hasActiveFilters={hasActiveFilters}
         />
         <SummaryCard items={summaryItems} />
       </>
     );
-  }, [summaryItems]);
+  }, [summaryItems, hasActiveFilters]);
 
   const renderItem = useCallback(({ item }) => {
     return (
@@ -95,16 +129,31 @@ const FilaDescargaScreen = ({ navigation }) => {
   }, []);
 
   const keyExtractor = useCallback((item, index) => {
-    return item.grupo || item.fila || index.toString();
+    const grupo = item.grupo || "";
+    const fila = item.fila || "";
+    const produto = item.produto || item.tp_prod || "";
+
+    if (grupo && produto) {
+      return `${grupo}-${produto}-${index}`;
+    }
+    if (fila && produto) {
+      return `${fila}-${produto}-${index}`;
+    }
+    return `item-${index}`;
   }, []);
 
   const renderEmptyComponent = useCallback(() => {
     if (loading) {
-      return <EmptyView icon="⏳" message="Carregando fila de descarga..." />;
+      return (
+        <EmptyView
+          icon="time-outline"
+          message="Carregando fila de descarga..."
+        />
+      );
     }
     return (
       <EmptyView
-        icon="⏳"
+        icon="time-outline"
         message={error || "Nenhum veículo na fila de descarga"}
         subMessage="Puxe para baixo para atualizar"
       />
@@ -179,11 +228,10 @@ const FilaDescargaScreen = ({ navigation }) => {
       <FilterModal
         visible={filterModalVisible}
         onClose={() => setFilterModalVisible(false)}
-        filtroServico={filtroServico}
-        setFiltroServico={setFiltroServico}
-        filtroOpPadrao={filtroOpPadrao}
-        setFiltroOpPadrao={setFiltroOpPadrao}
-        onApply={handleFilterApply}
+        filterGroups={filterGroups}
+        onApply={handleApplyFilters}
+        onReset={resetFilters}
+        hasActiveFilters={hasActiveFilters}
       />
 
       <BackgroundLoadingIndicator

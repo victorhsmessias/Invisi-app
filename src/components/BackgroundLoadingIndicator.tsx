@@ -132,41 +132,6 @@ export const HeaderLoadingIndicator = ({ visible }) => {
   );
 };
 
-export const PulseIndicator = ({ visible, color = COLORS.primary }) => {
-  const [pulseAnim] = React.useState(new Animated.Value(1));
-
-  React.useEffect(() => {
-    if (visible) {
-      const pulseAnimation = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 0.3,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      pulseAnimation.start();
-      return () => pulseAnimation.stop();
-    } else {
-      pulseAnim.setValue(1);
-    }
-  }, [visible, pulseAnim]);
-
-  if (!visible) return null;
-
-  return (
-    <Animated.View style={[styles.pulseIndicator, { opacity: pulseAnim }]}>
-      <View style={[styles.pulseDot, { backgroundColor: color }]} />
-    </Animated.View>
-  );
-};
-
 const styles = StyleSheet.create({
   container: {
     position: "absolute",
@@ -217,17 +182,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.primary,
     fontWeight: "bold",
-  },
-  pulseIndicator: {
-    position: "absolute",
-    top: 5,
-    right: 5,
-    zIndex: 100,
-  },
-  pulseDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
   },
   discreteContainer: {
     position: "absolute",

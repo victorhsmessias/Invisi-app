@@ -1,22 +1,22 @@
 import React, { useRef, useEffect, memo } from "react";
 import {
   View,
-  Text,
-  TouchableOpacity,
   TouchableWithoutFeedback,
   Modal,
-  ScrollView,
   Animated,
   Dimensions,
   StyleSheet,
   Platform,
   Alert,
 } from "react-native";
+import { List, Avatar, Divider, Text } from "react-native-paper";
+import { Ionicons } from "@expo/vector-icons";
 import { useApp } from "../context/AppContext";
 import { useAuth } from "../hooks/useAuth";
-import { COLORS, SCREEN_NAMES } from "../constants";
+import { colors, spacing } from "../constants/theme";
+import { SCREEN_NAMES } from "../constants";
 
-const { width: screenWidth } = Dimensions.get("window");
+const screenWidth = Dimensions.get("window").width;
 
 interface NavigationHelpers {
   navigate: (screen: string, params?: object) => void;
@@ -31,78 +31,37 @@ interface SideMenuProps {
   navigation: NavigationHelpers;
 }
 
-interface MenuItem {
-  id: string;
-  title?: string;
-  icon?: string;
-  screen?: string;
-  description?: string;
-  isDivider?: boolean;
-  isLogout?: boolean;
-  onPress?: () => void;
-}
-
 const SideMenu = memo<SideMenuProps>(({ visible, onClose, navigation }) => {
+  const translateX = useRef(new Animated.Value(-screenWidth * 0.75)).current;
   const { state } = useApp();
   const { logout } = useAuth();
-  const slideAnim = useRef(new Animated.Value(-screenWidth * 0.75)).current;
 
-  useEffect(() => {
-    Animated.timing(slideAnim, {
+  React.useEffect(() => {
+    Animated.timing(translateX, {
       toValue: visible ? 0 : -screenWidth * 0.75,
       duration: 300,
       useNativeDriver: true,
     }).start();
   }, [visible]);
 
-  const menuItems: MenuItem[] = [
-    {
-      id: "inicio",
-      title: "Início",
-      icon: "🏠",
-      screen: SCREEN_NAMES.HOME,
-      description: "Tela inicial",
-      onPress: () => navigation.navigate(SCREEN_NAMES.HOME),
-    },
-    {
-      id: "monitor_corte",
-      title: "Monitor Corte",
-      icon: "🔍",
-      screen: SCREEN_NAMES.MONITOR_CORTE,
-      description: "Monitor de cortes",
-      onPress: () => navigation.navigate(SCREEN_NAMES.MONITOR_CORTE),
-    },
-    {
-      id: "divider",
-      isDivider: true,
-    },
-    {
-      id: "logout",
-      title: "Sair",
-      icon: "🚪",
-      isLogout: true,
-      description: "Encerrar sessão",
-    },
-  ];
-
-  const handleMenuPress = (item: MenuItem) => {
+  const handleLogout = () => {
     onClose();
-
-    if (item.isLogout) {
-      Alert.alert("Confirmar Logout", "Deseja sair do sistema?", [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Sair",
-          style: "destructive",
-          onPress: async () => {
-            await logout();
-            navigation.replace(SCREEN_NAMES.LOGIN);
-          },
+    Alert.alert("Confirmar Logout", "Deseja sair do sistema?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Sair",
+        style: "destructive",
+        onPress: async () => {
+          await logout();
+          navigation.replace(SCREEN_NAMES.LOGIN);
         },
-      ]);
-    } else if (item.screen) {
-      navigation.navigate(item.screen);
-    }
+      },
+    ]);
+  };
+
+  const handleNavigate = (screen: string) => {
+    onClose();
+    navigation.navigate(screen);
   };
 
   return (
@@ -118,56 +77,54 @@ const SideMenu = memo<SideMenuProps>(({ visible, onClose, navigation }) => {
             <Animated.View
               style={[
                 styles.container,
-                { transform: [{ translateX: slideAnim }] },
+                { transform: [{ translateX: translateX }] },
               ]}
             >
+              {/* Header com avatar */}
               <View style={styles.header}>
-                <View style={styles.userAvatar}>
-                  <Text style={styles.avatarText}>
-                    {state.username ? state.username[0].toUpperCase() : "U"}
-                  </Text>
-                </View>
-                <View style={styles.userInfo}>
-                  <Text style={styles.userName}>
-                    {state.username || "Usuário"}
-                  </Text>
-                  <Text style={styles.userRole}>Operador</Text>
-                </View>
+                <Avatar.Text
+                  size={56}
+                  label={state.username ? state.username[0].toUpperCase() : "U"}
+                  style={styles.avatar}
+                />
+                <Text variant="titleLarge" style={styles.userName}>
+                  {state.username || "Usuário"}
+                </Text>
+                <Text variant="bodySmall" style={styles.userRole}>
+                  Filial: {state.selectedFilial}
+                </Text>
               </View>
 
-              <ScrollView style={styles.scroll}>
-                {menuItems.map((item) => {
-                  if (item.isDivider) {
-                    return <View key={item.id} style={styles.divider} />;
-                  }
+              {/* Lista de opções */}
+              <List.Section style={styles.listSection}>
+                <List.Item
+                  title="Início"
+                  left={(props) => <List.Icon {...props} icon="home-outline" />}
+                  onPress={() => handleNavigate(SCREEN_NAMES.HOME)}
+                  titleStyle={styles.listItemTitle}
+                />
 
-                  return (
-                    <TouchableOpacity
-                      key={item.id}
-                      style={[
-                        styles.menuItem,
-                        item.isLogout && styles.menuItemLogout,
-                      ]}
-                      onPress={() => handleMenuPress(item)}
-                    >
-                      <Text style={styles.menuItemIcon}>{item.icon}</Text>
-                      <View style={styles.menuItemContent}>
-                        <Text
-                          style={[
-                            styles.menuItemTitle,
-                            item.isLogout && styles.menuItemTitleLogout,
-                          ]}
-                        >
-                          {item.title}
-                        </Text>
-                        <Text style={styles.menuItemDescription}>
-                          {item.description}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
+                <List.Item
+                  title="Monitor Corte"
+                  left={(props) => (
+                    <List.Icon {...props} icon="chart-timeline-variant" />
+                  )}
+                  onPress={() => handleNavigate(SCREEN_NAMES.MONITOR_CORTE)}
+                  titleStyle={styles.listItemTitle}
+                />
+
+                <Divider style={styles.divider} />
+
+                <List.Item
+                  title="Sair"
+                  left={(props) => (
+                    <List.Icon {...props} icon="logout" color={colors.danger} />
+                  )}
+                  onPress={handleLogout}
+                  titleStyle={[styles.listItemTitle, { color: colors.danger }]}
+                  style={styles.logoutItem}
+                />
+              </List.Section>
             </Animated.View>
           </TouchableWithoutFeedback>
         </View>
@@ -187,7 +144,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: screenWidth * 0.75,
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.surface,
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -201,81 +158,39 @@ const styles = StyleSheet.create({
     }),
   },
   header: {
-    backgroundColor: COLORS.primary,
-    paddingTop: Platform.OS === "ios" ? 50 : 30,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    flexDirection: "row",
+    backgroundColor: colors.primary,
+    paddingTop: Platform.OS === "ios" ? 60 : 40,
+    paddingBottom: spacing.xxl,
+    paddingHorizontal: spacing.xl,
     alignItems: "center",
   },
-  userAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#ffffff30",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 15,
-  },
-  avatarText: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: COLORS.white,
-  },
-  userInfo: {
-    flex: 1,
+  avatar: {
+    backgroundColor: colors.primaryDark,
+    marginBottom: spacing.md,
   },
   userName: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: COLORS.white,
+    color: colors.white,
+    fontWeight: "700",
     textTransform: "capitalize",
   },
   userRole: {
-    fontSize: 14,
-    color: "#ffffff90",
-    marginTop: 2,
+    color: colors.white,
+    opacity: 0.9,
+    marginTop: spacing.xs,
   },
-  scroll: {
+  listSection: {
     flex: 1,
+    paddingTop: spacing.md,
   },
-  menuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-  },
-  menuItemLogout: {
-    backgroundColor: "#fff5f5",
-  },
-  menuItemIcon: {
-    fontSize: 24,
-    marginRight: 15,
-    width: 30,
-    textAlign: "center",
-  },
-  menuItemContent: {
-    flex: 1,
-  },
-  menuItemTitle: {
+  listItemTitle: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#333",
-    marginBottom: 2,
-  },
-  menuItemTitleLogout: {
-    color: COLORS.danger,
-  },
-  menuItemDescription: {
-    fontSize: 12,
-    color: COLORS.gray,
   },
   divider: {
-    height: 1,
-    backgroundColor: "#e0e0e0",
-    marginVertical: 10,
+    marginVertical: spacing.md,
+  },
+  logoutItem: {
+    backgroundColor: colors.neutral[50],
   },
 });
 

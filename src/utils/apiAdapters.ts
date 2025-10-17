@@ -101,11 +101,6 @@ export const extractVehicleArray = (
   );
 
   if (!Array.isArray(vehicleArray)) {
-    if (__DEV__) {
-      console.warn(
-        `[ApiAdapter] Dados de ${dataType} não são um array, normalizando para []`
-      );
-    }
     return [];
   }
 
@@ -142,11 +137,6 @@ export const calculateVehicleCount = (
   dataType: DataType
 ): number => {
   if (!Array.isArray(vehicleArray)) {
-    if (__DEV__) {
-      console.warn(
-        `[ApiAdapter] calculateVehicleCount recebeu não-array para ${dataType}`
-      );
-    }
     return 0;
   }
 
@@ -173,24 +163,11 @@ export const processVehicleCount = (
   return calculateVehicleCount(vehicleArray, dataType);
 };
 
-/**
- * Processa a resposta unificada do endpoint "monitor"
- * que retorna todos os dados do dashboard em uma única requisição
- *
- * A resposta vem no formato simplificado:
- * {
- *   dados: {
- *     transitoVeiculos: [{ t_veiculos: X }],
- *     filaDescargaVeiculos: [{ fd_veiculos: X }],
- *     ...
- *   }
- * }
- */
 export const processUnifiedDashboardResponse = (
   apiResponse: any
 ): Record<DataType, number> => {
   if (!apiResponse || !apiResponse.dados) {
-    console.warn('[ApiAdapter] Resposta unificada inválida ou vazia');
+    console.warn("[ApiAdapter] Resposta unificada inválida ou vazia");
     return {
       transito: 0,
       filaDescarga: 0,
@@ -205,24 +182,21 @@ export const processUnifiedDashboardResponse = (
   const { dados } = apiResponse;
 
   // Helper para extrair contagem de um array de forma segura
-  const extractCount = (
-    vehicleArray: any[],
-    countField: string
-  ): number => {
+  const extractCount = (vehicleArray: any[], countField: string): number => {
     if (!Array.isArray(vehicleArray) || vehicleArray.length === 0) {
       return 0;
     }
 
     return vehicleArray.reduce((total, item) => {
-      if (!item || typeof item !== 'object') return total;
+      if (!item || typeof item !== "object") return total;
 
       const value = item[countField];
 
-      if (typeof value === 'number') {
+      if (typeof value === "number") {
         return total + (isNaN(value) ? 0 : value);
       }
 
-      if (typeof value === 'string') {
+      if (typeof value === "string") {
         const parsed = parseInt(value, 10);
         return total + (isNaN(parsed) ? 0 : parsed);
       }
@@ -232,18 +206,17 @@ export const processUnifiedDashboardResponse = (
   };
 
   const result: Record<DataType, number> = {
-    transito: extractCount(dados.transitoVeiculos || [], 't_veiculos'),
-    filaDescarga: extractCount(dados.filaDescargaVeiculos || [], 'fd_veiculos'),
-    filaCarga: extractCount(dados.filaCargaVeiculos || [], 'fc_veiculos'),
-    patioDescarga: extractCount(dados.patioDescargaVeiculos || [], 'pd_veiculos'),
-    patioCarga: extractCount(dados.patioCargaVeiculos || [], 'pc_veiculos'),
-    descargasHoje: extractCount(dados.descargaVeiculos || [], 'd_veiculos'),
-    cargasHoje: extractCount(dados.cargaVeiculos || [], 'c_veiculos'),
+    transito: extractCount(dados.transitoVeiculos || [], "t_veiculos"),
+    filaDescarga: extractCount(dados.filaDescargaVeiculos || [], "fd_veiculos"),
+    filaCarga: extractCount(dados.filaCargaVeiculos || [], "fc_veiculos"),
+    patioDescarga: extractCount(
+      dados.patioDescargaVeiculos || [],
+      "pd_veiculos"
+    ),
+    patioCarga: extractCount(dados.patioCargaVeiculos || [], "pc_veiculos"),
+    descargasHoje: extractCount(dados.descargaVeiculos || [], "d_veiculos"),
+    cargasHoje: extractCount(dados.cargaVeiculos || [], "c_veiculos"),
   };
-
-  if (__DEV__) {
-    console.log('[ApiAdapter] Unified dashboard processed:', result);
-  }
 
   return result;
 };

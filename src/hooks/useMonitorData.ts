@@ -14,7 +14,7 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
     monitor_transito: "dados.listaTransito.transitoVeiculos",
     monitor_fila_desc: "dados.listaFilaDescarga.filaDescargaVeiculos",
     monitor_fila_carga: "dados.listaFilaCarga.filaCargaVeiculos",
-    monitor_patio_desc: "dados.listaPatioDescarga.patioDescargaVeiculos",
+    monitor_patio_desc_local: "dados.listaPatioDescarga.patioDescargaVeiculos",
     monitor_patio_carga: "dados.listaPatioCarga.patioCargaVeiculos",
     monitor_descarga: "dados.listaDescarga.DescargaVeiculos",
     monitor_carga: "dados.listaCarga.CargaVeiculos",
@@ -24,7 +24,7 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
     monitor_transito: "t_",
     monitor_fila_desc: "fd_",
     monitor_fila_carga: "fc_",
-    monitor_patio_desc: "pd_",
+    monitor_patio_desc_local: "pd_",
     monitor_patio_carga: "pc_",
     monitor_descarga: "d_",
     monitor_carga: "c_",
@@ -33,22 +33,11 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
   const extractDataFromResponse = useCallback(
     (response) => {
       if (!response || !response.dados) {
-        if (__DEV__) {
-          console.log(
-            `[useMonitorData] Response missing 'dados' property:`,
-            response
-          );
-        }
         return [];
       }
 
       const dataPath = DATA_PATH_MAP[tipoOperacao];
       if (!dataPath) {
-        if (__DEV__) {
-          console.log(
-            `[useMonitorData] Unknown operation type: ${tipoOperacao}`
-          );
-        }
         return [];
       }
 
@@ -58,17 +47,11 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
       for (const part of pathParts) {
         extractedData = extractedData[part];
         if (!extractedData) {
-          if (__DEV__) {
-            console.log(`[useMonitorData] Data not found at path: ${dataPath}`);
-          }
           return [];
         }
       }
 
       if (!Array.isArray(extractedData)) {
-        if (__DEV__) {
-          console.log(`[useMonitorData] Data is not an array:`, extractedData);
-        }
         return [];
       }
 
@@ -146,11 +129,6 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
   const fetchData = useCallback(
     async (isRefreshing = false) => {
       if (isRequestInProgress.current) {
-        if (__DEV__) {
-          console.log(
-            `[useMonitorData] Request already in progress for ${tipoOperacao}, skipping...`
-          );
-        }
         return;
       }
 
@@ -163,10 +141,6 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
           setLoading(true);
         }
         setError(null);
-
-        if (__DEV__) {
-          console.log(`[useMonitorData] Fetching ${tipoOperacao} for filial ${filial}`);
-        }
 
         let jsonResponse;
 
@@ -192,8 +166,8 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
               filters.filtroOpPadrao
             );
             break;
-          case "monitor_patio_desc":
-            jsonResponse = await apiService.getPatioDescargaData(
+          case "monitor_patio_desc_local":
+            jsonResponse = await apiService.getPatioDescargaLocalData(
               filial as Filial,
               filters.filtroServico,
               filters.filtroOpPadrao
@@ -222,13 +196,6 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
             break;
           default:
             throw new Error(`Tipo de operação desconhecido: ${tipoOperacao}`);
-        }
-
-        if (__DEV__) {
-          console.log(
-            `[useMonitorData] Response for ${tipoOperacao}:`,
-            jsonResponse
-          );
         }
 
         const extractedData = extractDataFromResponse(jsonResponse);

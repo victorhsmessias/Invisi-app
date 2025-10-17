@@ -107,10 +107,6 @@ const MonitorCorteScreen: React.FC<MonitorCorteScreenProps> = ({
           setLoading(true);
         }
 
-        if (__DEV__) {
-          console.log(`[MonitorCorteScreen] Fetching data (${loadingType})`);
-        }
-
         let apiFilters;
         try {
           apiFilters = getApiFilters();
@@ -174,11 +170,6 @@ const MonitorCorteScreen: React.FC<MonitorCorteScreenProps> = ({
   React.useEffect(() => {
     const timeout = setTimeout(() => {
       if (!hasShownInitialData) {
-        if (__DEV__) {
-          console.log(
-            "[MonitorCorteScreen] Timeout atingido, forçando saída do loading"
-          );
-        }
         setHasShownInitialData(true);
       }
     }, STABILITY_CHECK_TIMEOUT);
@@ -222,13 +213,6 @@ const MonitorCorteScreen: React.FC<MonitorCorteScreenProps> = ({
               dataAge < SHORT_NAVIGATION_STALE_TIME);
 
           if (shouldSkipReload) {
-            if (__DEV__) {
-              console.log(
-                `[MonitorCorteScreen] Skipping reload - Data age: ${Math.round(
-                  dataAge / 1000
-                )}s`
-              );
-            }
             navigationStartTime.current = null;
             setIsInitializingScreen(false);
             return;
@@ -288,14 +272,7 @@ const MonitorCorteScreen: React.FC<MonitorCorteScreenProps> = ({
     updateActivity();
     setFiltersVisible(false);
     setLastDataLoad(null);
-
-    try {
-      await fetchContratosData("manual");
-      if (__DEV__)
-        console.log("[MonitorCorteScreen] Filtros aplicados com sucesso");
-    } catch (error) {
-      console.error("[MonitorCorteScreen] Erro ao aplicar filtros:", error);
-    }
+    await fetchContratosData("manual");
   }, [fetchContratosData, updateActivity]);
 
   const hasActiveFilters = useMemo(() => {
@@ -504,12 +481,12 @@ const MonitorCorteScreen: React.FC<MonitorCorteScreenProps> = ({
       isInitializingScreen || loading || (!hasShownInitialData && !error);
 
     if (isStillLoading) {
-      return <EmptyView icon="⏳" message="Carregando monitor corte..." />;
+      return <EmptyView icon="time-outline" message="Carregando monitor corte..." />;
     }
 
     return (
       <EmptyView
-        icon="📋"
+        icon="document-text-outline"
         message={error || "Nenhum monitor corte encontrado"}
         subMessage="Verifique os filtros aplicados"
       />

@@ -20,11 +20,11 @@ import type {
   LoginCredentials,
   LoginResponse,
   ApiRequestBody,
-  MonitorDataResponse,
   ContratosResponse,
   FilterResponse,
-  MonitorFilters,
   ContratosFilaParams,
+  MonitorDataResponse,
+  MonitorFilters,
 } from "../types/api";
 
 class ApiService {
@@ -41,19 +41,16 @@ class ApiService {
     };
   }
 
-  async makeRequest(endpoint: string, body: any, filial: Filial): Promise<Response> {
+  async makeRequest(
+    endpoint: string,
+    body: any,
+    filial: Filial
+  ): Promise<Response> {
     if (!filial || !API_CONFIG.FILIAL_URLS[filial]) {
       throw new Error(`Filial '${filial}' não configurada ou inválida`);
     }
 
     const url = `${API_CONFIG.FILIAL_URLS[filial]}${endpoint}`;
-
-    if (__DEV__) {
-      console.log(
-        `[ApiService] Using filial-specific URL for ${filial}: ${url}`
-      );
-    }
-
     const headers = await this.getAuthHeaders();
 
     const response = await fetch(url, {
@@ -69,7 +66,11 @@ class ApiService {
     return response;
   }
 
-  async requestWithRetry<T = any>(endpoint: string, body: any, filial: Filial): Promise<T> {
+  async requestWithRetry<T = any>(
+    endpoint: string,
+    body: any,
+    filial: Filial
+  ): Promise<T> {
     if (!filial) {
       throw new Error("Filial é obrigatória para fazer requisições");
     }
@@ -111,10 +112,6 @@ class ApiService {
         const url = urls[i];
 
         try {
-          if (__DEV__) {
-            console.log(`[ApiService] Tentando autenticação em: ${url}`);
-          }
-
           const response = await fetch(`${url}/login.php`, {
             method: "POST",
             headers: {
@@ -130,16 +127,9 @@ class ApiService {
           const responseText = await response.text();
 
           validateLoginResponse(response, responseText);
-
           const token = extractToken(response, responseText);
-
           await saveAuthData(token, sanitized.username);
-
           rateLimiter.resetAttempts(sanitized.username);
-
-          if (__DEV__) {
-            console.log("[ApiService] Autenticação bem-sucedida");
-          }
 
           return {
             token,
@@ -153,256 +143,64 @@ class ApiService {
             error instanceof AuthenticationError &&
             error.code === AUTH_ERROR_CODES.INVALID_CREDENTIALS
           ) {
-            if (__DEV__) {
-              console.log(
-                "[ApiService] Credenciais inválidas, parando tentativas"
-              );
-            }
             break;
-          }
-
-          if (__DEV__) {
-            console.warn(
-              `[ApiService] Erro ao autenticar em ${url}:`,
-              (error as Error).message
-            );
           }
         }
       }
 
-      if (
-        lastError instanceof AuthenticationError &&
-        lastError.code === AUTH_ERROR_CODES.INVALID_CREDENTIALS
-      ) {
-        throw lastError;
-      }
-
-      throw new AuthenticationError(
-        "Não foi possível conectar ao servidor. Verifique sua conexão.",
-        AUTH_ERROR_CODES.NETWORK_ERROR,
-        { attemptedUrls: maxUrlAttempts }
-      );
+      throw lastError;
     } catch (error) {
-      if (error instanceof AuthenticationError) {
-        throw error;
-      }
-
-      throw new AuthenticationError(
-        (error as Error).message || "Erro desconhecido durante autenticação",
-        AUTH_ERROR_CODES.NETWORK_ERROR,
-        { originalError: (error as Error).name }
-      );
+      console.error("[ApiService] Error in login:", error);
+      throw error;
     }
-  }
-
-  async getMonitorData(
-    tipoOperacao: string,
-    filtros: Partial<MonitorFilters>
-  ): Promise<MonitorDataResponse> {
-    const requestBody: ApiRequestBody = {
-      AttApi: {
-        tipoOperacao,
-        ...filtros,
-      },
-    };
-
-    const filial = (filtros.filtro_filial || filtros.filtro_filial) as Filial;
-    const result = await this.requestWithRetry<MonitorDataResponse>(
-      "/monitor.php",
-      requestBody,
-      filial
-    );
-
-    return result;
-  }
-
-  async getTransitoData(
-    filial: Filial,
-    filtroServico: Record<string, 0 | 1> | null = null,
-    filtroOpPadrao: Record<string, 0 | 1> | null = null
-  ): Promise<MonitorDataResponse> {
-    return this.getMonitorData("monitor_transito", {
-      filtro_filial: filial,
-      filtro_servico: filtroServico || DEFAULT_API_FILTERS.SERVICO,
-      filtro_op_padrao: filtroOpPadrao || DEFAULT_API_FILTERS.OP_PADRAO,
-    });
-  }
-
-  async getFilaDescargaData(
-    filial: Filial,
-    filtroServico: Record<string, 0 | 1> | null = null,
-    filtroOpPadrao: Record<string, 0 | 1> | null = null
-  ): Promise<MonitorDataResponse> {
-    return this.getMonitorData("monitor_fila_desc", {
-      filtro_filial: filial,
-      filtro_servico: filtroServico || DEFAULT_API_FILTERS.SERVICO,
-      filtro_op_padrao: filtroOpPadrao || DEFAULT_API_FILTERS.OP_PADRAO,
-    });
-  }
-
-  async getFilaCargaData(
-    filial: Filial,
-    filtroServico: Record<string, 0 | 1> | null = null,
-    filtroOpPadrao: Record<string, 0 | 1> | null = null
-  ): Promise<MonitorDataResponse> {
-    return this.getMonitorData("monitor_fila_carga", {
-      filtro_filial: filial,
-      filtro_servico: filtroServico || DEFAULT_API_FILTERS.SERVICO,
-      filtro_op_padrao: filtroOpPadrao || DEFAULT_API_FILTERS.OP_PADRAO,
-    });
-  }
-
-  async getPatioDescargaData(
-    filial: Filial,
-    filtroServico: Record<string, 0 | 1> | null = null,
-    filtroOpPadrao: Record<string, 0 | 1> | null = null
-  ): Promise<MonitorDataResponse> {
-    return this.getMonitorData("monitor_patio_desc", {
-      filtro_filial: filial,
-      filtro_servico: filtroServico || DEFAULT_API_FILTERS.SERVICO,
-      filtro_op_padrao: filtroOpPadrao || DEFAULT_API_FILTERS.OP_PADRAO,
-    });
-  }
-
-  async getPatioCargaData(
-    filial: Filial,
-    filtroServico: Record<string, 0 | 1> | null = null,
-    filtroOpPadrao: Record<string, 0 | 1> | null = null
-  ): Promise<MonitorDataResponse> {
-    return this.getMonitorData("monitor_patio_carga", {
-      filtro_filial: filial,
-      filtro_servico: filtroServico || DEFAULT_API_FILTERS.SERVICO,
-      filtro_op_padrao: filtroOpPadrao || DEFAULT_API_FILTERS.OP_PADRAO,
-    });
-  }
-
-  async getDescargasHojeData(
-    filial: Filial,
-    filtroServico: Record<string, 0 | 1> | null = null,
-    filtroOpPadrao: Record<string, 0 | 1> | null = null
-  ): Promise<MonitorDataResponse> {
-    return this.getMonitorData("monitor_descarga", {
-      filtro_filial: filial,
-      filtro_servico: filtroServico || DEFAULT_API_FILTERS.SERVICO,
-      filtro_op_padrao: filtroOpPadrao || DEFAULT_API_FILTERS.OP_PADRAO,
-    });
-  }
-
-  async getCargasHojeData(
-    filial: Filial,
-    filtroServico: Record<string, 0 | 1> | null = null,
-    filtroOpPadrao: Record<string, 0 | 1> | null = null
-  ): Promise<MonitorDataResponse> {
-    return this.getMonitorData("monitor_carga", {
-      filtro_filial: filial,
-      filtro_servico: filtroServico || DEFAULT_API_FILTERS.SERVICO,
-      filtro_op_padrao: filtroOpPadrao || DEFAULT_API_FILTERS.OP_PADRAO,
-    });
-  }
-
-  /**
-   * Endpoint unificado para Dashboard - busca todos os dados em uma única requisição
-   * Mais eficiente que as 7 requisições paralelas anteriores
-   *
-   * @param filial - Filial a ser consultada
-   * @param filtroServico - Filtros de serviço (armazenagem, transbordo, pesagem)
-   * @param filtroOpPadrao - Filtros de operação padrão (rodo_ferro, ferro_rodo, etc)
-   * @param dataInicio - Data de início para filtro (formato YYYY-MM-DD)
-   * @param dataFim - Data de fim para filtro (formato YYYY-MM-DD)
-   * @returns Promise com todos os dados do dashboard em uma única resposta
-   */
-  async getAllDashboardData(
-    filial: Filial,
-    filtroServico: Record<string, 0 | 1> | null = null,
-    filtroOpPadrao: Record<string, 0 | 1> | null = null,
-    dataInicio?: string,
-    dataFim?: string
-  ): Promise<MonitorDataResponse> {
-    const hoje = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-
-    const requestBody: ApiRequestBody = {
-      AttApi: {
-        tipoOperacao: "monitor",
-        filtro_filial: filial,
-        filtro_servico: filtroServico || DEFAULT_API_FILTERS.SERVICO,
-        filtro_op_padrao: filtroOpPadrao || DEFAULT_API_FILTERS.OP_PADRAO,
-        filtro_data_inicio: dataInicio || hoje,
-        filtro_data_fim: dataFim || hoje,
-        filtro_acumulador: {
-          dia: 1,
-          mes: 0,
-          ano: 0,
-        },
-        filtro_grupo: "",
-        filtro_produto: "",
-      },
-    };
-
-    if (__DEV__) {
-      console.log('[ApiService] Fetching unified dashboard data:', {
-        filial,
-        tipoOperacao: 'monitor',
-        dataInicio: requestBody.AttApi.filtro_data_inicio,
-        dataFim: requestBody.AttApi.filtro_data_fim,
-      });
-    }
-
-    const result = await this.requestWithRetry<MonitorDataResponse>(
-      "/monitor.php",
-      requestBody,
-      filial
-    );
-
-    if (__DEV__) {
-      console.log('[ApiService] Unified dashboard data received successfully');
-    }
-
-    return result;
   }
 
   async getContratosData(
     filial: Filial,
-    filtroServico: Record<string, 0 | 1> | null = null,
-    filtroOpPadrao: Record<string, 0 | 1> | null = null,
-    filtroGrupo: GrupoItem[] | null = null,
-    filtroTpProd: ProdutoItem[] | null = null
+    filtroServico?: Record<string, 0 | 1>,
+    filtroOpPadrao?: Record<string, 0 | 1>,
+    grupos?: GrupoItem[],
+    produtos?: ProdutoItem[]
   ): Promise<ContratosResponse> {
     try {
-      let grupos = filtroGrupo;
-      let produtos = filtroTpProd;
+      const [gruposResponse, produtosResponse] = await Promise.all([
+        grupos
+          ? Promise.resolve({
+              dados: { grupos: grupos.map((g) => g.grupo) },
+            })
+          : this.getGruposFilter(filial),
+        produtos
+          ? Promise.resolve({
+              dados: { produtos: produtos.map((p) => p.tp_prod) },
+            })
+          : this.getProdutosFilter(filial),
+      ]);
 
-      if (!grupos || !produtos) {
-        console.log("[ApiService] Loading dynamic filters for contratos...");
+      if (!grupos && gruposResponse.dados?.grupos) {
+        grupos = gruposResponse.dados.grupos.map((grupo: string) => ({
+          grupo,
+        }));
+      }
 
-        const [gruposResponse, produtosResponse] = await Promise.all([
-          grupos
-            ? Promise.resolve({ dados: { grupos: grupos.map((g) => g.grupo) } })
-            : this.getGruposFilter(filial),
-          produtos
-            ? Promise.resolve({
-                dados: { produtos: produtos.map((p) => p.tp_prod) },
-              })
-            : this.getProdutosFilter(filial),
-        ]);
-
-        if (!grupos && gruposResponse.dados?.grupos) {
-          grupos = gruposResponse.dados.grupos.map((grupo: string) => ({ grupo }));
-        }
-
-        if (!produtos && produtosResponse.dados?.produtos) {
-          produtos = produtosResponse.dados.produtos.map((produto: string) => ({
-            tp_prod: produto,
-          }));
-        }
+      if (!produtos && produtosResponse.dados?.produtos) {
+        produtos = produtosResponse.dados.produtos.map((produto: string) => ({
+          tp_prod: produto,
+        }));
       }
 
       if (!grupos || grupos.length === 0) {
-        logFallbackUsage('grupos', 'getContratosData - grupos ausentes ou vazios');
+        logFallbackUsage(
+          "grupos",
+          "getContratosData - grupos ausentes ou vazios"
+        );
         grupos = FALLBACK_GRUPOS;
       }
 
       if (!produtos || produtos.length === 0) {
-        logFallbackUsage('produtos', 'getContratosData - produtos ausentes ou vazios');
+        logFallbackUsage(
+          "produtos",
+          "getContratosData - produtos ausentes ou vazios"
+        );
         produtos = FALLBACK_PRODUTOS;
       }
 
@@ -417,29 +215,51 @@ class ApiService {
         },
       };
 
-      if (__DEV__) {
-        console.log(
-          "[ApiService] Making contratos request with dynamic filters:",
-          {
-            filial,
-            grupos: grupos ? grupos.length : "null",
-            produtos: produtos ? produtos.length : "null",
-            filtroServico,
-            filtroOpPadrao,
-            gruposArray: grupos,
-            produtosArray: produtos,
-          }
-        );
-      }
-
-      return this.requestWithRetry<ContratosResponse>("/monitor_corte.php", requestBody, filial);
+      return this.requestWithRetry<ContratosResponse>(
+        "/monitor_corte.php",
+        requestBody,
+        filial
+      );
     } catch (error) {
       console.error("[ApiService] Error in getContratosData:", error);
       throw error;
     }
   }
 
-  async getFilterOptions(tipo: string, filial: Filial): Promise<FilterResponse> {
+  async getMonitorData(
+    tipoOperacao: string,
+    filtros: Partial<MonitorFilters>
+  ): Promise<MonitorDataResponse> {
+    try {
+      const filial = filtros.filtro_filial;
+      if (!filial) {
+        throw new Error("Filial é obrigatória para getMonitorData");
+      }
+
+      const requestBody: ApiRequestBody = {
+        AttApi: {
+          tipoOperacao,
+          filtro_filial: filial,
+          filtro_servico: filtros.filtro_servico || DEFAULT_API_FILTERS.SERVICO,
+          filtro_op_padrao: filtros.filtro_op_padrao || DEFAULT_API_FILTERS.OP_PADRAO,
+        },
+      };
+
+      return this.requestWithRetry<MonitorDataResponse>(
+        "/monitor.php",
+        requestBody,
+        filial
+      );
+    } catch (error) {
+      console.error("[ApiService] Error in getMonitorData:", error);
+      throw error;
+    }
+  }
+
+  async getFilterOptions(
+    tipo: string,
+    filial: Filial
+  ): Promise<FilterResponse> {
     return this.getMonitorData(tipo, {
       filtro_filial: filial,
     }) as Promise<FilterResponse>;
@@ -469,20 +289,122 @@ class ApiService {
     }) as Promise<FilterResponse>;
   }
 
+  async getAllDashboardData(filial: Filial): Promise<any> {
+    try {
+      const requestBody: ApiRequestBody = {
+        AttApi: {
+          tipoOperacao: "monitor",
+          filtro_filial: filial,
+          filtro_servico: DEFAULT_API_FILTERS.SERVICO,
+          filtro_op_padrao: DEFAULT_API_FILTERS.OP_PADRAO,
+        },
+      };
+
+      return this.requestWithRetry("/monitor.php", requestBody, filial);
+    } catch (error) {
+      console.error("[ApiService] Error in getAllDashboardData:", error);
+      throw error;
+    }
+  }
+
+  async getTransitoData(
+    filial: Filial,
+    filtroServico?: Record<string, 0 | 1>,
+    filtroOpPadrao?: Record<string, 0 | 1>
+  ): Promise<MonitorDataResponse> {
+    return this.getMonitorData("monitor_transito", {
+      filtro_filial: filial,
+      filtro_servico: filtroServico,
+      filtro_op_padrao: filtroOpPadrao,
+    });
+  }
+
+  async getFilaDescargaData(
+    filial: Filial,
+    filtroServico?: Record<string, 0 | 1>,
+    filtroOpPadrao?: Record<string, 0 | 1>
+  ): Promise<MonitorDataResponse> {
+    return this.getMonitorData("monitor_fila_desc", {
+      filtro_filial: filial,
+      filtro_servico: filtroServico,
+      filtro_op_padrao: filtroOpPadrao,
+    });
+  }
+
+  async getFilaCargaData(
+    filial: Filial,
+    filtroServico?: Record<string, 0 | 1>,
+    filtroOpPadrao?: Record<string, 0 | 1>
+  ): Promise<MonitorDataResponse> {
+    return this.getMonitorData("monitor_fila_carga", {
+      filtro_filial: filial,
+      filtro_servico: filtroServico,
+      filtro_op_padrao: filtroOpPadrao,
+    });
+  }
+
+  async getPatioDescargaLocalData(
+    filial: Filial,
+    filtroServico?: Record<string, 0 | 1>,
+    filtroOpPadrao?: Record<string, 0 | 1>
+  ): Promise<MonitorDataResponse> {
+    return this.getMonitorData("monitor_patio_desc_local", {
+      filtro_filial: filial,
+      filtro_servico: filtroServico,
+      filtro_op_padrao: filtroOpPadrao,
+    });
+  }
+
+  async getPatioCargaData(
+    filial: Filial,
+    filtroServico?: Record<string, 0 | 1>,
+    filtroOpPadrao?: Record<string, 0 | 1>
+  ): Promise<MonitorDataResponse> {
+    return this.getMonitorData("monitor_patio_carga", {
+      filtro_filial: filial,
+      filtro_servico: filtroServico,
+      filtro_op_padrao: filtroOpPadrao,
+    });
+  }
+
+  async getDescargasHojeData(
+    filial: Filial,
+    filtroServico?: Record<string, 0 | 1>,
+    filtroOpPadrao?: Record<string, 0 | 1>
+  ): Promise<MonitorDataResponse> {
+    return this.getMonitorData("monitor_descarga", {
+      filtro_filial: filial,
+      filtro_servico: filtroServico,
+      filtro_op_padrao: filtroOpPadrao,
+    });
+  }
+
+  async getCargasHojeData(
+    filial: Filial,
+    filtroServico?: Record<string, 0 | 1>,
+    filtroOpPadrao?: Record<string, 0 | 1>
+  ): Promise<MonitorDataResponse> {
+    return this.getMonitorData("monitor_carga", {
+      filtro_filial: filial,
+      filtro_servico: filtroServico,
+      filtro_op_padrao: filtroOpPadrao,
+    });
+  }
+
   async getContratosFilaData(
     filial: Filial,
     fila: string,
     grupo: string,
     produto: string,
-    dadosCorte?: ContratosFilaParams['dadosCorte']
+    dadosCorte?: ContratosFilaParams["dadosCorte"]
   ): Promise<any> {
     try {
       const requestBody: ApiRequestBody = {
         AttApi: {
           tipoOperacao: "monitor_contratos_fila",
-          filial: filial,
-          fila: fila,
-          grupo: grupo,
+          filial,
+          fila,
+          grupo,
           prod: produto,
           ...(dadosCorte && {
             peso_origem: dadosCorte.peso_origem || 0,

@@ -22,7 +22,6 @@ import { COLORS } from "../constants";
 const PatioCargaScreen = ({ navigation }) => {
   const { state } = useApp();
 
-  // Hook useFilters para gerenciar filtros
   const {
     selectedServicos,
     selectedOpPadrao,
@@ -35,7 +34,6 @@ const PatioCargaScreen = ({ navigation }) => {
 
   const [filterModalVisible, setFilterModalVisible] = useState(false);
 
-  // Converter filtros para formato da API
   const apiFilters = useMemo(() => {
     const filters = getFilters();
     return {
@@ -44,14 +42,12 @@ const PatioCargaScreen = ({ navigation }) => {
     };
   }, [getFilters]);
 
-  // Hook useMonitorData centraliza TODA lógica de fetch
   const { data, loading, refreshing, totals, error, refresh } = useMonitorData(
     "monitor_patio_carga",
     state.selectedFilial,
     apiFilters
   );
 
-  // Configurar grupos de filtros
   const filterGroups = useMemo(
     () => [
       {
@@ -67,15 +63,18 @@ const PatioCargaScreen = ({ navigation }) => {
         onToggle: toggleOpPadraoFilter,
       },
     ],
-    [selectedServicos, selectedOpPadrao, toggleServicoFilter, toggleOpPadraoFilter]
+    [
+      selectedServicos,
+      selectedOpPadrao,
+      toggleServicoFilter,
+      toggleOpPadraoFilter,
+    ]
   );
 
-  // Handler de aplicar filtros
   const handleApplyFilters = useCallback(() => {
     setFilterModalVisible(false);
   }, []);
 
-  // Formatar peso para exibição
   const formatWeight = useCallback((weight) => {
     if (weight >= 1000) {
       return `${(weight / 1000).toFixed(1)}t`;
@@ -83,13 +82,11 @@ const PatioCargaScreen = ({ navigation }) => {
     return `${weight.toLocaleString("pt-BR")}kg`;
   }, []);
 
-  // Preparar items do SummaryCard
   const summaryItems = useMemo(() => {
     return [
       {
         value: totals.veiculos || 0,
         label: "Veículos",
-        icon: "🏗️",
       },
       {
         value: totals.grupos || 0,
@@ -102,7 +99,6 @@ const PatioCargaScreen = ({ navigation }) => {
     ];
   }, [totals, formatWeight]);
 
-  // Renderizar header da lista
   const renderHeader = useCallback(() => {
     return (
       <>
@@ -117,7 +113,6 @@ const PatioCargaScreen = ({ navigation }) => {
     );
   }, [summaryItems, hasActiveFilters]);
 
-  // Renderizar cada item
   const renderItem = useCallback(({ item }) => {
     return (
       <VehicleCard
@@ -133,26 +128,38 @@ const PatioCargaScreen = ({ navigation }) => {
     );
   }, []);
 
-  // KeyExtractor
   const keyExtractor = useCallback((item, index) => {
-    return item.grupo || item.fila || index.toString();
+    const grupo = item.grupo || "";
+    const fila = item.fila || "";
+    const produto = item.produto || item.tp_prod || "";
+
+    if (grupo && produto) {
+      return `${grupo}-${produto}-${index}`;
+    }
+    if (fila && produto) {
+      return `${fila}-${produto}-${index}`;
+    }
+    return `item-${index}`;
   }, []);
 
-  // Renderizar componente vazio
   const renderEmptyComponent = useCallback(() => {
     if (loading) {
-      return <EmptyView icon="🏗️" message="Carregando pátio de carga..." />;
+      return (
+        <EmptyView
+          icon="construct-outline"
+          message="Carregando pátio de carga..."
+        />
+      );
     }
     return (
       <EmptyView
-        icon="🏗️"
+        icon="construct-outline"
         message={error || "Nenhum veículo carregando"}
         subMessage="Puxe para baixo para atualizar"
       />
     );
   }, [error, loading]);
 
-  // Loading inicial
   if (loading && (!data || data.length === 0)) {
     return (
       <SafeAreaView style={styles.container}>
@@ -167,7 +174,6 @@ const PatioCargaScreen = ({ navigation }) => {
     );
   }
 
-  // Erro inicial
   if (error && (!data || data.length === 0)) {
     return (
       <SafeAreaView style={styles.container}>
@@ -219,7 +225,6 @@ const PatioCargaScreen = ({ navigation }) => {
         })}
       />
 
-      {/* Modal de Filtros */}
       <FilterModal
         visible={filterModalVisible}
         onClose={() => setFilterModalVisible(false)}
@@ -229,7 +234,6 @@ const PatioCargaScreen = ({ navigation }) => {
         hasActiveFilters={hasActiveFilters}
       />
 
-      {/* Indicador de carregamento em background */}
       <BackgroundLoadingIndicator
         visible={loading && data && data.length > 0}
         text="Atualizando pátio de carga..."

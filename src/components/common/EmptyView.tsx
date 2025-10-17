@@ -1,9 +1,11 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from "react-native";
-import { COLORS } from "../../constants";
+import { View, StyleSheet, ViewStyle } from "react-native";
+import { Text, Button } from "react-native-paper";
+import { Ionicons } from "@expo/vector-icons";
+import { colors, spacing } from "../../constants/theme";
 
 interface EmptyViewProps {
-  icon?: string;
+  icon?: keyof typeof Ionicons.glyphMap;
   message?: string;
   subMessage?: string;
   actionText?: string;
@@ -13,7 +15,7 @@ interface EmptyViewProps {
 
 const EmptyView = React.memo<EmptyViewProps>(
   ({
-    icon = "📋",
+    icon = "document-text-outline",
     message = "Nenhum dado encontrado",
     subMessage,
     actionText,
@@ -22,13 +24,29 @@ const EmptyView = React.memo<EmptyViewProps>(
   }) => {
     return (
       <View style={[styles.emptyContainer, containerStyle]}>
-        <Text style={styles.emptyIcon}>{icon}</Text>
-        <Text style={styles.emptyText}>{message}</Text>
-        {subMessage && <Text style={styles.emptySubtext}>{subMessage}</Text>}
+        <View style={styles.iconContainer}>
+          <Ionicons name={icon} size={64} color={colors.textSecondary} />
+        </View>
+
+        <Text variant="titleLarge" style={styles.emptyText}>
+          {message}
+        </Text>
+
+        {subMessage && (
+          <Text variant="bodyMedium" style={styles.emptySubtext}>
+            {subMessage}
+          </Text>
+        )}
+
         {actionText && onActionPress && (
-          <TouchableOpacity style={styles.actionButton} onPress={onActionPress}>
-            <Text style={styles.actionButtonText}>{actionText}</Text>
-          </TouchableOpacity>
+          <Button
+            mode="contained"
+            onPress={onActionPress}
+            style={styles.actionButton}
+            contentStyle={styles.actionButtonContent}
+          >
+            {actionText}
+          </Button>
         )}
       </View>
     );
@@ -39,38 +57,36 @@ EmptyView.displayName = "EmptyView";
 
 const styles = StyleSheet.create({
   emptyContainer: {
-    padding: 20,
+    padding: spacing.xl,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 20,
+    marginTop: spacing.xl,
   },
-  emptyIcon: {
-    fontSize: 56,
-    marginBottom: 16,
+  iconContainer: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: colors.surfaceVariant,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.lg,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: COLORS.gray,
+    fontWeight: "600",
+    color: colors.text,
     textAlign: "center",
+    marginBottom: spacing.sm,
   },
   emptySubtext: {
-    fontSize: 14,
-    color: "#999",
+    color: colors.textSecondary,
     textAlign: "center",
-    marginTop: 8,
+    marginBottom: spacing.md,
   },
   actionButton: {
-    marginTop: 20,
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+    marginTop: spacing.md,
   },
-  actionButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: "600",
+  actionButtonContent: {
+    paddingHorizontal: spacing.md,
   },
 });
 

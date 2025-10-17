@@ -1,16 +1,21 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   FlatList,
   RefreshControl,
-  ActivityIndicator,
   Animated,
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import type { StackScreenProps } from "@react-navigation/stack";
 import { useApp } from "../context/AppContext";
 import { useTransportData } from "../hooks/useTransportData";
 import { useGlobalFilters } from "../hooks/useGlobalFilters";
@@ -19,26 +24,41 @@ import useBackgroundUpdates from "../hooks/useBackgroundUpdates";
 import useIntelligentRefresh from "../hooks/useIntelligentRefresh";
 import {
   StatusCard,
+  SkeletonCard,
+  FilialSelector,
   LoadingSpinner,
   ErrorMessage,
   SideMenu,
   BackgroundLoadingIndicator,
   Header,
-  UpdateBanner,
 } from "../components";
 import { COLORS, FILIAIS, SCREEN_NAMES } from "../constants";
 import { SHORT_DELAY, AUTO_HIDE_SHORT } from "../constants/timing";
+import type { RootStackParamList, Filial } from "../types";
 
-const HomeScreen = ({ navigation }) => {
+interface TransportCardData {
+  id: string;
+  title: string;
+  value: number;
+  icon: keyof typeof import("@expo/vector-icons").Ionicons.glyphMap;
+  color: string;
+  subtitle: string;
+  onPress: () => void;
+}
+
+type HomeScreenProps = StackScreenProps<RootStackParamList, "Home">;
+
+const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const { state, actions } = useApp();
   const { data, loading, lastUpdate, refresh, error } = useTransportData();
   const { selectedFilters } = useGlobalFilters();
   const { preloadAllFilters, hasValidCache } = useFilterLoader();
-  const [menuVisible, setMenuVisible] = useState(false);
-  const [hasShownInitialData, setHasShownInitialData] = useState(false);
+  const [menuVisible, setMenuVisible] = useState<boolean>(false);
+  const [hasShownInitialData, setHasShownInitialData] =
+    useState<boolean>(false);
+  const [isFilialChanging, setIsFilialChanging] = useState<boolean>(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  // Background updates
   const {
     isUpdating: isBackgroundUpdating,
     startBackgroundUpdate,
@@ -46,7 +66,6 @@ const HomeScreen = ({ navigation }) => {
     shouldShowIndicator,
   } = useBackgroundUpdates();
 
-  // Refresh inteligente
   const { manualRefresh, silentRefresh, updateActivity, isDataStale } =
     useIntelligentRefresh(refresh, {
       lastUpdate,
@@ -56,10 +75,9 @@ const HomeScreen = ({ navigation }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
-    // Animação mais rápida para melhor performance
     Animated.timing(fadeAnim, {
       toValue: 1,
-      duration: 300, // Reduzido de 600ms para 300ms
+      duration: 300,
       useNativeDriver: true,
     }).start();
   }, [fadeAnim]);
@@ -73,15 +91,8 @@ const HomeScreen = ({ navigation }) => {
   useEffect(() => {
     if (state.isLoggedIn) {
       const timer = setTimeout(() => {
-        if (__DEV__) {
-          console.log(
-            "[HomeScreen] Iniciando precarregamento de filtros em background"
-          );
-        }
         preloadAllFilters().catch((error) => {
-          if (__DEV__) {
-            console.log("[HomeScreen] Erro no precarregamento:", error);
-          }
+          console.error("[HomeScreen] Erro no precarregamento:", error);
         });
       }, SHORT_DELAY);
 
@@ -102,112 +113,180 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  const handleFilialChange = useCallback((filial) => {
-    actions.setFilial(filial);
+  const handleFilialChange = useCallback(
+    async (filial: Filial) => {
+      if (filial === state.selectedFilial) return;
 
-    if (!hasValidCache(filial)) {
-      if (__DEV__) {
-        console.log(
-          `[HomeScreen] Filtros não em cache para ${filial}, carregamento será automático`
-        );
-      }
-    }
-  }, [actions, hasValidCache]);
+      setIsFilialChanging(true);
 
-  // Memoizar cards para evitar recriação a cada render
-  const transportCards = useMemo(() => [
-    {
-      id: "transito",
-      title: "Em Trânsito",
-      value: data.emTransito,
-      icon: "🚛",
-      color: COLORS.warning,
-      subtitle: "veículos",
-      onPress: () =>
-        navigation.navigate(SCREEN_NAMES.TRANSITO, {
-          filial: state.selectedFilial,
-        }),
+      Animated.timing(fadeAnim, {
+        toValue: 0.5,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+
+      actions.setFilial(filial);
+
+      setTimeout(() => {
+        setIsFilialChanging(false);
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      }, 500);
+
+      // Cache handling - silent in production
     },
-    {
-      id: "filaDescarga",
-      title: "Na Fila de Descarga",
-      value: data.filaDescarga,
-      icon: "⏳",
-      color: COLORS.info,
-      subtitle: "aguardando",
-      onPress: () =>
-        navigation.navigate(SCREEN_NAMES.FILA_DESCARGA, {
-          filial: state.selectedFilial,
-        }),
-    },
-    {
-      id: "filaCarga",
-      title: "Na Fila de Carga",
-      value: data.filaCarga,
-      icon: "⏰",
-      color: COLORS.orange,
-      subtitle: "aguardando",
-      onPress: () =>
-        navigation.navigate(SCREEN_NAMES.FILA_CARGA, {
-          filial: state.selectedFilial,
-        }),
-    },
-    {
-      id: "patioDescarregando",
-      title: "No Pátio, Descarregando",
-      value: data.patioDescarregando,
-      icon: "📦",
-      color: COLORS.purple,
-      subtitle: "em operação",
-      onPress: () =>
-        navigation.navigate(SCREEN_NAMES.PATIO_DESCARGA, {
-          filial: state.selectedFilial,
-        }),
-    },
-    {
-      id: "patioCarregando",
-      title: "No Pátio, Carregando",
-      value: data.patioCarregando,
-      icon: "🏗️",
-      color: COLORS.teal,
-      subtitle: "em operação",
-      onPress: () =>
-        navigation.navigate(SCREEN_NAMES.PATIO_CARGA, {
-          filial: state.selectedFilial,
-        }),
-    },
-    {
-      id: "descargasHoje",
-      title: "Descargas Hoje",
-      value: data.descargasHoje,
-      icon: "✅",
-      color: COLORS.success,
-      subtitle: "concluídas",
-      onPress: () =>
-        navigation.navigate(SCREEN_NAMES.DESCARGAS_HOJE, {
-          filial: state.selectedFilial,
-        }),
-    },
-    {
-      id: "cargasHoje",
-      title: "Cargas Hoje",
-      value: data.cargasHoje,
-      icon: "✅",
-      color: COLORS.primary,
-      subtitle: "concluídas",
-      onPress: () =>
-        navigation.navigate(SCREEN_NAMES.CARGAS_HOJE, {
-          filial: state.selectedFilial,
-        }),
-    },
-  ], [data, state.selectedFilial, navigation]);
+    [actions, hasValidCache, state.selectedFilial, fadeAnim]
+  );
+
+  const transportCards = useMemo<TransportCardData[]>(
+    () => [
+      {
+        id: "transito",
+        title: "Em Trânsito",
+        value: data.emTransito,
+        icon: "car-outline",
+        color: COLORS.warning,
+        subtitle: "veículos",
+        onPress: () =>
+          navigation.navigate(SCREEN_NAMES.TRANSITO, {
+            filial: state.selectedFilial,
+          }),
+      },
+      {
+        id: "filaDescarga",
+        title: "Na Fila de Descarga",
+        value: data.filaDescarga,
+        icon: "timer-outline",
+        color: COLORS.primary,
+        subtitle: "aguardando",
+        onPress: () =>
+          navigation.navigate(SCREEN_NAMES.FILA_DESCARGA, {
+            filial: state.selectedFilial,
+          }),
+      },
+      {
+        id: "filaCarga",
+        title: "Na Fila de Carga",
+        value: data.filaCarga,
+        icon: "timer-outline",
+        color: COLORS.primary,
+        subtitle: "aguardando",
+        onPress: () =>
+          navigation.navigate(SCREEN_NAMES.FILA_CARGA, {
+            filial: state.selectedFilial,
+          }),
+      },
+      {
+        id: "patioDescarregando",
+        title: "No Pátio, Descarregando",
+        value: data.patioDescarregando,
+        icon: "cube-outline",
+        color: COLORS.purple,
+        subtitle: "em operação",
+        onPress: () =>
+          navigation.navigate(SCREEN_NAMES.PATIO_DESCARGA, {
+            filial: state.selectedFilial,
+          }),
+      },
+      {
+        id: "patioCarregando",
+        title: "No Pátio, Carregando",
+        value: data.patioCarregando,
+        icon: "construct-outline",
+        color: COLORS.teal,
+        subtitle: "em operação",
+        onPress: () =>
+          navigation.navigate(SCREEN_NAMES.PATIO_CARGA, {
+            filial: state.selectedFilial,
+          }),
+      },
+      {
+        id: "descargasHoje",
+        title: "Descargas Hoje",
+        value: data.descargasHoje,
+        icon: "checkmark-circle-outline",
+        color: COLORS.success,
+        subtitle: "concluídas",
+        onPress: () =>
+          navigation.navigate(SCREEN_NAMES.DESCARGAS_HOJE, {
+            filial: state.selectedFilial,
+          }),
+      },
+      {
+        id: "cargasHoje",
+        title: "Cargas Hoje",
+        value: data.cargasHoje,
+        icon: "checkmark-circle-outline",
+        color: COLORS.success,
+        subtitle: "concluídas",
+        onPress: () =>
+          navigation.navigate(SCREEN_NAMES.CARGAS_HOJE, {
+            filial: state.selectedFilial,
+          }),
+      },
+    ],
+    [data, state.selectedFilial, navigation]
+  );
+
+  const renderItem = useCallback(({ item }: { item: TransportCardData }) => {
+    return (
+      <StatusCard
+        title={item.title}
+        value={item.value}
+        icon={item.icon}
+        color={item.color}
+        subtitle={item.subtitle}
+        loading={false}
+        onPress={item.onPress}
+      />
+    );
+  }, []);
+
+  const renderSkeletonItem = useCallback(() => <SkeletonCard />, []);
+
+  const keyExtractor = useCallback((item: TransportCardData) => item.id, []);
+
+  const skeletonData = useMemo(
+    () =>
+      Array(7)
+        .fill(null)
+        .map((_, i) => ({ id: `skeleton-${i}` })),
+    []
+  );
 
   if (state.isLoading) {
     return <LoadingSpinner text="Carregando aplicação..." />;
   }
 
   if (loading && !hasShownInitialData) {
-    return <LoadingSpinner text="Carregando dashboard..." />;
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header
+          title="Invisi"
+          subtitle={`Filial: ${state.selectedFilial}`}
+          onMenuPress={() => setMenuVisible(true)}
+          showRefreshButton={false}
+        />
+
+        <FilialSelector
+          filiais={FILIAIS}
+          selectedFilial={state.selectedFilial}
+          onFilialChange={handleFilialChange}
+          disabled={true}
+        />
+
+        <FlatList
+          data={skeletonData}
+          keyExtractor={(item) => item.id}
+          renderItem={renderSkeletonItem}
+          contentContainerStyle={styles.cardsContainer}
+          showsVerticalScrollIndicator={false}
+        />
+      </SafeAreaView>
+    );
   }
 
   if (error && !hasShownInitialData && !loading) {
@@ -247,45 +326,24 @@ const HomeScreen = ({ navigation }) => {
             <Text style={styles.updateText}>
               Última atualização: {lastUpdate.toLocaleTimeString("pt-BR")}
             </Text>
+            {isFilialChanging && (
+              <Text style={styles.changingText}> • Carregando...</Text>
+            )}
           </View>
         )}
 
-        <View style={styles.filialSelector}>
-          {FILIAIS.map((filial) => (
-            <TouchableOpacity
-              key={filial}
-              style={[
-                styles.filialButton,
-                state.selectedFilial === filial && styles.filialButtonActive,
-              ]}
-              onPress={() => handleFilialChange(filial)}
-            >
-              <Text
-                style={[
-                  styles.filialText,
-                  state.selectedFilial === filial && styles.filialTextActive,
-                ]}
-              >
-                {filial}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <FilialSelector
+          filiais={FILIAIS}
+          selectedFilial={state.selectedFilial}
+          onFilialChange={handleFilialChange}
+          isLoading={isFilialChanging}
+          disabled={isRefreshing || isFilialChanging}
+        />
 
         <FlatList
           data={transportCards}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <StatusCard
-              title={item.title}
-              value={item.value}
-              icon={item.icon}
-              color={item.color}
-              subtitle={item.subtitle}
-              loading={false}
-              onPress={item.onPress}
-            />
-          )}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
@@ -329,42 +387,19 @@ const styles = StyleSheet.create({
     backgroundColor: "#e8f4fd",
     paddingVertical: 8,
     paddingHorizontal: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
   },
   updateText: {
     fontSize: 12,
     color: "#0066cc",
     textAlign: "center",
   },
-  filialSelector: {
-    flexDirection: "row",
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    backgroundColor: COLORS.white,
-  },
-  filialButton: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: "center",
-    backgroundColor: "#f0f0f0",
-    marginHorizontal: 5,
-    borderRadius: 8,
-  },
-  filialButtonActive: {
-    backgroundColor: COLORS.primary,
-  },
-  filialText: {
-    fontSize: 14,
+  changingText: {
+    fontSize: 12,
+    color: "#0066cc",
     fontWeight: "600",
-    color: COLORS.gray,
-  },
-  filialTextActive: {
-    color: COLORS.white,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 20,
   },
   cardsContainer: {
     padding: 15,

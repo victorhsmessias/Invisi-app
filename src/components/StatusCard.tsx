@@ -1,22 +1,27 @@
 import React, { useRef, memo } from "react";
-import {
-  View,
-  Text,
-  TouchableWithoutFeedback,
-  Animated,
-  ActivityIndicator,
-  StyleSheet,
-  Platform,
-} from "react-native";
-import { COLORS } from "../constants";
+import { View, StyleSheet, Animated } from "react-native";
+import { Card, Text, useTheme } from "react-native-paper";
+import { Ionicons } from "@expo/vector-icons";
+import { colors, spacing, borderRadius } from "../constants/theme";
 
-const StatusCard = memo(
-  ({ title, value, icon, color, loading, subtitle, onPress }) => {
+interface StatusCardProps {
+  title: string;
+  value: number;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  loading?: boolean;
+  subtitle?: string;
+  onPress?: () => void;
+}
+
+const StatusCard = memo<StatusCardProps>(
+  ({ title, value, icon, color, loading = false, subtitle, onPress }) => {
+    const theme = useTheme();
     const scaleAnim = useRef(new Animated.Value(1)).current;
 
     const handlePressIn = () => {
       Animated.spring(scaleAnim, {
-        toValue: 0.98,
+        toValue: 0.97,
         useNativeDriver: true,
       }).start();
     };
@@ -34,102 +39,98 @@ const StatusCard = memo(
       }
     };
 
-    const getColorByValue = (val, type) => {
+    const getColorByValue = (val: number, type: "fila" | "normal"): string => {
       if (type === "fila") {
-        if (val > 20) return COLORS.danger;
-        if (val > 10) return COLORS.warning;
-        return COLORS.success;
+        if (val > 20) return colors.danger;
+        if (val > 10) return colors.warning;
+        return colors.success;
       }
       return color;
     };
 
     const displayColor = getColorByValue(
       value,
-      title.includes("fila") ? "fila" : "normal"
+      title.toLowerCase().includes("fila") ? "fila" : "normal"
     );
 
     return (
-      <TouchableWithoutFeedback
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        onPress={handlePress}
-      >
-        <Animated.View
-          style={[
-            styles.container,
-            {
-              transform: [{ scale: scaleAnim }],
-              borderLeftColor: displayColor,
-            },
-          ]}
+      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+        <Card
+          mode="elevated"
+          elevation={2}
+          onPress={handlePress}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          style={[styles.card, { borderLeftColor: displayColor, borderLeftWidth: 4 }]}
         >
-          <View style={styles.header}>
-            <Text style={styles.icon}>{icon}</Text>
-            <View style={styles.content}>
-              {loading ? (
-                <ActivityIndicator size="small" color={displayColor} />
-              ) : (
-                <>
-                  <Text style={[styles.value, { color: displayColor }]}>
-                    {value}
-                  </Text>
-                  {subtitle && (
-                    <Text style={styles.subtitle}>{subtitle}</Text>
-                  )}
-                </>
-              )}
-              <Text style={styles.title}>{title}</Text>
+          <Card.Content style={styles.content}>
+            <View style={styles.iconContainer}>
+              <View style={[styles.iconCircle, { backgroundColor: displayColor + '15' }]}>
+                <Ionicons name={icon} size={28} color={displayColor} />
+              </View>
             </View>
-          </View>
-        </Animated.View>
-      </TouchableWithoutFeedback>
+
+            <View style={styles.infoContainer}>
+              <Text
+                variant="displaySmall"
+                style={[styles.value, { color: displayColor }]}
+              >
+                {loading ? "..." : value}
+              </Text>
+
+              {subtitle && (
+                <Text variant="bodySmall" style={styles.subtitle}>
+                  {subtitle}
+                </Text>
+              )}
+
+              <Text variant="bodyMedium" style={styles.title}>
+                {title}
+              </Text>
+            </View>
+          </Card.Content>
+        </Card>
+      </Animated.View>
     );
   }
 );
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 12,
-    borderLeftWidth: 4,
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  icon: {
-    fontSize: 28,
-    marginRight: 15,
+  card: {
+    marginBottom: spacing.md,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.surface,
   },
   content: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: spacing.md,
+  },
+  iconContainer: {
+    marginRight: spacing.lg,
+  },
+  iconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: borderRadius.xl,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  infoContainer: {
     flex: 1,
+    justifyContent: "center",
   },
   value: {
-    fontSize: 28,
-    fontWeight: "bold",
+    fontWeight: "700",
     marginBottom: 2,
   },
   subtitle: {
-    fontSize: 12,
-    color: COLORS.gray,
-    marginBottom: 4,
+    color: colors.textSecondary,
+    marginBottom: 2,
   },
   title: {
-    fontSize: 14,
-    color: COLORS.gray,
+    color: colors.text,
+    fontWeight: "500",
   },
 });
 

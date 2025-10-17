@@ -1,23 +1,40 @@
 import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Platform,
-  TouchableOpacity,
-} from "react-native";
-import { COLORS } from "../../constants";
+import { View, StyleSheet } from "react-native";
+import { Card, Text, Chip } from "react-native-paper";
+import { Ionicons } from "@expo/vector-icons";
+import { colors, spacing, borderRadius } from "../../constants/theme";
 import InfoRow from "./InfoRow";
 
-const VehicleCard = React.memo(
+interface VehicleCardProps {
+  item: {
+    grupo?: string;
+    fila?: string | number;
+    produto?: string;
+    peso?: number;
+    veiculos?: number;
+  };
+  badgeColor?: string;
+  onPress?: () => void;
+  additionalFields?: Array<{
+    label: string;
+    value: string | number;
+    isPercentage?: boolean;
+    percentageValue?: number;
+    isBalance?: boolean;
+    balanceValue?: number;
+  }>;
+  containerStyle?: any;
+}
+
+const VehicleCard = React.memo<VehicleCardProps>(
   ({
     item,
-    badgeColor = COLORS.success,
+    badgeColor = colors.success,
     onPress,
     additionalFields = [],
     containerStyle,
   }) => {
-    const formatPeso = (peso) => {
+    const formatPeso = (peso?: number) => {
       if (!peso || peso === 0) return "0kg";
       if (peso >= 1000) {
         return `${(peso / 1000).toFixed(1)}t`;
@@ -31,107 +48,120 @@ const VehicleCard = React.memo(
     const peso = item?.peso || 0;
     const veiculos = item?.veiculos || 0;
 
-    const CardContent = (
-      <View style={[styles.card, containerStyle]}>
-        <View style={styles.cardHeader}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.grupoText}>{grupo}</Text>
-            {fila && fila !== "N/A" && (
-              <Text style={styles.filaText}>Fila {fila}</Text>
-            )}
+    return (
+      <Card
+        mode="elevated"
+        elevation={2}
+        onPress={onPress}
+        style={[styles.card, containerStyle]}
+      >
+        <Card.Content>
+          <View style={styles.header}>
+            <View style={styles.headerLeft}>
+              <View style={styles.grupoContainer}>
+                <Ionicons
+                  name="business-outline"
+                  size={18}
+                  color={colors.text}
+                />
+                <Text variant="titleMedium" style={styles.grupoText}>
+                  {grupo}
+                </Text>
+              </View>
+              {fila && fila !== "N/A" && (
+                <Text variant="bodySmall" style={styles.filaText}>
+                  Fila {fila}
+                </Text>
+              )}
+            </View>
+
+            <Chip
+              mode="flat"
+              style={[styles.chip, { backgroundColor: badgeColor }]}
+              textStyle={styles.chipText}
+              icon={() => (
+                <Ionicons name="car" size={16} color={colors.white} />
+              )}
+            >
+              {veiculos}
+            </Chip>
           </View>
 
-          <View style={[styles.badge, { backgroundColor: badgeColor }]}>
-            <Text style={styles.badgeText}>
-              {veiculos} {veiculos === 1 ? "veículo" : "veículos"}
-            </Text>
+          <View style={styles.divider} />
+
+          <View style={styles.content}>
+            <InfoRow label="Produto:" value={produto} />
+            <InfoRow label="Peso:" value={formatPeso(peso)} />
+
+            {additionalFields.map((field, index) => (
+              <InfoRow
+                key={index}
+                label={field.label}
+                value={field.value}
+                isPercentage={field.isPercentage}
+                percentageValue={field.percentageValue}
+                isBalance={field.isBalance}
+                balanceValue={field.balanceValue}
+              />
+            ))}
           </View>
-        </View>
-
-        <View style={styles.cardContent}>
-          <InfoRow label="Produto:" value={produto} />
-          <InfoRow label="Peso:" value={formatPeso(peso)} />
-
-          {additionalFields.map((field, index) => (
-            <InfoRow
-              key={index}
-              label={field.label}
-              value={field.value}
-              isPercentage={field.isPercentage}
-              percentageValue={field.percentageValue}
-              isBalance={field.isBalance}
-              balanceValue={field.balanceValue}
-            />
-          ))}
-        </View>
-      </View>
+        </Card.Content>
+      </Card>
     );
-
-    if (onPress) {
-      return (
-        <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
-          {CardContent}
-        </TouchableOpacity>
-      );
-    }
-
-    return CardContent;
   }
 );
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: COLORS.white,
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 12,
-    marginHorizontal: 10,
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 3,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
+    marginBottom: spacing.md,
+    marginHorizontal: spacing.md,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.surface,
   },
-  cardHeader: {
+  header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    marginBottom: spacing.xs,
   },
   headerLeft: {
     flex: 1,
+    marginRight: spacing.md,
+  },
+  grupoContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: spacing.xs,
   },
   grupoText: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
+    fontWeight: "600",
+    color: colors.text,
+    marginLeft: spacing.sm,
   },
   filaText: {
+    color: colors.textSecondary,
+    marginLeft: spacing.xl + 2,
+  },
+  chip: {
+    height: 32,
+    justifyContent: "space-around",
+    alignItems: "center",
+    paddingHorizontal: 0,
+  },
+  chipText: {
     fontSize: 14,
-    color: COLORS.gray,
-    marginTop: 2,
-  },
-  badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  badgeText: {
-    fontSize: 12,
     fontWeight: "600",
-    color: COLORS.white,
+    color: colors.white,
+    marginLeft: 3,
+    marginTop: 3,
   },
-  cardContent: {
-    marginTop: 5,
+  divider: {
+    height: 1,
+    backgroundColor: colors.borderLight,
+    marginVertical: spacing.sm,
+  },
+  content: {
+    marginTop: spacing.xs,
   },
 });
 

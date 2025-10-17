@@ -1,6 +1,7 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { COLORS } from "../../constants";
+import { View, StyleSheet } from "react-native";
+import { Text, Button, Badge } from "react-native-paper";
+import { colors, spacing, borderRadius } from "../../constants/theme";
 
 interface UpdateBannerProps {
   lastUpdate: Date | null;
@@ -21,28 +22,34 @@ const UpdateBanner = React.memo<UpdateBannerProps>(
     if (!lastUpdate) return null;
 
     const formatTime = (date: Date) => {
-      return date.toLocaleTimeString("pt-BR").substring(0, 5);
+      return date.toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
     };
 
     return (
-      <View style={styles.updateContainer}>
-        <View style={styles.updateRow}>
-          <Text style={styles.updateText}>
-            Atualizado: {formatTime(lastUpdate)}
-          </Text>
-          {showFilterButton && onFilterPress && (
-            <TouchableOpacity
+      <View style={styles.container}>
+        <Text variant="bodySmall" style={styles.updateText}>
+          Atualizado: {formatTime(lastUpdate)}
+        </Text>
+
+        {showFilterButton && onFilterPress && (
+          <View style={styles.filterButtonContainer}>
+            <Button
+              mode="contained-tonal"
+              onPress={onFilterPress}
+              compact
               style={[
                 styles.filterButton,
                 hasActiveFilters && styles.filterButtonActive,
               ]}
-              onPress={onFilterPress}
             >
-              <Text style={styles.filterButtonText}>{filterButtonText}</Text>
-              {hasActiveFilters && <View style={styles.filterBadge} />}
-            </TouchableOpacity>
-          )}
-        </View>
+              {filterButtonText}
+            </Button>
+            {hasActiveFilters && <Badge size={8} style={styles.filterBadge} />}
+          </View>
+        )}
       </View>
     );
   }
@@ -51,49 +58,35 @@ const UpdateBanner = React.memo<UpdateBannerProps>(
 UpdateBanner.displayName = "UpdateBanner";
 
 const styles = StyleSheet.create({
-  updateContainer: {
-    backgroundColor: "#e8f4fd",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    marginTop: 2,
-    marginBottom: 5,
-    marginHorizontal: 10,
-    borderRadius: 5,
-  },
-  updateRow: {
+  container: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    top: spacing.xs,
+    paddingHorizontal: spacing.md,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.surfaceVariant,
+    borderRadius: borderRadius.md,
   },
   updateText: {
-    fontSize: 12,
-    color: "#0066cc",
+    color: colors.textSecondary,
+    fontWeight: "500",
   },
-  filterButton: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 4,
+  filterButtonContainer: {
     position: "relative",
   },
-  filterButtonActive: {
-    backgroundColor: COLORS.success,
+  filterButton: {
+    borderRadius: borderRadius.md,
   },
-  filterButtonText: {
-    fontSize: 12,
-    color: COLORS.white,
-    fontWeight: "500",
+  filterButtonActive: {
+    backgroundColor: colors.success + "20",
   },
   filterBadge: {
     position: "absolute",
     top: -4,
     right: -4,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.danger,
-    borderWidth: 1,
-    borderColor: COLORS.white,
+    backgroundColor: colors.danger,
   },
 });
 

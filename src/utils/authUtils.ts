@@ -253,9 +253,6 @@ export const extractToken = (
       return bodyToken;
     }
   } catch (parseError) {
-    if (__DEV__) {
-      console.warn("[authUtils] Falha ao parsear resposta JSON:", parseError);
-    }
   }
 
   throw new AuthenticationError(

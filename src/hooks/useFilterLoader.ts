@@ -45,9 +45,6 @@ export const useFilterLoader = () => {
       const { cache, isValid } = getCurrentCache(filial);
 
       if (isValid) {
-        if (__DEV__) {
-          console.log(`[useFilterLoader] Cache válido para filial ${filial}`);
-        }
 
         if (filial === stateRef.current.selectedFilial) {
           actionsRef.current.setFilterOptions(cache);
@@ -58,23 +55,12 @@ export const useFilterLoader = () => {
 
       const loadingKey = `filters_${filial}`;
       if (loadingRef.current.has(loadingKey)) {
-        if (__DEV__) {
-          console.log(
-            `[useFilterLoader] Carregamento já em progresso para ${filial}`
-          );
-        }
         return null;
       }
 
       try {
         loadingRef.current.add(loadingKey);
         actionsRef.current.setFiltersLoading(true);
-
-        if (__DEV__) {
-          console.log(
-            `[useFilterLoader] Carregando filtros para filial ${filial}`
-          );
-        }
 
         const [
           servicosResponse,
@@ -100,15 +86,6 @@ export const useFilterLoader = () => {
 
         if (filial === stateRef.current.selectedFilial) {
           actionsRef.current.setFilterOptions(filterData);
-        }
-
-        if (__DEV__) {
-          console.log(`[useFilterLoader] Filtros carregados para ${filial}:`, {
-            servicos: filterData.servicos.length,
-            opPadrao: filterData.opPadrao.length,
-            grupos: filterData.grupos.length,
-            produtos: filterData.produtos.length,
-          });
         }
 
         return filterData;
@@ -148,23 +125,12 @@ export const useFilterLoader = () => {
     try {
       const filiais = ["LDA", "CHP", "FND", "NMD", "NMG"];
 
-      if (__DEV__) {
-        console.log(
-          "[useFilterLoader] Iniciando precarregamento inteligente de filtros"
-        );
-      }
-
       const filiaisToLoad = filiais.filter((filial) => {
         const { isValid } = getCurrentCache(filial);
         return !isValid;
       });
 
       if (filiaisToLoad.length === 0) {
-        if (__DEV__) {
-          console.log(
-            "[useFilterLoader] Todos os filtros já estão em cache válido"
-          );
-        }
         return;
       }
 
@@ -178,12 +144,6 @@ export const useFilterLoader = () => {
         (r) => r.status === "fulfilled" && r.value
       ).length;
       const failed = results.filter((r) => r.status === "rejected").length;
-
-      if (__DEV__) {
-        console.log(
-          `[useFilterLoader] Precarregamento completo: ${successful} sucessos, ${failed} falhas`
-        );
-      }
     } catch (error) {
       console.error(
         "[useFilterLoader] Erro no precarregamento de filtros:",
@@ -212,12 +172,6 @@ export const useFilterLoader = () => {
 
       try {
         loadingRef.current.add(loadingKey);
-
-        if (__DEV__) {
-          console.log(
-            `[useFilterLoader] Carregando filtros básicos para ${filial}`
-          );
-        }
 
         const [servicosResponse, opPadraoResponse] = await Promise.all([
           apiService.getServicosFilter(filial),

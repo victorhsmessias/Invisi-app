@@ -62,10 +62,10 @@ export const OPERATION_TYPES: Record<string, OperationType> = {
     dataPrefix: "fc_",
     icon: "⏰",
   },
-  MONITOR_PATIO_DESCARGA: {
-    key: "monitor_patio_desc",
-    endpoint: "monitor_patio_desc",
-    label: "Pátio de Descarga",
+  MONITOR_PATIO_DESCARGA_LOCAL: {
+    key: "monitor_patio_desc_local",
+    endpoint: "monitor_patio_desc_local",
+    label: "Pátio de Descarga (Local)",
     dataPrefix: "pd_",
     icon: "📦",
   },
@@ -112,7 +112,7 @@ export const API_ENDPOINTS = {
   MONITOR_TRANSITO: "monitor_transito",
   MONITOR_FILA_DESC: "monitor_fila_desc",
   MONITOR_FILA_CARGA: "monitor_fila_carga",
-  MONITOR_PATIO_DESC: "monitor_patio_desc",
+  MONITOR_PATIO_DESC_LOCAL: "monitor_patio_desc_local",
   MONITOR_PATIO_CARGA: "monitor_patio_carga",
 
   DESCARGAS_HOJE: "descargas_hoje",

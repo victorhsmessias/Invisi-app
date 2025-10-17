@@ -31,15 +31,6 @@ export const useIntelligentRefresh = (refreshCallback, options = {}) => {
     });
 
     if (refreshStrategy.shouldRefresh) {
-      if (__DEV__) {
-        console.log("[useIntelligentRefresh] Executing refresh:", {
-          silent: refreshStrategy.silent,
-          source: refreshStrategy.source,
-          reason: refreshStrategy.reason,
-          dataAge: strategy.getDataAge(lastUpdate),
-        });
-      }
-
       refreshCallback({
         silent: refreshStrategy.silent,
         source: refreshStrategy.source,

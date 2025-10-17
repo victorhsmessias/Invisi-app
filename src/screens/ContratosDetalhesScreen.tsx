@@ -178,7 +178,7 @@ const ContratosDetalhesScreen = ({ navigation, route }) => {
   const renderEmptyComponent = useCallback(
     () => (
       <EmptyView
-        icon="📋"
+        icon="document-text-outline"
         message={error || "Nenhum contrato individual encontrado"}
         subMessage="Puxe para baixo para atualizar"
       />
@@ -221,7 +221,7 @@ const ContratosDetalhesScreen = ({ navigation, route }) => {
         title="Contratos da Fila"
         subtitle={`Filial: ${filial}`}
         showBackButton={true}
-        onBackPress={() => navigation.navigate(SCREEN_NAMES.MONITOR_CORTE)}
+        onBackPress={() => navigation.goBack()}
         showLoadingIndicator={loading}
       />
 

@@ -1,13 +1,9 @@
 import React, { useState, useCallback, useMemo } from "react";
-import {
-  View,
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-} from "react-native";
+import { View, FlatList, RefreshControl, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useApp } from "../context/AppContext";
 import { useMonitorData } from "../hooks/useMonitorData";
+import { useFilters } from "../hooks/useFilters";
 import {
   Header,
   VehicleCard,
@@ -17,40 +13,68 @@ import {
   ErrorMessage,
   UpdateBanner,
   BackgroundLoadingIndicator,
+  FilterModal,
 } from "../components";
-import FilterModal from "../components/FilterModal";
+import { SERVICO_OPTIONS, OP_PADRAO_OPTIONS } from "../constants/filters";
 import { BADGE_COLORS } from "../constants/colors";
 import { COLORS } from "../constants";
 
 const TransitoScreen = ({ navigation }) => {
   const { state } = useApp();
 
-  // Estados de filtros
-  const [filtroServico, setFiltroServico] = useState("T");
-  const [filtroOpPadrao, setFiltroOpPadrao] = useState("T");
+  const {
+    selectedServicos,
+    selectedOpPadrao,
+    toggleServicoFilter,
+    toggleOpPadraoFilter,
+    getFilters,
+    resetFilters,
+    hasActiveFilters,
+  } = useFilters();
+
   const [filterModalVisible, setFilterModalVisible] = useState(false);
 
-  // Hook useMonitorData centraliza TODA lógica de fetch
+  const apiFilters = useMemo(() => {
+    const filters = getFilters();
+    return {
+      filtro_servico: filters.filtro_servico,
+      filtro_op_padrao: filters.filtro_op_padrao,
+    };
+  }, [getFilters]);
+
   const { data, loading, refreshing, totals, error, refresh } = useMonitorData(
     "monitor_transito",
     state.selectedFilial,
-    {
-      filtroServico,
-      filtroOpPadrao,
-    }
+    apiFilters
   );
 
-  // Handler de aplicar filtros
-  const handleFilterApply = useCallback(
-    (newFiltroServico, newFiltroOpPadrao) => {
-      setFilterModalVisible(false);
-      setFiltroServico(newFiltroServico);
-      setFiltroOpPadrao(newFiltroOpPadrao);
-    },
-    []
+  const filterGroups = useMemo(
+    () => [
+      {
+        title: "Tipos de Serviço",
+        options: SERVICO_OPTIONS,
+        selected: selectedServicos,
+        onToggle: toggleServicoFilter,
+      },
+      {
+        title: "Tipos de Operação",
+        options: OP_PADRAO_OPTIONS,
+        selected: selectedOpPadrao,
+        onToggle: toggleOpPadraoFilter,
+      },
+    ],
+    [
+      selectedServicos,
+      selectedOpPadrao,
+      toggleServicoFilter,
+      toggleOpPadraoFilter,
+    ]
   );
 
-  // Formatar peso para exibição
+  const handleApplyFilters = useCallback(() => {
+    setFilterModalVisible(false);
+  }, []);
+
   const formatWeight = useCallback((weight) => {
     if (weight >= 1000) {
       return `${(weight / 1000).toFixed(1)}t`;
@@ -58,7 +82,6 @@ const TransitoScreen = ({ navigation }) => {
     return `${weight.toLocaleString("pt-BR")}kg`;
   }, []);
 
-  // Preparar items do SummaryCard
   const summaryItems = useMemo(() => {
     return [
       {
@@ -76,7 +99,6 @@ const TransitoScreen = ({ navigation }) => {
     ];
   }, [totals, formatWeight]);
 
-  // Renderizar header da lista
   const renderHeader = useCallback(() => {
     return (
       <>
@@ -84,13 +106,13 @@ const TransitoScreen = ({ navigation }) => {
           lastUpdate={new Date()}
           onFilterPress={() => setFilterModalVisible(true)}
           showFilterButton={true}
+          hasActiveFilters={hasActiveFilters}
         />
         <SummaryCard items={summaryItems} />
       </>
     );
-  }, [summaryItems]);
+  }, [summaryItems, hasActiveFilters]);
 
-  // Renderizar cada item
   const renderItem = useCallback(({ item }) => {
     return (
       <VehicleCard
@@ -106,26 +128,33 @@ const TransitoScreen = ({ navigation }) => {
     );
   }, []);
 
-  // KeyExtractor
   const keyExtractor = useCallback((item, index) => {
-    return item.grupo || item.fila || index.toString();
+    const grupo = item.grupo || "";
+    const fila = item.fila || "";
+    const produto = item.produto || item.tp_prod || "";
+
+    if (grupo && produto) {
+      return `${grupo}-${produto}-${index}`;
+    }
+    if (fila && produto) {
+      return `${fila}-${produto}-${index}`;
+    }
+    return `item-${index}`;
   }, []);
 
-  // Renderizar componente vazio
   const renderEmptyComponent = useCallback(() => {
     if (loading) {
-      return <EmptyView icon="🚛" message="Carregando trânsito..." />;
+      return <EmptyView icon="car-outline" message="Carregando trânsito..." />;
     }
     return (
       <EmptyView
-        icon="🚛"
+        icon="car-outline"
         message={error || "Nenhum trânsito encontrado"}
         subMessage="Puxe para baixo para atualizar"
       />
     );
   }, [error, loading]);
 
-  // Loading inicial
   if (loading && (!data || data.length === 0)) {
     return (
       <SafeAreaView style={styles.container}>
@@ -140,7 +169,6 @@ const TransitoScreen = ({ navigation }) => {
     );
   }
 
-  // Erro inicial
   if (error && (!data || data.length === 0)) {
     return (
       <SafeAreaView style={styles.container}>
@@ -192,18 +220,15 @@ const TransitoScreen = ({ navigation }) => {
         })}
       />
 
-      {/* Modal de Filtros */}
       <FilterModal
         visible={filterModalVisible}
         onClose={() => setFilterModalVisible(false)}
-        filtroServico={filtroServico}
-        setFiltroServico={setFiltroServico}
-        filtroOpPadrao={filtroOpPadrao}
-        setFiltroOpPadrao={setFiltroOpPadrao}
-        onApply={handleFilterApply}
+        filterGroups={filterGroups}
+        onApply={handleApplyFilters}
+        onReset={resetFilters}
+        hasActiveFilters={hasActiveFilters}
       />
 
-      {/* Indicador de carregamento em background */}
       <BackgroundLoadingIndicator
         visible={loading && data && data.length > 0}
         text="Atualizando trânsito..."

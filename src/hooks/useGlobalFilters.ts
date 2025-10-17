@@ -25,19 +25,9 @@ export const useGlobalFilters = () => {
         hasInitialized.current = false;
         userHasModifiedFilters.current = false;
         lastFilialRef.current = currentFilial;
-        if (__DEV__) {
-          console.log(
-            `[useGlobalFilters] Filial mudou para ${currentFilial}, resetando flags`
-          );
-        }
       }
 
       if (!hasValidCache(currentFilial)) {
-        if (__DEV__) {
-          console.log(
-            `[useGlobalFilters] Carregando filtros para filial ${currentFilial}`
-          );
-        }
         loadFiltersForFilial(currentFilial);
       }
     }
@@ -52,20 +42,6 @@ export const useGlobalFilters = () => {
       !hasInitialized.current &&
       !userHasModifiedFilters.current
     ) {
-      if (__DEV__) {
-        console.log("[useGlobalFilters] ====== INICIALIZANDO FILTROS ======");
-        console.log("[useGlobalFilters] Opções carregadas:", {
-          servicos: servicos.length,
-          opPadrao: opPadrao.length,
-          grupos: grupos.length,
-          produtos: produtos.length,
-        });
-        console.log(
-          "[useGlobalFilters] Estado atual dos selectedFilters:",
-          selectedFilters
-        );
-      }
-
       setSelectedFilters({
         servicos: [...servicos],
         opPadrao: [...opPadrao],
@@ -74,10 +50,6 @@ export const useGlobalFilters = () => {
       });
 
       hasInitialized.current = true;
-
-      if (__DEV__) {
-        console.log("[useGlobalFilters] Filtros inicializados com sucesso");
-      }
     }
   }, [state.filterOptions.grupos.length, state.filterOptions.produtos.length]);
 
@@ -88,14 +60,6 @@ export const useGlobalFilters = () => {
       const newArray = isCurrentlySelected
         ? currentArray.filter((item) => item !== value)
         : [...currentArray, value];
-
-      if (__DEV__) {
-        console.log(`[useGlobalFilters] Toggle ${filterType}.${value}:`, {
-          before: currentArray,
-          after: newArray,
-          action: isCurrentlySelected ? "REMOVE" : "ADD",
-        });
-      }
 
       userHasModifiedFilters.current = true;
 
@@ -123,10 +87,6 @@ export const useGlobalFilters = () => {
   }, []);
 
   const resetFilters = useCallback(() => {
-    if (__DEV__) {
-      console.log("[useGlobalFilters] ====== RESETANDO FILTROS ======");
-      console.log("[useGlobalFilters] Estado antes do reset:", selectedFilters);
-    }
 
     userHasModifiedFilters.current = true;
     setSelectedFilters({
@@ -135,10 +95,6 @@ export const useGlobalFilters = () => {
       grupos: [],
       produtos: [],
     });
-
-    if (__DEV__) {
-      console.log("[useGlobalFilters] Filtros resetados para vazio");
-    }
   }, []);
 
   const getApiFilters = useCallback(() => {
@@ -171,18 +127,6 @@ export const useGlobalFilters = () => {
           ? produtos.map((produto) => ({ tp_prod: produto }))
           : null;
 
-      if (__DEV__) {
-        console.log(
-          "[useGlobalFilters] ====== USANDO FILTROS PADRÃO (todos) ======"
-        );
-        console.log("[useGlobalFilters] Filtros padrão aplicados:", {
-          filtroServico,
-          filtroOpPadrao,
-          grupos: filtroGrupo ? filtroGrupo.length : 0,
-          produtos: filtroTpProd ? filtroTpProd.length : 0,
-        });
-      }
-
       return {
         filtroServico,
         filtroOpPadrao,
@@ -213,27 +157,6 @@ export const useGlobalFilters = () => {
       selectedFilters.produtos.length > 0
         ? selectedFilters.produtos.map((produto) => ({ tp_prod: produto }))
         : null;
-
-    if (__DEV__) {
-      console.log(
-        "[useGlobalFilters] Estado selectedFilters:",
-        selectedFilters
-      );
-      console.log("[useGlobalFilters] Filtros convertidos para API:", {
-        filtroServico,
-        filtroOpPadrao,
-        grupos: filtroGrupo ? filtroGrupo.length : 0,
-        produtos: filtroTpProd ? filtroTpProd.length : 0,
-      });
-      console.log(
-        "[useGlobalFilters] Serviços ativos:",
-        Object.keys(filtroServico).filter((key) => filtroServico[key] === 1)
-      );
-      console.log(
-        "[useGlobalFilters] OpPadrão ativos:",
-        Object.keys(filtroOpPadrao).filter((key) => filtroOpPadrao[key] === 1)
-      );
-    }
 
     return {
       filtroServico,

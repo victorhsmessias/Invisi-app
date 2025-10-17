@@ -107,3 +107,4 @@ export type AsyncFunction<T = any> = (...args: any[]) => Promise<T>;
 
 export * from "./api";
 export * from "./context";
+export type { Filial } from "../constants/api";

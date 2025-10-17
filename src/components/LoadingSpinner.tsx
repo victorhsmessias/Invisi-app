@@ -2,7 +2,11 @@ import React from "react";
 import { View, ActivityIndicator, Text, StyleSheet } from "react-native";
 import { COLORS } from "../constants";
 
-const LoadingSpinner = ({ text = "Carregando...", size = "large", color = COLORS.primary }) => {
+const LoadingSpinner = ({
+  text = "Carregando...",
+  size = "large",
+  color = COLORS.primary,
+}) => {
   return (
     <View style={styles.container}>
       <ActivityIndicator size={size} color={color} />

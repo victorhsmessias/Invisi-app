@@ -9,8 +9,31 @@ import {
   Platform,
 } from "react-native";
 import { COLORS } from "../../constants";
+import { filterColors } from "../../constants/theme";
 
-const FilterModal = ({
+interface FilterOption {
+  key: string;
+  label: string;
+  value: string;
+}
+
+interface FilterGroup {
+  title: string;
+  options: FilterOption[];
+  selected: string[];
+  onToggle: (key: string) => void;
+}
+
+interface FilterModalProps {
+  visible: boolean;
+  onClose: () => void;
+  filterGroups?: FilterGroup[];
+  onApply?: () => void;
+  onReset?: () => void;
+  hasActiveFilters?: boolean;
+}
+
+const FilterModal: React.FC<FilterModalProps> = ({
   visible,
   onClose,
   filterGroups = [],
@@ -30,6 +53,8 @@ const FilterModal = ({
       onReset();
     }
   };
+
+  // Debug logs removed for production
 
   return (
     <Modal
@@ -55,12 +80,18 @@ const FilterModal = ({
             contentContainerStyle={styles.contentContainer}
             showsVerticalScrollIndicator={false}
           >
+            {filterGroups.length === 0 && (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>Nenhum filtro disponível</Text>
+              </View>
+            )}
+
             {filterGroups.map((group, groupIndex) => (
               <View key={groupIndex} style={styles.filterGroup}>
                 <Text style={styles.groupTitle}>{group.title}</Text>
 
                 <View style={styles.optionsContainer}>
-                  {group.options &&
+                  {group.options && group.options.length > 0 ? (
                     group.options.map((option, optionIndex) => {
                       const isSelected = group.selected
                         ? group.selected.includes(option.key)
@@ -87,7 +118,12 @@ const FilterModal = ({
                           </Text>
                         </TouchableOpacity>
                       );
-                    })}
+                    })
+                  ) : (
+                    <Text style={styles.noOptionsText}>
+                      Nenhuma opção disponível
+                    </Text>
+                  )}
                 </View>
               </View>
             ))}
@@ -124,14 +160,14 @@ const FilterModal = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: filterColors.overlay,
     justifyContent: "flex-end",
   },
   modalContainer: {
-    backgroundColor: COLORS.white,
+    backgroundColor: filterColors.modalBackground,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: "80%",
+    height: 500,
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -151,7 +187,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
+    borderBottomColor: filterColors.modalBorder,
   },
   headerTitle: {
     fontSize: 18,
@@ -169,15 +205,17 @@ const styles = StyleSheet.create({
   },
   closeButtonText: {
     fontSize: 24,
-    color: COLORS.gray,
+    color: filterColors.closeButtonText,
     fontWeight: "300",
   },
   content: {
     flex: 1,
+    minHeight: 200,
   },
   contentContainer: {
     padding: 20,
     paddingBottom: 10,
+    flexGrow: 1,
   },
   filterGroup: {
     marginBottom: 24,
@@ -185,35 +223,41 @@ const styles = StyleSheet.create({
   groupTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: COLORS.black,
+    color: "#000000",
     marginBottom: 12,
+    backgroundColor: "#f0f0f0",
+    padding: 8,
+    borderRadius: 4,
   },
   optionsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
   },
   chip: {
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: "#f0f0f0",
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
+    backgroundColor: filterColors.chipInactive,
+    borderWidth: 2,
+    borderColor: filterColors.chipInactiveBorder,
     marginRight: 8,
     marginBottom: 8,
+    minHeight: 40,
+    justifyContent: "center",
+    alignItems: "center",
   },
   chipActive: {
-    backgroundColor: "#007AFF",
-    borderColor: "#007AFF",
+    backgroundColor: filterColors.chipActive,
+    borderColor: filterColors.chipActiveBorder,
+    borderWidth: 2,
   },
   chipText: {
     fontSize: 14,
-    color: COLORS.black,
+    color: "#000000",
     fontWeight: "500",
   },
   chipTextActive: {
-    color: COLORS.white,
+    color: "#FFFFFF",
     fontWeight: "600",
   },
   footer: {
@@ -222,25 +266,25 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingBottom: Platform.OS === "ios" ? 32 : 16,
     borderTopWidth: 1,
-    borderTopColor: "#e0e0e0",
-    gap: 12,
+    borderTopColor: filterColors.modalBorder,
   },
   resetButton: {
     flex: 1,
-    backgroundColor: "#f0f0f0",
+    backgroundColor: filterColors.resetButtonBackground,
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
+    marginRight: 12,
   },
   resetButtonText: {
     fontSize: 16,
     fontWeight: "600",
-    color: COLORS.gray,
+    color: filterColors.resetButtonText,
   },
   applyButton: {
     flex: 1,
-    backgroundColor: "#007AFF",
+    backgroundColor: filterColors.applyButtonBackground,
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: "center",
@@ -252,7 +296,23 @@ const styles = StyleSheet.create({
   applyButtonText: {
     fontSize: 16,
     fontWeight: "600",
-    color: COLORS.white,
+    color: filterColors.applyButtonText,
+  },
+  emptyState: {
+    padding: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyText: {
+    fontSize: 16,
+    color: COLORS.gray,
+    textAlign: "center",
+  },
+  noOptionsText: {
+    fontSize: 14,
+    color: COLORS.gray,
+    fontStyle: "italic",
+    padding: 10,
   },
 });
 

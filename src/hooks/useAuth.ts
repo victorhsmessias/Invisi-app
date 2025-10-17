@@ -31,10 +31,6 @@ export const useAuth = (): UseAuthReturn => {
         actions.setAuth(true, result.token);
         actions.setUsername(result.username || username.trim().toUpperCase());
 
-        if (__DEV__) {
-          console.log("[useAuth] Login bem-sucedido para:", result.username);
-        }
-
         return { success: true };
       } else {
         throw new AuthenticationError(
@@ -69,13 +65,6 @@ export const useAuth = (): UseAuthReturn => {
             errorMessage = error.message || "Erro desconhecido ao fazer login";
         }
 
-        if (__DEV__) {
-          console.error("[useAuth] Erro de autenticação:", {
-            code: error.code,
-            message: error.message,
-            details: error.details,
-          });
-        }
       } else {
         errorMessage = (error as Error).message || "Erro inesperado ao fazer login";
         console.error("[useAuth] Erro inesperado:", error);
@@ -93,10 +82,6 @@ export const useAuth = (): UseAuthReturn => {
     try {
       await clearAuthData();
       await actions.logout();
-
-      if (__DEV__) {
-        console.log("[useAuth] Logout realizado com sucesso");
-      }
     } catch (error) {
       console.error("[useAuth] Erro ao fazer logout:", error);
     } finally {

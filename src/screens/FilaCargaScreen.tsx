@@ -113,7 +113,6 @@ const FilaCargaScreen = ({ navigation }) => {
     );
   }, [summaryItems, hasActiveFilters]);
 
-  // Renderizar cada item
   const renderItem = useCallback(({ item }) => {
     const formatDate = (dateStr) => {
       if (!dateStr) return "N/A";
@@ -125,6 +124,14 @@ const FilaCargaScreen = ({ navigation }) => {
       return timeStr.substring(0, 5);
     };
 
+    const additionalFields = [];
+    if (item.data) {
+      additionalFields.push({ label: "Data:", value: formatDate(item.data) });
+    }
+    if (item.hora) {
+      additionalFields.push({ label: "Hora:", value: formatTime(item.hora) });
+    }
+
     return (
       <VehicleCard
         item={{
@@ -135,34 +142,43 @@ const FilaCargaScreen = ({ navigation }) => {
           veiculos: parseInt(item.veiculos || 0),
         }}
         badgeColor={BADGE_COLORS.filaCarga}
-        additionalFields={[
-          { label: "Data:", value: formatDate(item.data) },
-          { label: "Hora:", value: formatTime(item.hora) },
-        ]}
+        additionalFields={additionalFields}
       />
     );
   }, []);
 
-  // KeyExtractor
   const keyExtractor = useCallback((item, index) => {
-    return item.grupo || item.fila || index.toString();
+    const grupo = item.grupo || "";
+    const fila = item.fila || "";
+    const produto = item.produto || item.tp_prod || "";
+
+    if (grupo && produto) {
+      return `${grupo}-${produto}-${index}`;
+    }
+    if (fila && produto) {
+      return `${fila}-${produto}-${index}`;
+    }
+    return `item-${index}`;
   }, []);
 
-  // Renderizar componente vazio
   const renderEmptyComponent = useCallback(() => {
     if (loading) {
-      return <EmptyView icon="⏰" message="Carregando fila de carga..." />;
+      return (
+        <EmptyView
+          icon="alarm-outline"
+          message="Carregando fila de carga..."
+        />
+      );
     }
     return (
       <EmptyView
-        icon="⏰"
+        icon="alarm-outline"
         message={error || "Nenhum veículo na fila de carga"}
         subMessage="Puxe para baixo para atualizar"
       />
     );
   }, [error, loading]);
 
-  // Loading inicial
   if (loading && (!data || data.length === 0)) {
     return (
       <SafeAreaView style={styles.container}>
@@ -177,7 +193,6 @@ const FilaCargaScreen = ({ navigation }) => {
     );
   }
 
-  // Erro inicial
   if (error && (!data || data.length === 0)) {
     return (
       <SafeAreaView style={styles.container}>
@@ -229,7 +244,6 @@ const FilaCargaScreen = ({ navigation }) => {
         })}
       />
 
-      {/* Modal de Filtros */}
       <FilterModal
         visible={filterModalVisible}
         onClose={() => setFilterModalVisible(false)}
@@ -239,7 +253,6 @@ const FilaCargaScreen = ({ navigation }) => {
         hasActiveFilters={hasActiveFilters}
       />
 
-      {/* Indicador de carregamento em background */}
       <BackgroundLoadingIndicator
         visible={loading && data && data.length > 0}
         text="Atualizando fila de carga..."

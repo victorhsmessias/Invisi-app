@@ -87,13 +87,6 @@ export const useAdaptiveInterval = (
 
       const interval = calculateInterval(context);
 
-      if (__DEV__) {
-        console.log("[useAdaptiveInterval] Starting interval:", {
-          interval,
-          context,
-        });
-      }
-
       intervalRef.current = setInterval(() => {
         if (callbackRef.current) {
           callbackRef.current();

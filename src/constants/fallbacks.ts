@@ -157,9 +157,6 @@ export const logFallbackUsage = (
   type: string,
   reason: string = "API falhou"
 ): void => {
-  if (__DEV__) {
-    console.warn(`[Fallback] Usando fallback para '${type}': ${reason}`);
-  }
 };
 
 export default {

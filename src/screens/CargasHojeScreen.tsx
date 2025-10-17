@@ -1,177 +1,178 @@
 import React, { useState, useCallback, useMemo } from "react";
-import {
-  FlatList,
-  RefreshControl,
-  View,
-  StyleSheet,
-  SafeAreaView,
-} from "react-native";
+import { View, FlatList, RefreshControl, StyleSheet } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useApp } from "../context/AppContext";
-import { useVehicleData } from "../hooks/useVehicleData";
-import Header from "../components/common/Header";
-import VehicleCard from "../components/common/VehicleCard";
-import SummaryCard from "../components/common/SummaryCard";
-import EmptyView from "../components/common/EmptyView";
-import UpdateBanner from "../components/common/UpdateBanner";
-import FilterModal from "../components/FilterModal";
-import { LoadingSpinner } from "../components";
+import { useMonitorData } from "../hooks/useMonitorData";
+import { useFilters } from "../hooks/useFilters";
+import {
+  Header,
+  VehicleCard,
+  SummaryCard,
+  EmptyView,
+  LoadingSpinner,
+  ErrorMessage,
+  UpdateBanner,
+  BackgroundLoadingIndicator,
+  FilterModal,
+} from "../components";
+import { SERVICO_OPTIONS, OP_PADRAO_OPTIONS } from "../constants/filters";
 import { BADGE_COLORS } from "../constants/colors";
 import { COLORS } from "../constants";
 
 const CargasHojeScreen = ({ navigation }) => {
   const { state } = useApp();
-  const {
-    data,
-    loading,
-    lastUpdate,
-    error,
-    refresh,
-    filtroServico,
-    setFiltroServico,
-    filtroOpPadrao,
-    setFiltroOpPadrao,
-    applyFiltersAndRefresh,
-  } = useVehicleData("cargas_hoje");
 
-  const [refreshing, setRefreshing] = useState(false);
+  const {
+    selectedServicos,
+    selectedOpPadrao,
+    toggleServicoFilter,
+    toggleOpPadraoFilter,
+    getFilters,
+    resetFilters,
+    hasActiveFilters,
+  } = useFilters();
+
   const [filterModalVisible, setFilterModalVisible] = useState(false);
 
-  const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await refresh();
-    setRefreshing(false);
-  }, [refresh]);
+  const apiFilters = useMemo(() => {
+    const filters = getFilters();
+    return {
+      filtro_servico: filters.filtro_servico,
+      filtro_op_padrao: filters.filtro_op_padrao,
+    };
+  }, [getFilters]);
 
-  const handleFilterPress = useCallback(() => {
-    setFilterModalVisible(true);
+  const { data, loading, refreshing, totals, error, refresh } = useMonitorData(
+    "monitor_carga",
+    state.selectedFilial,
+    apiFilters
+  );
+
+  const filterGroups = useMemo(
+    () => [
+      {
+        title: "Tipos de Serviço",
+        options: SERVICO_OPTIONS,
+        selected: selectedServicos,
+        onToggle: toggleServicoFilter,
+      },
+      {
+        title: "Tipos de Operação",
+        options: OP_PADRAO_OPTIONS,
+        selected: selectedOpPadrao,
+        onToggle: toggleOpPadraoFilter,
+      },
+    ],
+    [
+      selectedServicos,
+      selectedOpPadrao,
+      toggleServicoFilter,
+      toggleOpPadraoFilter,
+    ]
+  );
+
+  const handleApplyFilters = useCallback(() => {
+    setFilterModalVisible(false);
   }, []);
 
-  const handleFilterApply = useCallback(
-    (newFiltroServico, newFiltroOpPadrao) => {
-      applyFiltersAndRefresh(newFiltroServico, newFiltroOpPadrao);
-    },
-    [applyFiltersAndRefresh]
-  );
+  const formatWeight = useCallback((weight) => {
+    if (weight >= 1000) {
+      return `${(weight / 1000).toFixed(1)}t`;
+    }
+    return `${weight.toLocaleString("pt-BR")}kg`;
+  }, []);
 
   const summaryItems = useMemo(() => {
-    if (!data || !Array.isArray(data) || data.length === 0) {
-      return [
-        { label: "Veículos", value: "0" },
-        { label: "Grupos", value: "0" },
-        { label: "Peso Total", value: "0kg" },
-      ];
-    }
-
-    const totalVehicles = data.reduce((sum, item) => {
-      return sum + parseInt(item.c_veiculos || item.veiculos || 0);
-    }, 0);
-
-    const totalGroups = data.length;
-
-    const totalWeight = data.reduce((sum, item) => {
-      return sum + parseFloat(item.c_peso || item.peso || 0);
-    }, 0);
-
-    const formatWeight = (weight) => {
-      if (weight >= 1000) {
-        return `${(weight / 1000).toFixed(1)}t`;
-      }
-      return `${weight.toLocaleString("pt-BR")}kg`;
-    };
-
     return [
-      { label: "Veículos", value: totalVehicles.toString() },
-      { label: "Grupos", value: totalGroups.toString() },
-      { label: "Peso Total", value: formatWeight(totalWeight) },
+      {
+        value: totals.veiculos || 0,
+        label: "Veículos",
+      },
+      {
+        value: totals.grupos || 0,
+        label: "Grupos",
+      },
+      {
+        value: formatWeight(totals.peso || 0),
+        label: "Peso Total",
+      },
     ];
-  }, [data]);
+  }, [totals, formatWeight]);
 
-  const getAdditionalFields = useCallback((item) => {
-    const fields = [];
-
-    if (item.c_fila) {
-      fields.push({ label: "Fila:", value: item.c_fila });
-    }
-
-    if (item.c_data) {
-      const dataFormatada = new Date(item.c_data).toLocaleDateString("pt-BR");
-      fields.push({ label: "Data:", value: dataFormatada });
-    }
-
-    if (item.c_hora) {
-      const horaFormatada = item.c_hora.substring(0, 8);
-      fields.push({ label: "Hora:", value: horaFormatada });
-    }
-
-    return fields;
-  }, []);
-
-  const normalizeItem = useCallback((item) => {
-    return {
-      grupo: item.c_grupo || item.grupo || "N/A",
-      fila: item.c_fila || item.fila || null,
-      produto: item.c_produto || item.produto || "Não informado",
-      peso: parseFloat(item.c_peso || item.peso || 0),
-      veiculos: parseInt(item.c_veiculos || item.veiculos || 0),
-    };
-  }, []);
-
-  const renderItem = useCallback(
-    ({ item }) => {
-      const normalizedItem = normalizeItem(item);
-      const additionalFields = getAdditionalFields(item);
-
-      return (
-        <VehicleCard
-          item={normalizedItem}
-          badgeColor={BADGE_COLORS.cargasHoje}
-          additionalFields={additionalFields}
-        />
-      );
-    },
-    [normalizeItem, getAdditionalFields]
-  );
-
-  const renderListHeader = useCallback(() => {
+  const renderHeader = useCallback(() => {
     return (
-      <View>
+      <>
         <UpdateBanner
-          lastUpdate={lastUpdate}
-          onFilterPress={handleFilterPress}
+          lastUpdate={new Date()}
+          onFilterPress={() => setFilterModalVisible(true)}
           showFilterButton={true}
+          hasActiveFilters={hasActiveFilters}
         />
         <SummaryCard items={summaryItems} />
-      </View>
+      </>
     );
-  }, [lastUpdate, handleFilterPress, summaryItems]);
+  }, [summaryItems, hasActiveFilters]);
+
+  const renderItem = useCallback(({ item }) => {
+    const formatDate = (dateStr) => {
+      if (!dateStr) return "N/A";
+      return new Date(dateStr).toLocaleDateString("pt-BR");
+    };
+
+    const formatTime = (timeStr) => {
+      if (!timeStr) return "N/A";
+      return timeStr.substring(0, 5);
+    };
+
+    return (
+      <VehicleCard
+        item={{
+          grupo: item.grupo || "N/A",
+          fila: item.fila || "N/A",
+          produto: item.produto || "Não informado",
+          peso: parseFloat(item.peso || 0),
+          veiculos: parseInt(item.veiculos || 0),
+        }}
+        badgeColor={BADGE_COLORS.cargasHoje}
+        additionalFields={[
+          { label: "Data:", value: formatDate(item.data) },
+          { label: "Hora:", value: formatTime(item.hora) },
+        ]}
+      />
+    );
+  }, []);
+
+  const keyExtractor = useCallback((item, index) => {
+    const grupo = item.grupo || "";
+    const fila = item.fila || "";
+    const produto = item.produto || item.tp_prod || "";
+
+    if (grupo && produto) {
+      return `${grupo}-${produto}-${index}`;
+    }
+    if (fila && produto) {
+      return `${fila}-${produto}-${index}`;
+    }
+    return `item-${index}`;
+  }, []);
 
   const renderEmptyComponent = useCallback(() => {
-    if (error) {
+    if (loading) {
       return (
         <EmptyView
-          icon="📦"
-          message="Erro ao carregar cargas"
-          subMessage={error}
-          actionText="Tentar novamente"
-          onActionPress={refresh}
+          icon="cube-outline"
+          message="Carregando cargas de hoje..."
         />
       );
     }
-
     return (
       <EmptyView
-        icon="📦"
-        message="Nenhuma carga realizada hoje"
+        icon="cube-outline"
+        message={error || "Nenhuma carga realizada hoje"}
         subMessage="Puxe para baixo para atualizar"
       />
     );
-  }, [error, refresh]);
-
-  const keyExtractor = useCallback((item, index) => {
-    return (
-      item.c_grupo || item.grupo || item.c_fila || item.fila || index.toString()
-    );
-  }, []);
+  }, [error, loading]);
 
   if (loading && (!data || data.length === 0)) {
     return (
@@ -179,10 +180,24 @@ const CargasHojeScreen = ({ navigation }) => {
         <Header
           title="Cargas de Hoje"
           subtitle={`Filial: ${state.selectedFilial}`}
-          onBackPress={() => navigation.goBack()}
           showBackButton={true}
+          onBackPress={() => navigation.goBack()}
         />
-        <LoadingSpinner text="Carregando cargas..." />
+        <LoadingSpinner text="Carregando cargas de hoje..." />
+      </SafeAreaView>
+    );
+  }
+
+  if (error && (!data || data.length === 0)) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header
+          title="Cargas de Hoje"
+          subtitle={`Filial: ${state.selectedFilial}`}
+          showBackButton={true}
+          onBackPress={() => navigation.goBack()}
+        />
+        <ErrorMessage message={error} onRetry={refresh} />
       </SafeAreaView>
     );
   }
@@ -192,8 +207,9 @@ const CargasHojeScreen = ({ navigation }) => {
       <Header
         title="Cargas de Hoje"
         subtitle={`Filial: ${state.selectedFilial}`}
-        onBackPress={() => navigation.goBack()}
         showBackButton={true}
+        onBackPress={() => navigation.goBack()}
+        showLoadingIndicator={loading}
       />
 
       <FlatList
@@ -203,13 +219,13 @@ const CargasHojeScreen = ({ navigation }) => {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={handleRefresh}
+            onRefresh={refresh}
             colors={[COLORS.primary]}
             tintColor={COLORS.primary}
           />
         }
         contentContainerStyle={styles.listContent}
-        ListHeaderComponent={renderListHeader}
+        ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmptyComponent}
         removeClippedSubviews={true}
         maxToRenderPerBatch={8}
@@ -223,20 +239,20 @@ const CargasHojeScreen = ({ navigation }) => {
         })}
       />
 
-      {filtroServico &&
-        setFiltroServico &&
-        filtroOpPadrao &&
-        setFiltroOpPadrao && (
-          <FilterModal
-            visible={filterModalVisible}
-            onClose={() => setFilterModalVisible(false)}
-            filtroServico={filtroServico}
-            setFiltroServico={setFiltroServico}
-            filtroOpPadrao={filtroOpPadrao}
-            setFiltroOpPadrao={setFiltroOpPadrao}
-            onApply={handleFilterApply}
-          />
-        )}
+      <FilterModal
+        visible={filterModalVisible}
+        onClose={() => setFilterModalVisible(false)}
+        filterGroups={filterGroups}
+        onApply={handleApplyFilters}
+        onReset={resetFilters}
+        hasActiveFilters={hasActiveFilters}
+      />
+
+      <BackgroundLoadingIndicator
+        visible={loading && data && data.length > 0}
+        text="Atualizando cargas de hoje..."
+        position="bottom"
+      />
     </SafeAreaView>
   );
 };

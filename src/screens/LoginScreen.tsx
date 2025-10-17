@@ -1,24 +1,24 @@
 import React, { useState, useEffect } from "react";
 import {
   View,
-  Text,
-  TextInput,
-  TouchableOpacity,
   StyleSheet,
-  Alert,
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   Animated,
+  Alert,
 } from "react-native";
+import { TextInput, Button, Text, HelperText, Surface } from "react-native-paper";
 import { useAuth } from "../hooks/useAuth";
 import { LoadingSpinner } from "../components";
-import { COLORS, SCREEN_NAMES } from "../constants";
+import { SCREEN_NAMES } from "../constants";
+import { colors, spacing, borderRadius } from "../constants/theme";
 import { useFilterLoader } from "../hooks/useFilterLoader";
 
 const LoginScreen = ({ navigation }) => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [secureText, setSecureText] = useState(true);
   const { login, loading, error, isLoggedIn } = useAuth();
   const { preloadAllFilters } = useFilterLoader();
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -31,22 +31,16 @@ const LoginScreen = ({ navigation }) => {
 
     Animated.timing(fadeAnim, {
       toValue: 1,
-      duration: 800,
+      duration: 600,
       useNativeDriver: true,
     }).start();
-  }, [isLoggedIn]);
+  }, [isLoggedIn, navigation, fadeAnim]);
 
   const handleLogin = async () => {
     try {
       const result = await login(username, password);
       if (result.success) {
         preloadAllFilters().catch((error) => {
-          if (__DEV__) {
-            console.log(
-              "[LoginScreen] Erro no precarregamento pós-login:",
-              error
-            );
-          }
         });
         navigation.replace(SCREEN_NAMES.HOME);
       }
@@ -64,69 +58,68 @@ const LoginScreen = ({ navigation }) => {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <Animated.View style={[styles.loginContainer, { opacity: fadeAnim }]}>
+          {/* Header */}
           <View style={styles.headerContainer}>
-            <Text style={styles.title}>Invisi</Text>
-            <Text style={styles.subtitle}>Login</Text>
+            <Text variant="displayMedium" style={styles.title}>
+              Invisi
+            </Text>
+            <Text variant="bodyLarge" style={styles.subtitle}>
+              Sistema de Gestão Logística
+            </Text>
           </View>
 
-          {error && (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          )}
+          {/* Card de Login */}
+          <Surface style={styles.card} elevation={2}>
+            {error && (
+              <HelperText type="error" visible={!!error} style={styles.errorText}>
+                {error}
+              </HelperText>
+            )}
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Nome de Usuário</Text>
             <TextInput
-              style={[styles.input, !isFormValid && styles.inputInvalid]}
+              label="Nome de Usuário"
               value={username}
               onChangeText={setUsername}
-              placeholder="Digite seu nome de usuário"
-              placeholderTextColor={COLORS.gray}
+              mode="outlined"
               autoCapitalize="characters"
               autoCorrect={false}
-              editable={!loading}
+              disabled={loading}
               returnKeyType="next"
+              left={<TextInput.Icon icon="account-outline" />}
+              style={styles.input}
             />
-          </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Senha</Text>
             <TextInput
-              style={[styles.input, !isFormValid && styles.inputInvalid]}
+              label="Senha"
               value={password}
               onChangeText={setPassword}
-              placeholder="Digite sua senha"
-              placeholderTextColor={COLORS.gray}
+              mode="outlined"
               autoCorrect={false}
-              editable={!loading}
-              secureTextEntry={true}
+              disabled={loading}
+              secureTextEntry={secureText}
               returnKeyType="go"
-              onSubmitEditing={isFormValid ? handleLogin : null}
-            />
-          </View>
-
-          <TouchableOpacity
-            style={[
-              styles.loginButton,
-              loading && styles.loginButtonDisabled,
-              !isFormValid && styles.loginButtonInvalid,
-            ]}
-            onPress={handleLogin}
-            disabled={loading || !isFormValid}
-          >
-            {loading ? (
-              <View style={styles.loadingContainer}>
-                <LoadingSpinner
-                  text="Entrando..."
-                  size="small"
-                  color={COLORS.white}
+              onSubmitEditing={isFormValid ? handleLogin : undefined}
+              left={<TextInput.Icon icon="lock-outline" />}
+              right={
+                <TextInput.Icon
+                  icon={secureText ? "eye-outline" : "eye-off-outline"}
+                  onPress={() => setSecureText(!secureText)}
                 />
-              </View>
-            ) : (
-              <Text style={styles.loginButtonText}>Entrar</Text>
-            )}
-          </TouchableOpacity>
+              }
+              style={styles.input}
+            />
+
+            <Button
+              mode="contained"
+              onPress={handleLogin}
+              disabled={loading || !isFormValid}
+              loading={loading}
+              style={styles.loginButton}
+              contentStyle={styles.loginButtonContent}
+            >
+              {loading ? "Entrando..." : "Entrar"}
+            </Button>
+          </Surface>
         </Animated.View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -136,7 +129,7 @@ const LoginScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.lightGray,
+    backgroundColor: colors.background,
   },
   keyboardAvoid: {
     flex: 1,
@@ -144,80 +137,40 @@ const styles = StyleSheet.create({
   loginContainer: {
     flex: 1,
     justifyContent: "center",
-    paddingHorizontal: 30,
+    paddingHorizontal: spacing.xxl,
   },
   headerContainer: {
     alignItems: "center",
-    marginBottom: 40,
+    marginBottom: spacing.xxxl,
   },
   title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: COLORS.black,
-    marginBottom: 8,
+    fontWeight: "700",
+    color: colors.primary,
+    marginBottom: spacing.sm,
   },
   subtitle: {
-    fontSize: 16,
-    color: COLORS.gray,
+    color: colors.textSecondary,
+    fontWeight: "500",
   },
-  errorContainer: {
-    backgroundColor: "#ffe6e6",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 20,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.danger,
+  card: {
+    padding: spacing.xxl,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.surface,
   },
   errorText: {
-    color: COLORS.danger,
     fontSize: 14,
-    textAlign: "center",
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: COLORS.black,
-    marginBottom: 8,
+    marginBottom: spacing.md,
   },
   input: {
-    height: 50,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    backgroundColor: COLORS.white,
-    fontSize: 16,
-  },
-  inputInvalid: {
-    borderColor: "#ffcccc",
+    marginBottom: spacing.lg,
+    backgroundColor: colors.surface,
   },
   loginButton: {
-    height: 50,
-    backgroundColor: COLORS.primary,
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 20,
-    marginBottom: 20,
+    marginTop: spacing.md,
+    borderRadius: borderRadius.md,
   },
-  loginButtonDisabled: {
-    opacity: 0.6,
-  },
-  loginButtonInvalid: {
-    backgroundColor: "#cccccc",
-  },
-  loginButtonText: {
-    color: COLORS.white,
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  loadingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+  loginButtonContent: {
+    paddingVertical: spacing.sm,
   },
 });
 
