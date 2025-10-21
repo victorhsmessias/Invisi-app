@@ -48,14 +48,6 @@ const FilterModal: React.FC<FilterModalProps> = ({
     onClose();
   };
 
-  const handleReset = () => {
-    if (onReset) {
-      onReset();
-    }
-  };
-
-  // Debug logs removed for production
-
   return (
     <Modal
       visible={visible}
@@ -133,17 +125,16 @@ const FilterModal: React.FC<FilterModalProps> = ({
             {hasActiveFilters && onReset && (
               <TouchableOpacity
                 style={styles.resetButton}
-                onPress={handleReset}
-                activeOpacity={0.7}
+                onPress={onReset}
+                activeOpacity={0.8}
               >
                 <Text style={styles.resetButtonText}>Resetar</Text>
               </TouchableOpacity>
             )}
-
             <TouchableOpacity
               style={[
                 styles.applyButton,
-                hasActiveFilters && onReset && styles.applyButtonSmall,
+                hasActiveFilters && onReset && styles.applyButtonWithReset,
               ]}
               onPress={handleApply}
               activeOpacity={0.8}
@@ -269,9 +260,9 @@ const styles = StyleSheet.create({
     borderTopColor: filterColors.modalBorder,
   },
   resetButton: {
-    flex: 1,
     backgroundColor: filterColors.resetButtonBackground,
     paddingVertical: 14,
+    paddingHorizontal: 20,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
@@ -290,8 +281,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  applyButtonSmall: {
-    flex: 2,
+  applyButtonWithReset: {
+    flex: 1,
   },
   applyButtonText: {
     fontSize: 16,

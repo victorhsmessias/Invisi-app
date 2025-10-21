@@ -1,3 +1,5 @@
+import type { StackScreenProps } from "@react-navigation/stack";
+import type { RootStackParamList } from "../types";
 import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
@@ -28,7 +30,9 @@ import {
 import apiService from "../services/apiService";
 import { CONTRATOS_REFRESH_INTERVAL } from "../constants/timing";
 
-const ContratosDetalhesScreen = ({ navigation, route }) => {
+type Props = StackScreenProps<RootStackParamList, "ContratosDetalhes">;
+
+const ContratosDetalhesScreen: React.FC<Props> = ({ navigation, route }) => {
   const { state } = useApp();
   const { fila, grupo, produto, filial, dadosCorte } = route.params;
 
@@ -38,13 +42,6 @@ const ContratosDetalhesScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-
-  const { updateActivity } = useAutoRefresh(fetchContratosDetalhes, {
-    enabled: true,
-    interval: CONTRATOS_REFRESH_INTERVAL,
-    pauseOnBackground: true,
-    adaptiveInterval: true,
-  });
 
   const fetchContratosDetalhes = useCallback(
     async (loadingType = "background") => {
@@ -90,6 +87,17 @@ const ContratosDetalhesScreen = ({ navigation, route }) => {
     [filial, fila, grupo, produto, dadosCorte]
   );
 
+  const refreshWrapper = useCallback(() => {
+    fetchContratosDetalhes("background");
+  }, [fetchContratosDetalhes]);
+
+  const { updateActivity } = useAutoRefresh(refreshWrapper, {
+    enabled: true,
+    interval: CONTRATOS_REFRESH_INTERVAL,
+    pauseOnBackground: true,
+    adaptiveInterval: true,
+  });
+
   useEffect(() => {
     fetchContratosDetalhes("initial");
   }, [fetchContratosDetalhes]);
@@ -99,7 +107,7 @@ const ContratosDetalhesScreen = ({ navigation, route }) => {
     await fetchContratosDetalhes("manual");
   }, [fetchContratosDetalhes, updateActivity]);
 
-  const ContratoIndividualCard = React.memo(({ item }) => (
+  const ContratoIndividualCard = React.memo(({ item }: { item: any }) => (
     <View style={styles.contratoCard}>
       <View style={styles.cardHeader}>
         <Text style={styles.contratoText}>Contrato {item.contrato}</Text>
@@ -157,7 +165,7 @@ const ContratosDetalhesScreen = ({ navigation, route }) => {
       }
     );
 
-    const formatWeight = (weight) => {
+    const formatWeight = (weight: number) => {
       if (Math.abs(weight) >= 1000) {
         return `${(weight / 1000).toFixed(1)}t`;
       }

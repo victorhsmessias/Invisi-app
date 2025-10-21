@@ -2,7 +2,13 @@ import React from "react";
 import { View, ActivityIndicator, Text, StyleSheet } from "react-native";
 import { COLORS } from "../constants";
 
-const LoadingSpinner = ({
+interface LoadingSpinnerProps {
+  text?: string;
+  size?: number | "small" | "large";
+  color?: string;
+}
+
+const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   text = "Carregando...",
   size = "large",
   color = COLORS.primary,

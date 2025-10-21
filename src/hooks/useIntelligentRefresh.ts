@@ -4,7 +4,24 @@ import useAppState from "./useAppState";
 import useRefreshStrategy from "./useRefreshStrategy";
 import useAdaptiveInterval from "./useAdaptiveInterval";
 
-export const useIntelligentRefresh = (refreshCallback, options = {}) => {
+interface RefreshOptions {
+  silent?: boolean;
+  source?: string;
+}
+
+interface UseIntelligentRefreshOptions {
+  lastUpdate?: Date | null;
+  enabled?: boolean;
+  interval?: number;
+  backgroundInterval?: number;
+  staleTime?: number;
+  backgroundStaleTime?: number;
+}
+
+export const useIntelligentRefresh = (
+  refreshCallback: (options?: RefreshOptions) => void,
+  options: UseIntelligentRefreshOptions = {}
+) => {
   const {
     lastUpdate = null,
     enabled = true,
@@ -14,7 +31,7 @@ export const useIntelligentRefresh = (refreshCallback, options = {}) => {
     backgroundStaleTime = API_CONFIG.BACKGROUND_STALE_TIME,
   } = options;
 
-  const timeoutRef = useRef(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const appState = useAppState();
   const strategy = useRefreshStrategy({ staleTime, backgroundStaleTime });

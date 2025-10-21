@@ -42,7 +42,7 @@ const FilialSelector = memo<FilialSelectorProps>(
       <View style={styles.container}>
         <SegmentedButtons
           value={selectedFilial}
-          onValueChange={(value) =>
+          onValueChange={(value: string) =>
             !disabled && !isLoading && onFilialChange(value as Filial)
           }
           buttons={buttons}

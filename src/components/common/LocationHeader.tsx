@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, StyleSheet } from "react-native";
 import { Text } from "react-native-paper";
 import { Ionicons } from "@expo/vector-icons";
@@ -10,17 +10,20 @@ interface LocationHeaderProps {
   totalWeight?: number;
 }
 
+const formatWeight = (weight?: number): string | null => {
+  if (!weight || weight === 0) return null;
+  if (weight >= 1000) {
+    return `${(weight / 1000).toFixed(1)}t`;
+  }
+  return `${weight.toLocaleString("pt-BR")}kg`;
+};
+
 const LocationHeader = React.memo<LocationHeaderProps>(
   ({ location, vehicleCount, totalWeight }) => {
-    const formatWeight = (weight?: number) => {
-      if (!weight || weight === 0) return null;
-      if (weight >= 1000) {
-        return `${(weight / 1000).toFixed(1)}t`;
-      }
-      return `${weight.toLocaleString("pt-BR")}kg`;
-    };
-
-    const formattedWeight = formatWeight(totalWeight);
+    const formattedWeight = useMemo(
+      () => formatWeight(totalWeight),
+      [totalWeight]
+    );
 
     return (
       <View style={styles.container}>
@@ -40,6 +43,13 @@ const LocationHeader = React.memo<LocationHeaderProps>(
           </View>
         </View>
       </View>
+    );
+  },
+  (prevProps, nextProps) => {
+    return (
+      prevProps.location === nextProps.location &&
+      prevProps.vehicleCount === nextProps.vehicleCount &&
+      prevProps.totalWeight === nextProps.totalWeight
     );
   }
 );

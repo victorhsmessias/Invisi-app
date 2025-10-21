@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, StyleSheet, TextStyle } from "react-native";
 import { COLORS } from "../../constants";
 
@@ -26,7 +26,7 @@ const InfoRow = React.memo<InfoRowProps>(
     valueStyle,
     bold = false,
   }) => {
-    const getValueStyle = () => {
+    const computedValueStyle = useMemo(() => {
       const baseStyles = [styles.infoValue, valueStyle];
 
       if (isPercentage && percentageValue !== undefined) {
@@ -48,17 +48,28 @@ const InfoRow = React.memo<InfoRowProps>(
       }
 
       return baseStyles;
-    };
+    }, [isPercentage, percentageValue, isBalance, balanceValue, valueStyle]);
 
     return (
       <View style={styles.infoRow}>
         <Text style={[styles.infoLabel, bold && styles.boldLabel, labelStyle]}>
           {label}
         </Text>
-        <Text style={getValueStyle()} numberOfLines={1} ellipsizeMode="tail">
+        <Text style={computedValueStyle} numberOfLines={1} ellipsizeMode="tail">
           {value || "N/A"}
         </Text>
       </View>
+    );
+  },
+  (prevProps, nextProps) => {
+    return (
+      prevProps.label === nextProps.label &&
+      prevProps.value === nextProps.value &&
+      prevProps.isPercentage === nextProps.isPercentage &&
+      prevProps.percentageValue === nextProps.percentageValue &&
+      prevProps.isBalance === nextProps.isBalance &&
+      prevProps.balanceValue === nextProps.balanceValue &&
+      prevProps.bold === nextProps.bold
     );
   }
 );

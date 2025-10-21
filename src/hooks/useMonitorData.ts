@@ -3,12 +3,36 @@ import { useFocusEffect } from "@react-navigation/native";
 import apiService from "../services/apiService";
 import type { Filial } from "../constants/api";
 
-export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [totals, setTotals] = useState({ veiculos: 0, peso: 0 });
-  const [error, setError] = useState(null);
+type TipoOperacao =
+  | "monitor_transito"
+  | "monitor_fila_desc"
+  | "monitor_fila_carga"
+  | "monitor_patio_desc_local"
+  | "monitor_patio_carga"
+  | "monitor_descarga"
+  | "monitor_carga";
+
+interface MonitorFilters {
+  filtro_servico?: Record<string, 0 | 1>;
+  filtro_op_padrao?: Record<string, 0 | 1>;
+}
+
+interface Totals {
+  veiculos: number;
+  peso: number;
+  grupos?: number;
+}
+
+export const useMonitorData = (
+  tipoOperacao: TipoOperacao,
+  filial: Filial,
+  filters: MonitorFilters = {}
+) => {
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [totals, setTotals] = useState<Totals>({ veiculos: 0, peso: 0 });
+  const [error, setError] = useState<string | null>(null);
   const isRequestInProgress = useRef(false);
   const DATA_PATH_MAP = {
     monitor_transito: "dados.listaTransito.transitoVeiculos",
@@ -31,7 +55,7 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
   };
 
   const extractDataFromResponse = useCallback(
-    (response) => {
+    (response: any): any[] => {
       if (!response || !response.dados) {
         return [];
       }
@@ -61,12 +85,12 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
   );
 
   const normalizeData = useCallback(
-    (rawData) => {
+    (rawData: any[]): any[] => {
       const prefix = FIELD_PREFIXES[tipoOperacao];
       if (!prefix) return rawData;
 
       return rawData.map((item) => {
-        const normalizedItem = {};
+        const normalizedItem: Record<string, any> = {};
 
         Object.keys(item).forEach((key) => {
           if (key.startsWith(prefix)) {
@@ -82,7 +106,7 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
     [tipoOperacao]
   );
 
-  const calculateTotals = useCallback((dataArray) => {
+  const calculateTotals = useCallback((dataArray: any[]): Totals => {
     if (!Array.isArray(dataArray) || dataArray.length === 0) {
       return { veiculos: 0, peso: 0, grupos: 0 };
     }
@@ -127,7 +151,7 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
   }, []);
 
   const fetchData = useCallback(
-    async (isRefreshing = false) => {
+    async (isRefreshing = false): Promise<void> => {
       if (isRequestInProgress.current) {
         return;
       }
@@ -148,50 +172,50 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
           case "monitor_transito":
             jsonResponse = await apiService.getTransitoData(
               filial as Filial,
-              filters.filtroServico,
-              filters.filtroOpPadrao
+              filters.filtro_servico,
+              filters.filtro_op_padrao
             );
             break;
           case "monitor_fila_desc":
             jsonResponse = await apiService.getFilaDescargaData(
               filial as Filial,
-              filters.filtroServico,
-              filters.filtroOpPadrao
+              filters.filtro_servico,
+              filters.filtro_op_padrao
             );
             break;
           case "monitor_fila_carga":
             jsonResponse = await apiService.getFilaCargaData(
               filial as Filial,
-              filters.filtroServico,
-              filters.filtroOpPadrao
+              filters.filtro_servico,
+              filters.filtro_op_padrao
             );
             break;
           case "monitor_patio_desc_local":
             jsonResponse = await apiService.getPatioDescargaLocalData(
               filial as Filial,
-              filters.filtroServico,
-              filters.filtroOpPadrao
+              filters.filtro_servico,
+              filters.filtro_op_padrao
             );
             break;
           case "monitor_patio_carga":
             jsonResponse = await apiService.getPatioCargaData(
               filial as Filial,
-              filters.filtroServico,
-              filters.filtroOpPadrao
+              filters.filtro_servico,
+              filters.filtro_op_padrao
             );
             break;
           case "monitor_descarga":
             jsonResponse = await apiService.getDescargasHojeData(
               filial as Filial,
-              filters.filtroServico,
-              filters.filtroOpPadrao
+              filters.filtro_servico,
+              filters.filtro_op_padrao
             );
             break;
           case "monitor_carga":
             jsonResponse = await apiService.getCargasHojeData(
               filial as Filial,
-              filters.filtroServico,
-              filters.filtroOpPadrao
+              filters.filtro_servico,
+              filters.filtro_op_padrao
             );
             break;
           default:
@@ -206,9 +230,9 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
 
         setData(normalizedData);
         setTotals(calculatedTotals);
-      } catch (err) {
+      } catch (err: any) {
         console.error(`[useMonitorData] Error for ${tipoOperacao}:`, err);
-        setError(err.message || "Erro ao carregar dados. Tente novamente.");
+        setError(err?.message || "Erro ao carregar dados. Tente novamente.");
         setData([]);
         setTotals({ veiculos: 0, peso: 0, grupos: 0 });
       } finally {
@@ -220,8 +244,8 @@ export const useMonitorData = (tipoOperacao, filial, filters = {}) => {
     [
       tipoOperacao,
       filial,
-      filters.filtroServico,
-      filters.filtroOpPadrao,
+      filters.filtro_servico,
+      filters.filtro_op_padrao,
       extractDataFromResponse,
       normalizeData,
       calculateTotals,

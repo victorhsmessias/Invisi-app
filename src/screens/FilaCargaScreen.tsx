@@ -1,3 +1,5 @@
+import type { StackScreenProps } from "@react-navigation/stack";
+import type { RootStackParamList } from "../types";
 import React, { useState, useCallback, useMemo } from "react";
 import { View, FlatList, RefreshControl, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -19,16 +21,22 @@ import { SERVICO_OPTIONS, OP_PADRAO_OPTIONS } from "../constants/filters";
 import { BADGE_COLORS } from "../constants/colors";
 import { COLORS } from "../constants";
 
-const FilaCargaScreen = ({ navigation }) => {
+type Props = StackScreenProps<RootStackParamList, "FilaCarga">;
+
+const FilaCargaScreen: React.FC<Props> = ({ navigation }) => {
   const { state } = useApp();
 
   const {
     selectedServicos,
     selectedOpPadrao,
-    toggleServicoFilter,
-    toggleOpPadraoFilter,
-    getFilters,
+    tempSelectedServicos,
+    tempSelectedOpPadrao,
+    toggleTempServicoFilter,
+    toggleTempOpPadraoFilter,
+    initializeTempFilters,
+    applyTempFilters,
     resetFilters,
+    getFilters,
     hasActiveFilters,
   } = useFilters();
 
@@ -53,29 +61,35 @@ const FilaCargaScreen = ({ navigation }) => {
       {
         title: "Tipos de Serviço",
         options: SERVICO_OPTIONS,
-        selected: selectedServicos,
-        onToggle: toggleServicoFilter,
+        selected: tempSelectedServicos,
+        onToggle: toggleTempServicoFilter,
       },
       {
         title: "Tipos de Operação",
         options: OP_PADRAO_OPTIONS,
-        selected: selectedOpPadrao,
-        onToggle: toggleOpPadraoFilter,
+        selected: tempSelectedOpPadrao,
+        onToggle: toggleTempOpPadraoFilter,
       },
     ],
     [
-      selectedServicos,
-      selectedOpPadrao,
-      toggleServicoFilter,
-      toggleOpPadraoFilter,
+      tempSelectedServicos,
+      tempSelectedOpPadrao,
+      toggleTempServicoFilter,
+      toggleTempOpPadraoFilter,
     ]
   );
 
-  const handleApplyFilters = useCallback(() => {
-    setFilterModalVisible(false);
-  }, []);
+  const handleOpenFilter = useCallback(() => {
+    initializeTempFilters();
+    setFilterModalVisible(true);
+  }, [initializeTempFilters]);
 
-  const formatWeight = useCallback((weight) => {
+  const handleApplyFilters = useCallback(() => {
+    applyTempFilters();
+    setFilterModalVisible(false);
+  }, [applyTempFilters]);
+
+  const formatWeight = useCallback((weight: number) => {
     if (weight >= 1000) {
       return `${(weight / 1000).toFixed(1)}t`;
     }
@@ -104,22 +118,22 @@ const FilaCargaScreen = ({ navigation }) => {
       <>
         <UpdateBanner
           lastUpdate={new Date()}
-          onFilterPress={() => setFilterModalVisible(true)}
+          onFilterPress={handleOpenFilter}
           showFilterButton={true}
           hasActiveFilters={hasActiveFilters}
         />
         <SummaryCard items={summaryItems} />
       </>
     );
-  }, [summaryItems, hasActiveFilters]);
+  }, [summaryItems, hasActiveFilters, handleOpenFilter]);
 
-  const renderItem = useCallback(({ item }) => {
-    const formatDate = (dateStr) => {
+  const renderItem = useCallback(({ item }: { item: any }) => {
+    const formatDate = (dateStr: string) => {
       if (!dateStr) return "N/A";
       return new Date(dateStr).toLocaleDateString("pt-BR");
     };
 
-    const formatTime = (timeStr) => {
+    const formatTime = (timeStr: string) => {
       if (!timeStr) return "N/A";
       return timeStr.substring(0, 5);
     };
@@ -147,7 +161,7 @@ const FilaCargaScreen = ({ navigation }) => {
     );
   }, []);
 
-  const keyExtractor = useCallback((item, index) => {
+  const keyExtractor = useCallback((item: any, index: number) => {
     const grupo = item.grupo || "";
     const fila = item.fila || "";
     const produto = item.produto || item.tp_prod || "";

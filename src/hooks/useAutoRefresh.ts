@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
-import { AppState } from "react-native";
+import { AppState, AppStateStatus } from "react-native";
 import { API_CONFIG } from "../constants";
 import {
   USER_IDLE_MEDIUM,
@@ -7,7 +7,22 @@ import {
   CHECK_INTERVAL,
 } from "../constants/timing";
 
-export const useAutoRefresh = (refreshCallback, options = {}) => {
+interface RefreshOptions {
+  silent?: boolean;
+  source?: string;
+}
+
+interface UseAutoRefreshOptions {
+  interval?: number;
+  enabled?: boolean;
+  pauseOnBackground?: boolean;
+  adaptiveInterval?: boolean;
+}
+
+export const useAutoRefresh = (
+  refreshCallback: (options?: RefreshOptions) => void,
+  options: UseAutoRefreshOptions = {}
+) => {
   const {
     interval = API_CONFIG.AUTO_REFRESH,
     enabled = true,
@@ -15,12 +30,12 @@ export const useAutoRefresh = (refreshCallback, options = {}) => {
     adaptiveInterval = true,
   } = options;
 
-  const intervalRef = useRef(null);
-  const adaptiveCheckIntervalRef = useRef(null);
-  const timeoutRef = useRef(null);
-  const appStateRef = useRef(AppState.currentState);
-  const lastActivityRef = useRef(Date.now());
-  const isActiveRef = useRef(true);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const adaptiveCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const lastActivityRef = useRef<number>(Date.now());
+  const isActiveRef = useRef<boolean>(true);
 
   const getAdaptiveInterval = useCallback(() => {
     if (!adaptiveInterval) return interval;
@@ -75,7 +90,7 @@ export const useAutoRefresh = (refreshCallback, options = {}) => {
   }, [stopAutoRefresh, startAutoRefresh, enabled]);
 
   useEffect(() => {
-    const handleAppStateChange = (nextAppState) => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (pauseOnBackground) {
         if (
           appStateRef.current.match(/inactive|background/) &&

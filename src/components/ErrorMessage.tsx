@@ -2,7 +2,14 @@ import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { COLORS } from "../constants";
 
-const ErrorMessage = ({
+interface ErrorMessageProps {
+  message: string;
+  onRetry?: (() => void) | null;
+  retryText?: string;
+  icon?: string;
+}
+
+const ErrorMessage: React.FC<ErrorMessageProps> = ({
   message,
   onRetry = null,
   retryText = "Tentar novamente",

@@ -66,12 +66,10 @@ export const useTransportData = (): UseTransportDataReturn => {
         }
         actionsRef.current.resetError();
 
-        // NOVA IMPLEMENTAÇÃO: 1 requisição unificada ao invés de 7 paralelas
         const response = await apiService.getAllDashboardData(
           state.selectedFilial
         );
 
-        // Processa a resposta unificada
         const counts = processUnifiedDashboardResponse(response);
 
         const processedData: TransportData = {

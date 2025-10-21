@@ -1,26 +1,49 @@
 import React from "react";
-import { View, Text, StyleSheet, Platform } from "react-native";
+import { View, Text, StyleSheet, Platform, ViewStyle, TextStyle } from "react-native";
 import { COLORS } from "../../constants";
 
-const SummaryCard = React.memo(({ items = [], containerStyle }) => {
-  if (!items || items.length === 0) return null;
+interface SummaryItem {
+  icon?: string;
+  value: string | number;
+  label: string;
+  valueStyle?: TextStyle;
+  labelStyle?: TextStyle;
+}
 
-  return (
-    <View style={[styles.summaryContainer, containerStyle]}>
-      {items.map((item, index) => (
-        <View key={index} style={styles.summaryItem}>
-          {item.icon && <Text style={styles.summaryIcon}>{item.icon}</Text>}
-          <Text style={[styles.summaryValue, item.valueStyle]}>
-            {item.value}
-          </Text>
-          <Text style={[styles.summaryLabel, item.labelStyle]}>
-            {item.label}
-          </Text>
-        </View>
-      ))}
-    </View>
-  );
-});
+interface SummaryCardProps {
+  items?: SummaryItem[];
+  containerStyle?: ViewStyle;
+}
+
+const SummaryCard: React.FC<SummaryCardProps> = React.memo(
+  ({ items = [], containerStyle }) => {
+    if (!items || items.length === 0) return null;
+
+    return (
+      <View style={[styles.summaryContainer, containerStyle]}>
+        {items.map((item: SummaryItem, index: number) => (
+          <View key={`${item.label}-${index}`} style={styles.summaryItem}>
+            {item.icon && <Text style={styles.summaryIcon}>{item.icon}</Text>}
+            <Text style={[styles.summaryValue, item.valueStyle]}>
+              {item.value}
+            </Text>
+            <Text style={[styles.summaryLabel, item.labelStyle]}>
+              {item.label}
+            </Text>
+          </View>
+        ))}
+      </View>
+    );
+  },
+  (prevProps, nextProps) => {
+    if (prevProps.items?.length !== nextProps.items?.length) return false;
+
+    return prevProps.items?.every((item, index) =>
+      item.value === nextProps.items?.[index]?.value &&
+      item.label === nextProps.items?.[index]?.label
+    ) ?? true;
+  }
+);
 
 const styles = StyleSheet.create({
   summaryContainer: {
@@ -64,5 +87,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 });
+
+SummaryCard.displayName = "SummaryCard";
 
 export default SummaryCard;

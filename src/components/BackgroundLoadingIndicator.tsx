@@ -13,7 +13,20 @@ import {
   ANIMATION_DURATION,
 } from "../constants/timing";
 
-const BackgroundLoadingIndicator = ({
+interface BackgroundLoadingIndicatorProps {
+  visible: boolean;
+  text?: string;
+  position?: "top" | "bottom";
+  variant?: "default" | "discrete" | "minimal";
+  autoHide?: boolean;
+  autoHideDuration?: number;
+}
+
+interface HeaderLoadingIndicatorProps {
+  visible: boolean;
+}
+
+const BackgroundLoadingIndicator: React.FC<BackgroundLoadingIndicatorProps> = ({
   visible,
   text = "Atualizando...",
   position = "top",
@@ -99,7 +112,7 @@ const BackgroundLoadingIndicator = ({
   );
 };
 
-export const HeaderLoadingIndicator = ({ visible }) => {
+export const HeaderLoadingIndicator: React.FC<HeaderLoadingIndicatorProps> = ({ visible }) => {
   const [rotateAnim] = React.useState(new Animated.Value(0));
 
   React.useEffect(() => {

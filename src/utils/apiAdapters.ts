@@ -181,7 +181,6 @@ export const processUnifiedDashboardResponse = (
 
   const { dados } = apiResponse;
 
-  // Helper para extrair contagem de um array de forma segura
   const extractCount = (vehicleArray: any[], countField: string): number => {
     if (!Array.isArray(vehicleArray) || vehicleArray.length === 0) {
       return 0;

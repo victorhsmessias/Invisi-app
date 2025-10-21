@@ -71,8 +71,7 @@ const MonitorCorteScreen: React.FC<MonitorCorteScreenProps> = ({
     filterOptions,
     selectedFilters,
     isLoading: filtersLoading,
-    toggleFilter,
-    resetFilters,
+    applyFilters,
     getApiFilters,
   } = useGlobalFilters();
 
@@ -80,12 +79,14 @@ const MonitorCorteScreen: React.FC<MonitorCorteScreenProps> = ({
 
   const [data, setData] = useState<ContratoData[]>([]);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
-  const [hasShownInitialData, setHasShownInitialData] = useState<boolean>(false);
+  const [hasShownInitialData, setHasShownInitialData] =
+    useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [isInitializingScreen, setIsInitializingScreen] = useState<boolean>(true);
+  const [isInitializingScreen, setIsInitializingScreen] =
+    useState<boolean>(true);
   const [lastDataLoad, setLastDataLoad] = useState<number | null>(null);
   const lastFocusTime = useRef<number | null>(null);
   const navigationStartTime = useRef<number | null>(null);
@@ -96,8 +97,23 @@ const MonitorCorteScreen: React.FC<MonitorCorteScreenProps> = ({
     "servicos" | "operacao" | "grupos" | "produtos"
   >("servicos");
 
+  const [tempSelectedFilters, setTempSelectedFilters] = useState({
+    servicos: [] as string[],
+    opPadrao: [] as string[],
+    grupos: [] as string[],
+    produtos: [] as string[],
+  });
+
   const fetchContratosData = useCallback(
-    async (loadingType: LoadingType = "background") => {
+    async (
+      loadingType: LoadingType = "background",
+      customFilters?: {
+        servicos: string[];
+        opPadrao: string[];
+        grupos: string[];
+        produtos: string[];
+      }
+    ) => {
       if (!state.isLoggedIn || !state.selectedFilial) return;
 
       try {
@@ -109,11 +125,49 @@ const MonitorCorteScreen: React.FC<MonitorCorteScreenProps> = ({
 
         let apiFilters;
         try {
-          apiFilters = getApiFilters();
+          if (customFilters) {
+            const filtroServico = {
+              armazenagem: customFilters.servicos.includes("armazenagem") ? 1 : 0,
+              transbordo: customFilters.servicos.includes("transbordo") ? 1 : 0,
+              pesagem: customFilters.servicos.includes("pesagem") ? 1 : 0,
+            };
+
+            const filtroOpPadrao = {
+              rodo_ferro: customFilters.opPadrao.includes("rodo_ferro") ? 1 : 0,
+              ferro_rodo: customFilters.opPadrao.includes("ferro_rodo") ? 1 : 0,
+              rodo_rodo: customFilters.opPadrao.includes("rodo_rodo") ? 1 : 0,
+              outros: customFilters.opPadrao.includes("outros") ? 1 : 0,
+            };
+
+            const filtroGrupo =
+              customFilters.grupos.length > 0
+                ? customFilters.grupos.map((grupo) => ({ grupo }))
+                : null;
+
+            const filtroTpProd =
+              customFilters.produtos.length > 0
+                ? customFilters.produtos.map((produto) => ({ tp_prod: produto }))
+                : null;
+
+            apiFilters = {
+              filtroServico,
+              filtroOpPadrao,
+              filtroGrupo,
+              filtroTpProd,
+            };
+          } else {
+            apiFilters = getApiFilters();
+          }
         } catch (error) {
           apiFilters = {
-            filtroServico: { ...DEFAULT_API_FILTERS.SERVICO } as Record<string, 0 | 1>,
-            filtroOpPadrao: { ...DEFAULT_API_FILTERS.OP_PADRAO } as Record<string, 0 | 1>,
+            filtroServico: { ...DEFAULT_API_FILTERS.SERVICO } as Record<
+              string,
+              0 | 1
+            >,
+            filtroOpPadrao: { ...DEFAULT_API_FILTERS.OP_PADRAO } as Record<
+              string,
+              0 | 1
+            >,
             filtroGrupo: null,
             filtroTpProd: null,
           };
@@ -177,7 +231,11 @@ const MonitorCorteScreen: React.FC<MonitorCorteScreenProps> = ({
     return () => clearTimeout(timeout);
   }, [hasShownInitialData]);
 
-  const { updateActivity } = useAutoRefresh(fetchContratosData, {
+  const refreshWrapper = useCallback(() => {
+    fetchContratosData("background");
+  }, [fetchContratosData]);
+
+  const { updateActivity } = useAutoRefresh(refreshWrapper, {
     enabled: true,
     interval: MONITOR_CORTE_REFRESH_INTERVAL,
     pauseOnBackground: true,
@@ -268,12 +326,60 @@ const MonitorCorteScreen: React.FC<MonitorCorteScreenProps> = ({
     await fetchContratosData("manual");
   }, [fetchContratosData, updateActivity]);
 
+  const handleOpenFilters = useCallback(() => {
+    setTempSelectedFilters({
+      servicos: [...selectedFilters.servicos],
+      opPadrao: [...selectedFilters.opPadrao],
+      grupos: [...selectedFilters.grupos],
+      produtos: [...selectedFilters.produtos],
+    });
+    setFiltersVisible(true);
+  }, [selectedFilters]);
+
+  const toggleTempFilter = useCallback(
+    (
+      filterType: "servicos" | "operacao" | "grupos" | "produtos",
+      value: string
+    ) => {
+      const mappedType = filterType === "operacao" ? "opPadrao" : filterType;
+
+      setTempSelectedFilters((prev) => {
+        const currentArray = prev[mappedType as keyof typeof prev];
+        const isCurrentlySelected = currentArray.includes(value);
+        const newArray = isCurrentlySelected
+          ? currentArray.filter((item: string) => item !== value)
+          : [...currentArray, value];
+
+        return {
+          ...prev,
+          [mappedType]: newArray,
+        };
+      });
+    },
+    []
+  );
+
   const handleApplyFilters = useCallback(async () => {
+    const hasServicos = (tempSelectedFilters?.servicos || []).length > 0;
+    const hasOpPadrao = (tempSelectedFilters?.opPadrao || []).length > 0;
+    const hasGrupos = (tempSelectedFilters?.grupos || []).length > 0;
+    const hasProdutos = (tempSelectedFilters?.produtos || []).length > 0;
+
+    if (!hasServicos || !hasOpPadrao || !hasGrupos || !hasProdutos) {
+      setError(
+        "Selecione pelo menos um filtro em cada categoria antes de aplicar"
+      );
+      return;
+    }
+
+    applyFilters(tempSelectedFilters);
+
     updateActivity();
     setFiltersVisible(false);
     setLastDataLoad(null);
-    await fetchContratosData("manual");
-  }, [fetchContratosData, updateActivity]);
+    setError(null);
+    await fetchContratosData("manual", tempSelectedFilters);
+  }, [fetchContratosData, updateActivity, tempSelectedFilters, applyFilters]);
 
   const hasActiveFilters = useMemo(() => {
     const servicos = selectedFilters?.servicos || [];
@@ -412,7 +518,7 @@ const MonitorCorteScreen: React.FC<MonitorCorteScreenProps> = ({
     const renderFilterOptions = (
       options: string[],
       selectedItems: string[],
-      filterType: string
+      filterType: "servicos" | "operacao" | "grupos" | "produtos"
     ) => (
       <View style={styles.filterOptions}>
         {options.map((option) => (
@@ -420,7 +526,7 @@ const MonitorCorteScreen: React.FC<MonitorCorteScreenProps> = ({
             key={option}
             option={option}
             isSelected={selectedItems.includes(option)}
-            onToggle={(value) => toggleFilter(filterType, value)}
+            onToggle={(value) => toggleTempFilter(filterType, value)}
           />
         ))}
       </View>
@@ -430,25 +536,25 @@ const MonitorCorteScreen: React.FC<MonitorCorteScreenProps> = ({
       case "servicos":
         return renderFilterOptions(
           filterOptions.servicos,
-          selectedFilters.servicos,
+          tempSelectedFilters.servicos,
           "servicos"
         );
       case "operacao":
         return renderFilterOptions(
           filterOptions.opPadrao,
-          selectedFilters.opPadrao,
-          "opPadrao"
+          tempSelectedFilters.opPadrao,
+          "operacao"
         );
       case "grupos":
         return renderFilterOptions(
           filterOptions.grupos,
-          selectedFilters.grupos,
+          tempSelectedFilters.grupos,
           "grupos"
         );
       case "produtos":
         return renderFilterOptions(
           filterOptions.produtos,
-          selectedFilters.produtos,
+          tempSelectedFilters.produtos,
           "produtos"
         );
       default:
@@ -458,8 +564,8 @@ const MonitorCorteScreen: React.FC<MonitorCorteScreenProps> = ({
     filtersLoading,
     activeFilterTab,
     filterOptions,
-    selectedFilters,
-    toggleFilter,
+    tempSelectedFilters,
+    toggleTempFilter,
   ]);
 
   const renderHeader = useCallback(() => {
@@ -468,20 +574,22 @@ const MonitorCorteScreen: React.FC<MonitorCorteScreenProps> = ({
         lastUpdate={lastUpdate}
         onFilterPress={() => {
           updateActivity();
-          setFiltersVisible(true);
+          handleOpenFilters();
         }}
         showFilterButton={true}
         hasActiveFilters={hasActiveFilters}
       />
     );
-  }, [lastUpdate, hasActiveFilters]);
+  }, [lastUpdate, hasActiveFilters, handleOpenFilters, updateActivity]);
 
   const renderEmptyComponent = useCallback(() => {
     const isStillLoading =
       isInitializingScreen || loading || (!hasShownInitialData && !error);
 
     if (isStillLoading) {
-      return <EmptyView icon="time-outline" message="Carregando monitor corte..." />;
+      return (
+        <EmptyView icon="time-outline" message="Carregando monitor corte..." />
+      );
     }
 
     return (
@@ -499,21 +607,14 @@ const MonitorCorteScreen: React.FC<MonitorCorteScreenProps> = ({
     !hasShownInitialData &&
     !error;
 
-  if (__DEV__ && shouldShowLoading) {
-    console.log("[MonitorCorteScreen] Showing loading spinner:", {
-      isInitializingScreen,
-      loading,
-      dataLength: data.length,
-      hasShownInitialData,
-      error: !!error,
-    });
-  }
-
   if (shouldShowLoading) {
     return <LoadingSpinner text="Carregando monitor corte..." />;
   }
 
-  if (error && data.length === 0) {
+  const isCriticalError =
+    error && !error.includes("Nenhum monitor corte encontrado");
+
+  if (isCriticalError && data.length === 0) {
     return (
       <ErrorMessage
         message={error}
@@ -568,19 +669,38 @@ const MonitorCorteScreen: React.FC<MonitorCorteScreenProps> = ({
         visible={filtersVisible}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setFiltersVisible(false)}
+        onRequestClose={() => {
+          setFiltersVisible(false);
+          if (error && error.includes("Selecione pelo menos um filtro")) {
+            setError(null);
+          }
+        }}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Filtros</Text>
               <TouchableOpacity
-                onPress={() => setFiltersVisible(false)}
+                onPress={() => {
+                  setFiltersVisible(false);
+                  if (
+                    error &&
+                    error.includes("Selecione pelo menos um filtro")
+                  ) {
+                    setError(null);
+                  }
+                }}
                 style={styles.modalCloseButton}
               >
                 <Text style={styles.modalCloseText}>✕</Text>
               </TouchableOpacity>
             </View>
+
+            {error && error.includes("Selecione pelo menos um filtro") && (
+              <View style={styles.warningBanner}>
+                <Text style={styles.warningText}>{error}</Text>
+              </View>
+            )}
 
             <View style={styles.filterTabs}>
               {[
@@ -618,12 +738,6 @@ const MonitorCorteScreen: React.FC<MonitorCorteScreenProps> = ({
             </ScrollView>
 
             <View style={styles.filterButtons}>
-              <TouchableOpacity
-                style={styles.resetButton}
-                onPress={resetFilters}
-              >
-                <Text style={styles.resetButtonText}>Limpar</Text>
-              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.applyButton}
                 onPress={handleApplyFilters}
@@ -791,21 +905,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginTop: 10,
   },
-  resetButton: {
-    flex: 1,
-    backgroundColor: COLORS.gray,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: "center",
-    marginRight: 10,
-  },
-  resetButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: "600",
-  },
   applyButton: {
-    flex: 2,
+    flex: 1,
     backgroundColor: COLORS.primary,
     paddingVertical: 12,
     borderRadius: 8,
@@ -815,6 +916,20 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 16,
     fontWeight: "600",
+  },
+  warningBanner: {
+    backgroundColor: "#FEF3CD",
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.warning,
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    marginBottom: 15,
+    borderRadius: 5,
+  },
+  warningText: {
+    color: "#856404",
+    fontSize: 14,
+    fontWeight: "500",
   },
 });
 

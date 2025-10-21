@@ -1,3 +1,5 @@
+import type { StackScreenProps } from "@react-navigation/stack";
+import type { RootStackParamList } from "../types";
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -8,14 +10,22 @@ import {
   Animated,
   Alert,
 } from "react-native";
-import { TextInput, Button, Text, HelperText, Surface } from "react-native-paper";
+import {
+  TextInput,
+  Button,
+  Text,
+  HelperText,
+  Surface,
+} from "react-native-paper";
 import { useAuth } from "../hooks/useAuth";
 import { LoadingSpinner } from "../components";
 import { SCREEN_NAMES } from "../constants";
 import { colors, spacing, borderRadius } from "../constants/theme";
 import { useFilterLoader } from "../hooks/useFilterLoader";
 
-const LoginScreen = ({ navigation }) => {
+type Props = StackScreenProps<RootStackParamList, "Login">;
+
+const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [secureText, setSecureText] = useState(true);
@@ -40,8 +50,7 @@ const LoginScreen = ({ navigation }) => {
     try {
       const result = await login(username, password);
       if (result.success) {
-        preloadAllFilters().catch((error) => {
-        });
+        preloadAllFilters().catch((error) => {});
         navigation.replace(SCREEN_NAMES.HOME);
       }
     } catch (err) {
@@ -58,7 +67,6 @@ const LoginScreen = ({ navigation }) => {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <Animated.View style={[styles.loginContainer, { opacity: fadeAnim }]}>
-          {/* Header */}
           <View style={styles.headerContainer}>
             <Text variant="displayMedium" style={styles.title}>
               Invisi
@@ -68,10 +76,13 @@ const LoginScreen = ({ navigation }) => {
             </Text>
           </View>
 
-          {/* Card de Login */}
           <Surface style={styles.card} elevation={2}>
             {error && (
-              <HelperText type="error" visible={!!error} style={styles.errorText}>
+              <HelperText
+                type="error"
+                visible={!!error}
+                style={styles.errorText}
+              >
                 {error}
               </HelperText>
             )}

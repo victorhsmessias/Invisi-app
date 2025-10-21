@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, StyleSheet } from "react-native";
 import { Card, Text, Chip } from "react-native-paper";
 import { Ionicons } from "@expo/vector-icons";
@@ -26,6 +26,14 @@ interface VehicleCardProps {
   containerStyle?: any;
 }
 
+const formatPeso = (peso?: number): string => {
+  if (!peso || peso === 0) return "0kg";
+  if (peso >= 1000) {
+    return `${(peso / 1000).toFixed(1)}t`;
+  }
+  return `${peso.toLocaleString("pt-BR")}kg`;
+};
+
 const VehicleCard = React.memo<VehicleCardProps>(
   ({
     item,
@@ -34,19 +42,13 @@ const VehicleCard = React.memo<VehicleCardProps>(
     additionalFields = [],
     containerStyle,
   }) => {
-    const formatPeso = (peso?: number) => {
-      if (!peso || peso === 0) return "0kg";
-      if (peso >= 1000) {
-        return `${(peso / 1000).toFixed(1)}t`;
-      }
-      return `${peso.toLocaleString("pt-BR")}kg`;
-    };
-
     const grupo = item?.grupo || "N/A";
     const fila = item?.fila || "N/A";
     const produto = item?.produto || "Não informado";
     const peso = item?.peso || 0;
     const veiculos = item?.veiculos || 0;
+
+    const pesoFormatado = useMemo(() => formatPeso(peso), [peso]);
 
     return (
       <Card
@@ -91,7 +93,7 @@ const VehicleCard = React.memo<VehicleCardProps>(
 
           <View style={styles.content}>
             <InfoRow label="Produto:" value={produto} />
-            <InfoRow label="Peso:" value={formatPeso(peso)} />
+            <InfoRow label="Peso:" value={pesoFormatado} />
 
             {additionalFields.map((field, index) => (
               <InfoRow
@@ -107,6 +109,17 @@ const VehicleCard = React.memo<VehicleCardProps>(
           </View>
         </Card.Content>
       </Card>
+    );
+  },
+  (prevProps, nextProps) => {
+    return (
+      prevProps.item.grupo === nextProps.item.grupo &&
+      prevProps.item.fila === nextProps.item.fila &&
+      prevProps.item.produto === nextProps.item.produto &&
+      prevProps.item.peso === nextProps.item.peso &&
+      prevProps.item.veiculos === nextProps.item.veiculos &&
+      prevProps.badgeColor === nextProps.badgeColor &&
+      prevProps.additionalFields?.length === nextProps.additionalFields?.length
     );
   }
 );

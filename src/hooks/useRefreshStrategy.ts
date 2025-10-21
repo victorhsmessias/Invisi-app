@@ -1,14 +1,26 @@
 import { useCallback } from "react";
 import { STALE_TIME, BACKGROUND_STALE_TIME } from "../constants/timing";
 
-export const useRefreshStrategy = (options = {}) => {
+interface UseRefreshStrategyOptions {
+  staleTime?: number;
+  backgroundStaleTime?: number;
+}
+
+interface RefreshContext {
+  isAppInBackground?: boolean;
+  isUserIdle?: boolean;
+  lastUpdate?: Date | string | number | null;
+  forceRefresh?: boolean;
+}
+
+export const useRefreshStrategy = (options: UseRefreshStrategyOptions = {}) => {
   const {
     staleTime = STALE_TIME,
     backgroundStaleTime = BACKGROUND_STALE_TIME,
   } = options;
 
   const isDataStale = useCallback(
-    (lastUpdate, source = "manual") => {
+    (lastUpdate: Date | string | number | null | undefined, source = "manual") => {
       if (!lastUpdate) return true;
 
       const now = Date.now();
@@ -33,7 +45,7 @@ export const useRefreshStrategy = (options = {}) => {
     [staleTime, backgroundStaleTime]
   );
 
-  const getDataAge = useCallback((lastUpdate) => {
+  const getDataAge = useCallback((lastUpdate: Date | string | number | null | undefined) => {
     if (!lastUpdate) return null;
 
     const now = Date.now();
@@ -53,7 +65,7 @@ export const useRefreshStrategy = (options = {}) => {
   }, []);
 
   const getRefreshStrategy = useCallback(
-    (context = {}) => {
+    (context: RefreshContext = {}) => {
       const {
         isAppInBackground = false,
         isUserIdle = false,
@@ -119,7 +131,7 @@ export const useRefreshStrategy = (options = {}) => {
   );
 
   const getOptimisticStrategy = useCallback(
-    (context = {}) => {
+    (context: RefreshContext = {}) => {
       const {
         isAppInBackground = false,
         isUserIdle = false,
@@ -140,7 +152,7 @@ export const useRefreshStrategy = (options = {}) => {
   );
 
   const getConservativeStrategy = useCallback(
-    (context = {}) => {
+    (context: RefreshContext = {}) => {
       const { lastUpdate = null, forceRefresh = false } = context;
 
       if (forceRefresh) {
@@ -165,7 +177,7 @@ export const useRefreshStrategy = (options = {}) => {
   );
 
   const shouldRefreshOnForeground = useCallback(
-    (lastUpdate) => {
+    (lastUpdate: Date | string | number | null | undefined) => {
       return isDataStale(lastUpdate, "manual");
     },
     [isDataStale]

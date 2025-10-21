@@ -135,8 +135,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           useNativeDriver: true,
         }).start();
       }, 500);
-
-      // Cache handling - silent in production
     },
     [actions, hasValidCache, state.selectedFilial, fadeAnim]
   );

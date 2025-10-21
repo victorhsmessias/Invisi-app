@@ -80,7 +80,6 @@ const SideMenu = memo<SideMenuProps>(({ visible, onClose, navigation }) => {
                 { transform: [{ translateX: translateX }] },
               ]}
             >
-              {/* Header com avatar */}
               <View style={styles.header}>
                 <Avatar.Text
                   size={56}
@@ -95,7 +94,6 @@ const SideMenu = memo<SideMenuProps>(({ visible, onClose, navigation }) => {
                 </Text>
               </View>
 
-              {/* Lista de opções */}
               <List.Section style={styles.listSection}>
                 <List.Item
                   title="Início"

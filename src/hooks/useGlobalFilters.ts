@@ -2,6 +2,15 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useApp } from "../context/AppContext";
 import { useFilterLoader } from "./useFilterLoader";
 
+type FilterType = "servicos" | "opPadrao" | "grupos" | "produtos";
+
+interface SelectedFilters {
+  servicos: string[];
+  opPadrao: string[];
+  grupos: string[];
+  produtos: string[];
+}
+
 export const useGlobalFilters = () => {
   const { state } = useApp();
   const { loadFiltersForFilial, hasValidCache, isLoading } = useFilterLoader();
@@ -10,7 +19,7 @@ export const useGlobalFilters = () => {
   const lastFilialRef = useRef(state.selectedFilial);
   const userHasModifiedFilters = useRef(false);
 
-  const [selectedFilters, setSelectedFilters] = useState({
+  const [selectedFilters, setSelectedFilters] = useState<SelectedFilters>({
     servicos: [],
     opPadrao: [],
     grupos: [],
@@ -43,8 +52,10 @@ export const useGlobalFilters = () => {
       !userHasModifiedFilters.current
     ) {
       setSelectedFilters({
-        servicos: [...servicos],
-        opPadrao: [...opPadrao],
+        servicos: servicos.filter(
+          (s) => s === "armazenagem" || s === "transbordo"
+        ),
+        opPadrao: opPadrao.filter((op) => op !== "outros"),
         grupos: [...grupos],
         produtos: [...produtos],
       });
@@ -53,12 +64,12 @@ export const useGlobalFilters = () => {
     }
   }, [state.filterOptions.grupos.length, state.filterOptions.produtos.length]);
 
-  const toggleFilter = useCallback((filterType, value) => {
+  const toggleFilter = useCallback((filterType: FilterType, value: string) => {
     setSelectedFilters((prev) => {
       const currentArray = prev[filterType];
       const isCurrentlySelected = currentArray.includes(value);
       const newArray = isCurrentlySelected
-        ? currentArray.filter((item) => item !== value)
+        ? currentArray.filter((item: string) => item !== value)
         : [...currentArray, value];
 
       userHasModifiedFilters.current = true;
@@ -70,31 +81,20 @@ export const useGlobalFilters = () => {
     });
   }, []);
 
-  const removeFilter = useCallback((type, value) => {
+  const removeFilter = useCallback((type: FilterType, value: string) => {
     userHasModifiedFilters.current = true;
     setSelectedFilters((prev) => ({
       ...prev,
-      [type]: prev[type].filter((item) => item !== value),
+      [type]: prev[type].filter((item: string) => item !== value),
     }));
   }, []);
 
-  const applyFilters = useCallback((filters) => {
+  const applyFilters = useCallback((filters: Partial<SelectedFilters>) => {
     userHasModifiedFilters.current = true;
     setSelectedFilters((prev) => ({
       ...prev,
       ...filters,
     }));
-  }, []);
-
-  const resetFilters = useCallback(() => {
-
-    userHasModifiedFilters.current = true;
-    setSelectedFilters({
-      servicos: [],
-      opPadrao: [],
-      grupos: [],
-      produtos: [],
-    });
   }, []);
 
   const getApiFilters = useCallback(() => {
@@ -107,17 +107,22 @@ export const useGlobalFilters = () => {
     if (!hasAnyFilters) {
       const { grupos, produtos, opPadrao, servicos } = state.filterOptions;
 
+      const defaultServicos = servicos.filter(
+        (s) => s === "armazenagem" || s === "transbordo"
+      );
+      const defaultOpPadrao = opPadrao.filter((op) => op !== "outros");
+
       const filtroServico = {
-        armazenagem: servicos.includes("armazenagem") ? 1 : 0,
-        transbordo: servicos.includes("transbordo") ? 1 : 0,
-        pesagem: servicos.includes("pesagem") ? 1 : 0,
+        armazenagem: defaultServicos.includes("armazenagem") ? 1 : 0,
+        transbordo: defaultServicos.includes("transbordo") ? 1 : 0,
+        pesagem: defaultServicos.includes("pesagem") ? 1 : 0,
       };
 
       const filtroOpPadrao = {
-        rodo_ferro: opPadrao.includes("rodo_ferro") ? 1 : 0,
-        ferro_rodo: opPadrao.includes("ferro_rodo") ? 1 : 0,
-        rodo_rodo: opPadrao.includes("rodo_rodo") ? 1 : 0,
-        outros: opPadrao.includes("outros") ? 1 : 0,
+        rodo_ferro: defaultOpPadrao.includes("rodo_ferro") ? 1 : 0,
+        ferro_rodo: defaultOpPadrao.includes("ferro_rodo") ? 1 : 0,
+        rodo_rodo: defaultOpPadrao.includes("rodo_rodo") ? 1 : 0,
+        outros: defaultOpPadrao.includes("outros") ? 1 : 0,
       };
 
       const filtroGrupo =
@@ -172,7 +177,6 @@ export const useGlobalFilters = () => {
     toggleFilter,
     removeFilter,
     applyFilters,
-    resetFilters,
     getApiFilters,
 
     isLoading,

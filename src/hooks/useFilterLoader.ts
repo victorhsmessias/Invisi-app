@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useApp } from "../context/AppContext";
 import apiService from "../services/apiService";
+import type { Filial } from "../types";
 import {
   FALLBACK_SERVICOS,
   FALLBACK_OP_PADRAO,
@@ -12,9 +13,16 @@ import {
 } from "../constants/fallbacks";
 import { MEDIUM_DELAY } from "../constants/timing";
 
+interface FilterData {
+  servicos: string[];
+  opPadrao: string[];
+  grupos?: string[];
+  produtos?: string[];
+}
+
 export const useFilterLoader = () => {
   const { state, actions } = useApp();
-  const loadingRef = useRef(new Set());
+  const loadingRef = useRef(new Set<string>());
 
   const stateRef = useRef(state);
   const actionsRef = useRef(actions);
@@ -24,14 +32,14 @@ export const useFilterLoader = () => {
     actionsRef.current = actions;
   }, [state, actions]);
 
-  const getCurrentCache = useCallback((filial) => {
+  const getCurrentCache = useCallback((filial: Filial) => {
     const cache = stateRef.current.filtersCache[filial];
     const expiry = stateRef.current.filtersCacheExpiry[filial];
     return { cache, expiry, isValid: cache && expiry && Date.now() < expiry };
   }, []);
 
   const hasValidCache = useCallback(
-    (filial) => {
+    (filial: Filial) => {
       const { isValid } = getCurrentCache(filial);
       return isValid;
     },
@@ -39,7 +47,7 @@ export const useFilterLoader = () => {
   );
 
   const loadFiltersForFilial = useCallback(
-    async (filial) => {
+    async (filial: Filial): Promise<FilterData | null> => {
       if (!filial) return null;
 
       const { cache, isValid } = getCurrentCache(filial);
@@ -123,9 +131,9 @@ export const useFilterLoader = () => {
 
   const preloadAllFilters = useCallback(async () => {
     try {
-      const filiais = ["LDA", "CHP", "FND", "NMD", "NMG"];
+      const filiais: Filial[] = ["LDA", "CHP", "FND", "NMD", "NMG"];
 
-      const filiaisToLoad = filiais.filter((filial) => {
+      const filiaisToLoad = filiais.filter((filial: Filial) => {
         const { isValid } = getCurrentCache(filial);
         return !isValid;
       });
@@ -153,7 +161,7 @@ export const useFilterLoader = () => {
   }, [getCurrentCache, loadFiltersForFilial]);
 
   const loadBasicFilters = useCallback(
-    async (filial) => {
+    async (filial: Filial): Promise<{ servicos: string[]; opPadrao: string[] } | null> => {
       if (!filial) return null;
 
       const { cache, isValid } = getCurrentCache(filial);

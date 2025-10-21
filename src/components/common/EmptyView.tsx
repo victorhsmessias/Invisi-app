@@ -50,6 +50,14 @@ const EmptyView = React.memo<EmptyViewProps>(
         )}
       </View>
     );
+  },
+  (prevProps, nextProps) => {
+    return (
+      prevProps.icon === nextProps.icon &&
+      prevProps.message === nextProps.message &&
+      prevProps.subMessage === nextProps.subMessage &&
+      prevProps.actionText === nextProps.actionText
+    );
   }
 );
 
