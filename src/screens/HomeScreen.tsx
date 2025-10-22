@@ -146,7 +146,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         title: "Em Trânsito",
         value: data.emTransito,
         icon: "car-outline",
-        color: COLORS.warning,
+        color: COLORS.primary,
         subtitle: "veículos",
         onPress: () =>
           navigation.navigate(SCREEN_NAMES.TRANSITO, {
@@ -182,7 +182,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         title: "No Pátio, Descarregando",
         value: data.patioDescarregando,
         icon: "cube-outline",
-        color: COLORS.purple,
+        color: COLORS.primary,
         subtitle: "em operação",
         onPress: () =>
           navigation.navigate(SCREEN_NAMES.PATIO_DESCARGA, {
@@ -194,7 +194,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         title: "No Pátio, Carregando",
         value: data.patioCarregando,
         icon: "construct-outline",
-        color: COLORS.teal,
+        color: COLORS.primary,
         subtitle: "em operação",
         onPress: () =>
           navigation.navigate(SCREEN_NAMES.PATIO_CARGA, {
@@ -206,7 +206,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         title: "Descargas Hoje",
         value: data.descargasHoje,
         icon: "checkmark-circle-outline",
-        color: COLORS.success,
+        color: COLORS.primary,
         subtitle: "concluídas",
         onPress: () =>
           navigation.navigate(SCREEN_NAMES.DESCARGAS_HOJE, {
@@ -218,7 +218,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         title: "Cargas Hoje",
         value: data.cargasHoje,
         icon: "checkmark-circle-outline",
-        color: COLORS.success,
+        color: COLORS.primary,
         subtitle: "concluídas",
         onPress: () =>
           navigation.navigate(SCREEN_NAMES.CARGAS_HOJE, {

@@ -39,19 +39,7 @@ const StatusCard = memo<StatusCardProps>(
       }
     };
 
-    const getColorByValue = (val: number, type: "fila" | "normal"): string => {
-      if (type === "fila") {
-        if (val > 20) return colors.danger;
-        if (val > 10) return colors.warning;
-        return colors.success;
-      }
-      return color;
-    };
-
-    const displayColor = getColorByValue(
-      value,
-      title.toLowerCase().includes("fila") ? "fila" : "normal"
-    );
+    const displayColor = color;
 
     return (
       <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>

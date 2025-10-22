@@ -28,7 +28,7 @@ const LocationHeader = React.memo<LocationHeaderProps>(
     return (
       <View style={styles.container}>
         <View style={styles.leftContent}>
-          <Ionicons name="location" size={20} color={colors.primary} />
+          <Ionicons name="location" size={20} color="#0066CC" />
           <Text variant="titleMedium" style={styles.locationText}>
             Local {location}
           </Text>
@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: colors.surfaceVariant,
+    backgroundColor: "#E8F4FD",
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     marginTop: spacing.sm,
@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.md,
     borderRadius: borderRadius.md,
     borderLeftWidth: 4,
-    borderLeftColor: colors.primary,
+    borderLeftColor: "#0066CC",
   },
   leftContent: {
     flexDirection: "row",
@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
   badge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.primary,
+    backgroundColor: "#0066CC",
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.full,
