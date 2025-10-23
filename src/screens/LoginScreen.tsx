@@ -58,7 +58,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  const isFormValid = username.trim().length > 0 && password.trim().length > 0;
+  const isFormValid = username.trim().length > 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -72,7 +72,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
               Invisi
             </Text>
             <Text variant="bodyLarge" style={styles.subtitle}>
-              Sistema de Gestão Logística
+              Mobile
             </Text>
           </View>
 

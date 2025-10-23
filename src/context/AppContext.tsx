@@ -151,73 +151,79 @@ interface AppProviderProps {
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
-  const actions: AppActions = useMemo(() => ({
-    setLoading: (loading: boolean) =>
-      dispatch({ type: "SET_LOADING", payload: loading }),
+  const actions: AppActions = useMemo(
+    () => ({
+      setLoading: (loading: boolean) =>
+        dispatch({ type: "SET_LOADING", payload: loading }),
 
-    setAuth: (isLoggedIn: boolean, token: string | null = null) =>
-      dispatch({
-        type: "SET_AUTH",
-        payload: { isLoggedIn, token },
-      }),
+      setAuth: (isLoggedIn: boolean, token: string | null = null) =>
+        dispatch({
+          type: "SET_AUTH",
+          payload: { isLoggedIn, token },
+        }),
 
-    setUsername: (username: string) =>
-      dispatch({ type: "SET_USERNAME", payload: username }),
+      setUsername: (username: string) =>
+        dispatch({ type: "SET_USERNAME", payload: username }),
 
-    setFilial: (filial: Filial) =>
-      dispatch({ type: "SET_FILIAL", payload: filial }),
+      setFilial: (filial: Filial) =>
+        dispatch({ type: "SET_FILIAL", payload: filial }),
 
-    setTransportData: (data: TransportData, lastUpdate: Date | null = null) =>
-      dispatch({
-        type: "SET_TRANSPORT_DATA",
-        payload: { data, lastUpdate },
-      }),
+      setTransportData: (data: TransportData, lastUpdate: Date | null = null) =>
+        dispatch({
+          type: "SET_TRANSPORT_DATA",
+          payload: { data, lastUpdate },
+        }),
 
-    setTransportLoading: (loading: boolean) =>
-      dispatch({ type: "SET_TRANSPORT_LOADING", payload: loading }),
+      setTransportLoading: (loading: boolean) =>
+        dispatch({ type: "SET_TRANSPORT_LOADING", payload: loading }),
 
-    setContratosData: (data: ContratoData[], lastUpdate: Date | null = null) =>
-      dispatch({
-        type: "SET_CONTRATOS_DATA",
-        payload: { data, lastUpdate },
-      }),
+      setContratosData: (
+        data: ContratoData[],
+        lastUpdate: Date | null = null
+      ) =>
+        dispatch({
+          type: "SET_CONTRATOS_DATA",
+          payload: { data, lastUpdate },
+        }),
 
-    setContratosLoading: (loading: boolean) =>
-      dispatch({ type: "SET_CONTRATOS_LOADING", payload: loading }),
+      setContratosLoading: (loading: boolean) =>
+        dispatch({ type: "SET_CONTRATOS_LOADING", payload: loading }),
 
-    setFilterOptions: (options: Partial<FilterOptions>) =>
-      dispatch({ type: "SET_FILTER_OPTIONS", payload: options }),
+      setFilterOptions: (options: Partial<FilterOptions>) =>
+        dispatch({ type: "SET_FILTER_OPTIONS", payload: options }),
 
-    setFiltersLoading: (loading: boolean) =>
-      dispatch({ type: "SET_FILTERS_LOADING", payload: loading }),
+      setFiltersLoading: (loading: boolean) =>
+        dispatch({ type: "SET_FILTERS_LOADING", payload: loading }),
 
-    setFiltersCache: (filial: string, data: any) => {
-      const expiry = Date.now() + 5 * 60 * 1000;
-      dispatch({
-        type: "SET_FILTERS_CACHE",
-        payload: { filial, data, expiry },
-      });
-    },
+      setFiltersCache: (filial: string, data: any) => {
+        const expiry = Date.now() + 5 * 60 * 1000;
+        dispatch({
+          type: "SET_FILTERS_CACHE",
+          payload: { filial, data, expiry },
+        });
+      },
 
-    clearFiltersCache: () => dispatch({ type: "CLEAR_FILTERS_CACHE" }),
+      clearFiltersCache: () => dispatch({ type: "CLEAR_FILTERS_CACHE" }),
 
-    setError: (error: string | null) =>
-      dispatch({ type: "SET_ERROR", payload: error }),
+      setError: (error: string | null) =>
+        dispatch({ type: "SET_ERROR", payload: error }),
 
-    resetError: () => dispatch({ type: "RESET_ERROR" }),
+      resetError: () => dispatch({ type: "RESET_ERROR" }),
 
-    logout: async () => {
-      try {
-        await AsyncStorage.multiRemove([
-          STORAGE_KEYS.USER_TOKEN,
-          STORAGE_KEYS.USERNAME,
-        ]);
-        dispatch({ type: "LOGOUT" });
-      } catch (error) {
-        console.error("Erro ao fazer logout:", error);
-      }
-    },
-  }), []);
+      logout: async () => {
+        try {
+          await AsyncStorage.multiRemove([
+            STORAGE_KEYS.USER_TOKEN,
+            STORAGE_KEYS.USERNAME,
+          ]);
+          dispatch({ type: "LOGOUT" });
+        } catch (error) {
+          console.error("Erro ao fazer logout:", error);
+        }
+      },
+    }),
+    []
+  );
 
   useEffect(() => {
     const checkLoginStatus = async () => {

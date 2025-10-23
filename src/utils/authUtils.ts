@@ -137,20 +137,6 @@ export const validateAndSanitizeCredentials = (
     );
   }
 
-  if (username.trim().length < 3) {
-    throw new AuthenticationError(
-      "Nome de usuário muito curto (mínimo 3 caracteres)",
-      AUTH_ERROR_CODES.INVALID_INPUT
-    );
-  }
-
-  if (password.trim().length < 4) {
-    throw new AuthenticationError(
-      "Senha muito curta (mínimo 4 caracteres)",
-      AUTH_ERROR_CODES.INVALID_INPUT
-    );
-  }
-
   const sanitizedUsername = username.trim().substring(0, 50).toUpperCase();
   const sanitizedPassword = password.trim().substring(0, 100).toUpperCase();
 
@@ -252,8 +238,7 @@ export const extractToken = (
     if (bodyToken && validateToken(bodyToken)) {
       return bodyToken;
     }
-  } catch (parseError) {
-  }
+  } catch (parseError) {}
 
   throw new AuthenticationError(
     "Token de autenticação não recebido do servidor",
