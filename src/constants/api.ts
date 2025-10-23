@@ -1,6 +1,6 @@
 export const API_CONFIG = {
   FILIAL_URLS: {
-    LDA: "http://192.168.10.201/attmonitor/api",
+    LDA: "http://200.150.120.54:9090/attmonitor/api",
     CHP: "http://45.4.111.173:9090/attmonitor/api",
     FND: "http://177.84.63.82:9090/attmonitor/api",
     NMD: "http://168.195.5.254:9090/attmonitor/api",
