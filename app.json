@@ -23,12 +23,8 @@
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#ffffff"
       },
-      "permissions": [
-        "INTERNET",
-        "ACCESS_NETWORK_STATE"
-      ],
-      "edgeToEdgeEnabled": true,
-      "usesCleartextTraffic": true
+      "permissions": ["INTERNET", "ACCESS_NETWORK_STATE"],
+      "edgeToEdgeEnabled": true
     },
     "web": {
       "favicon": "./assets/icon.png"
@@ -37,6 +33,16 @@
       "eas": {
         "projectId": "6e87b0b3-3c00-4a55-b593-160c1074ad9c"
       }
-    }
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ]
   }
 }
