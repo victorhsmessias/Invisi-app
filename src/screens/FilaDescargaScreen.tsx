@@ -20,6 +20,10 @@ import {
 import { SERVICO_OPTIONS, OP_PADRAO_OPTIONS } from "../constants/filters";
 import { BADGE_COLORS } from "../constants/colors";
 import { COLORS } from "../constants";
+import {
+  calculateWaitTimeInHours,
+  getCardColorByWaitTime,
+} from "../utils/formatters";
 
 type Props = StackScreenProps<RootStackParamList, "FilaDescarga">;
 
@@ -50,11 +54,8 @@ const FilaDescargaScreen: React.FC<Props> = ({ navigation }) => {
     };
   }, [getFilters]);
 
-  const { data, loading, refreshing, totals, error, refresh } = useMonitorData(
-    "monitor_fila_desc",
-    state.selectedFilial,
-    apiFilters
-  );
+  const { data, loading, refreshing, totals, error, refresh, lastUpdate } =
+    useMonitorData("monitor_fila_desc", state.selectedFilial, apiFilters);
 
   const filterGroups = useMemo(
     () => [
@@ -117,7 +118,7 @@ const FilaDescargaScreen: React.FC<Props> = ({ navigation }) => {
     return (
       <>
         <UpdateBanner
-          lastUpdate={new Date()}
+          lastUpdate={lastUpdate || new Date()}
           onFilterPress={handleOpenFilter}
           showFilterButton={true}
           hasActiveFilters={hasActiveFilters}
@@ -125,35 +126,57 @@ const FilaDescargaScreen: React.FC<Props> = ({ navigation }) => {
         <SummaryCard items={summaryItems} />
       </>
     );
-  }, [summaryItems, hasActiveFilters, handleOpenFilter]);
+  }, [summaryItems, hasActiveFilters, handleOpenFilter, lastUpdate]);
 
-  const renderItem = useCallback(({ item }: { item: any }) => {
-    return (
-      <VehicleCard
-        item={{
-          grupo: item.grupo || "N/A",
-          fila: item.fila || "N/A",
-          produto: item.produto || "Não informado",
-          peso: parseFloat(item.peso || 0),
-          veiculos: parseInt(item.veiculos || 0),
-        }}
-        badgeColor={BADGE_COLORS.filaDescarga}
-      />
-    );
-  }, []);
+  const renderItem = useCallback(
+    ({ item }: { item: any }) => {
+      const waitTimeInHours = calculateWaitTimeInHours(item.data, item.hora);
+      const borderColor = getCardColorByWaitTime(waitTimeInHours);
+
+      const borderWidth = waitTimeInHours >= 22 ? 8 : 5;
+
+      return (
+        <VehicleCard
+          item={{
+            grupo: item.grupo || "N/A",
+            fila: item.fila || "N/A",
+            produto: item.produto || "Não informado",
+            peso: parseFloat(item.peso || 0),
+            veiculos: parseInt(item.veiculos || 0),
+            data: item.data,
+            hora: item.hora,
+          }}
+          badgeColor={BADGE_COLORS.filaDescarga}
+          borderColor={borderColor}
+          borderWidth={borderWidth}
+          showEntryTime={true}
+          onPress={() => {
+            navigation.navigate("FilaDescargaDetalhes", {
+              fila: item.fila || "N/A",
+              grupo: item.grupo || "N/A",
+              produto: item.produto || "Não informado",
+            });
+          }}
+        />
+      );
+    },
+    [navigation]
+  );
 
   const keyExtractor = useCallback((item: any, index: number) => {
     const grupo = item.grupo || "";
     const fila = item.fila || "";
     const produto = item.produto || item.tp_prod || "";
+    const peso = item.peso || "";
+    const veiculos = item.veiculos || "";
 
     if (grupo && produto) {
-      return `${grupo}-${produto}-${index}`;
+      return `${grupo}-${produto}-${peso}-${veiculos}`;
     }
     if (fila && produto) {
-      return `${fila}-${produto}-${index}`;
+      return `${fila}-${produto}-${peso}-${veiculos}`;
     }
-    return `item-${index}`;
+    return `item-${grupo || fila}-${produto}-${index}`;
   }, []);
 
   const renderEmptyComponent = useCallback(() => {

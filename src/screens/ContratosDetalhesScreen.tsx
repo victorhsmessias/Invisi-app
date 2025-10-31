@@ -237,9 +237,7 @@ const ContratosDetalhesScreen: React.FC<Props> = ({ navigation, route }) => {
         data={data}
         renderItem={({ item }) => <ContratoIndividualCard item={item} />}
         keyExtractor={(item, index) =>
-          `${item.contrato || "no-contrato"}-${
-            item.grupo || "no-grupo"
-          }-idx-${index}`
+          `${item.contrato || "no-contrato"}-${item.grupo || "no-grupo"}-${item.placa || ""}-${item.peso || ""}-${item.data || ""}-${item.hora || index}`
         }
         refreshControl={
           <RefreshControl

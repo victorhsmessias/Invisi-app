@@ -53,7 +53,6 @@ export const useFilterLoader = () => {
       const { cache, isValid } = getCurrentCache(filial);
 
       if (isValid) {
-
         if (filial === stateRef.current.selectedFilial) {
           actionsRef.current.setFilterOptions(cache);
         }
@@ -129,39 +128,55 @@ export const useFilterLoader = () => {
     [getCurrentCache]
   );
 
-  const preloadAllFilters = useCallback(async () => {
-    try {
-      const filiais: Filial[] = ["LDA", "CHP", "FND", "NMD", "NMG"];
+  const preloadAllFilters = useCallback(
+    async (filiaisPermitidas?: readonly Filial[]) => {
+      try {
+        const filiais = filiaisPermitidas || stateRef.current.allowedFilials;
 
-      const filiaisToLoad = filiais.filter((filial: Filial) => {
-        const { isValid } = getCurrentCache(filial);
-        return !isValid;
-      });
+        if (!filiais || filiais.length === 0) {
+          console.warn(
+            "[useFilterLoader] Nenhuma filial permitida para preload"
+          );
+          return;
+        }
 
-      if (filiaisToLoad.length === 0) {
-        return;
+        const filiaisToLoad = filiais.filter((filial: Filial) => {
+          const { isValid } = getCurrentCache(filial);
+          return !isValid;
+        });
+
+        if (filiaisToLoad.length === 0) {
+          return;
+        }
+
+        const loadPromises = filiaisToLoad.map((filial) =>
+          loadFiltersForFilial(filial)
+        );
+
+        const results = await Promise.allSettled(loadPromises);
+
+        const successful = results.filter(
+          (r) => r.status === "fulfilled" && r.value
+        ).length;
+        const failed = results.filter((r) => r.status === "rejected").length;
+
+        console.log(
+          `[useFilterLoader] Preload concluído: ${successful}/${filiais.length} filiais carregadas`
+        );
+      } catch (error) {
+        console.error(
+          "[useFilterLoader] Erro no precarregamento de filtros:",
+          error
+        );
       }
-
-      const loadPromises = filiaisToLoad.map((filial) =>
-        loadFiltersForFilial(filial)
-      );
-
-      const results = await Promise.allSettled(loadPromises);
-
-      const successful = results.filter(
-        (r) => r.status === "fulfilled" && r.value
-      ).length;
-      const failed = results.filter((r) => r.status === "rejected").length;
-    } catch (error) {
-      console.error(
-        "[useFilterLoader] Erro no precarregamento de filtros:",
-        error
-      );
-    }
-  }, [getCurrentCache, loadFiltersForFilial]);
+    },
+    [getCurrentCache, loadFiltersForFilial]
+  );
 
   const loadBasicFilters = useCallback(
-    async (filial: Filial): Promise<{ servicos: string[]; opPadrao: string[] } | null> => {
+    async (
+      filial: Filial
+    ): Promise<{ servicos: string[]; opPadrao: string[] } | null> => {
       if (!filial) return null;
 
       const { cache, isValid } = getCurrentCache(filial);
@@ -222,18 +237,6 @@ export const useFilterLoader = () => {
     },
     [getCurrentCache]
   );
-
-  useEffect(() => {
-    if (state.isLoggedIn && state.selectedFilial) {
-      loadFiltersForFilial(state.selectedFilial);
-
-      const timer = setTimeout(() => {
-        preloadAllFilters();
-      }, MEDIUM_DELAY);
-
-      return () => clearTimeout(timer);
-    }
-  }, [state.isLoggedIn]);
 
   useEffect(() => {
     if (state.isLoggedIn && state.selectedFilial) {

@@ -106,6 +106,51 @@ export const formatPhoneNumber = (phone: string | null | undefined): string => {
   return phone;
 };
 
+export const calculateWaitTimeInHours = (
+  data: string | null | undefined,
+  hora: string | null | undefined
+): number => {
+  if (!data || !hora) return 0;
+
+  try {
+    const dateTimeStr = `${data}T${hora}`;
+    const entryDate = new Date(dateTimeStr);
+    const now = new Date();
+
+    const diffInMs = now.getTime() - entryDate.getTime();
+    const diffInHours = diffInMs / (1000 * 60 * 60);
+
+    return Math.max(0, diffInHours);
+  } catch (error) {
+    console.error("Erro ao calcular tempo de espera:", error);
+    return 0;
+  }
+};
+
+export const getCardColorByWaitTime = (waitTimeInHours: number): string => {
+  if (waitTimeInHours >= 24) {
+    return "#EF4444";
+  } else if (waitTimeInHours >= 22) {
+    return "#F59E0B";
+  }
+  return "#10B981";
+};
+
+export const formatWaitTime = (waitTimeInHours: number): string => {
+  if (waitTimeInHours < 1) {
+    const minutes = Math.floor(waitTimeInHours * 60);
+    return `${minutes} min`;
+  } else if (waitTimeInHours < 24) {
+    const hours = Math.floor(waitTimeInHours);
+    const minutes = Math.floor((waitTimeInHours - hours) * 60);
+    return minutes > 0 ? `${hours}h ${minutes}min` : `${hours}h`;
+  } else {
+    const days = Math.floor(waitTimeInHours / 24);
+    const hours = Math.floor(waitTimeInHours % 24);
+    return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+  }
+};
+
 export default {
   formatPeso,
   formatPercentual,
@@ -116,4 +161,7 @@ export default {
   truncateText,
   capitalizeFirst,
   formatPhoneNumber,
+  calculateWaitTimeInHours,
+  getCardColorByWaitTime,
+  formatWaitTime,
 };

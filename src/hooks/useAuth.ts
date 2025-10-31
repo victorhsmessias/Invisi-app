@@ -6,6 +6,13 @@ import {
   AUTH_ERROR_CODES,
   clearAuthData,
 } from "../utils/authUtils";
+import { mapLotacaoToFilial, isValidLotacao } from "../utils/filialMapper";
+import {
+  getAllowedFilials,
+  getInitialFilial,
+  isAdmin,
+} from "../utils/permissions";
+import { useFilterLoader } from "./useFilterLoader";
 
 interface UseAuthReturn {
   isLoggedIn: boolean;
@@ -19,8 +26,12 @@ interface UseAuthReturn {
 export const useAuth = (): UseAuthReturn => {
   const { state, actions } = useApp();
   const [loading, setLoading] = useState(false);
+  const { preloadAllFilters } = useFilterLoader();
 
-  const login = async (username: string, password: string): Promise<{ success: boolean }> => {
+  const login = async (
+    username: string,
+    password: string
+  ): Promise<{ success: boolean }> => {
     setLoading(true);
     actions.resetError();
 
@@ -28,8 +39,49 @@ export const useAuth = (): UseAuthReturn => {
       const result = await apiService.login({ username, password });
 
       if (result.success && result.token) {
+        const userRole = result.id_grupo_usuario || null;
+        const userFilial = mapLotacaoToFilial(result.lotacao);
+
+        if (!isAdmin(userRole) && !isValidLotacao(result.lotacao)) {
+          throw new AuthenticationError(
+            "Usuário não está cadastrado em nenhuma filial.",
+            AUTH_ERROR_CODES.INVALID_RESPONSE
+          );
+        }
+        const allowedFilials = getAllowedFilials(userRole, userFilial);
+        const initialFilial = getInitialFilial(
+          userRole,
+          userFilial,
+          state.selectedFilial
+        );
+
         actions.setAuth(true, result.token);
         actions.setUsername(result.username || username.trim().toUpperCase());
+        actions.setUserRole(userRole);
+        actions.setUserFilial(userFilial);
+        actions.setAllowedFilials(allowedFilials);
+        actions.setFilial(initialFilial);
+        actions.setInitializing(true);
+
+        try {
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(
+              () => reject(new Error("Timeout ao carregar filtros")),
+              10000
+            )
+          );
+
+          await Promise.race([
+            preloadAllFilters(allowedFilials),
+            timeoutPromise,
+          ]);
+
+          console.log("[useAuth] Filtros carregados com sucesso");
+        } catch (filterError) {
+          console.warn("[useAuth] Erro ao carregar filtros:", filterError);
+        } finally {
+          actions.setInitializing(false);
+        }
 
         return { success: true };
       } else {
@@ -56,7 +108,8 @@ export const useAuth = (): UseAuthReturn => {
             errorMessage = "Erro de conexão. Verifique sua internet.";
             break;
           case AUTH_ERROR_CODES.SERVER_ERROR:
-            errorMessage = "Servidor temporariamente indisponível. Tente novamente.";
+            errorMessage =
+              "Servidor temporariamente indisponível. Tente novamente.";
             break;
           case AUTH_ERROR_CODES.NO_TOKEN_RECEIVED:
             errorMessage = "Erro na resposta do servidor. Contate o suporte.";
@@ -64,9 +117,9 @@ export const useAuth = (): UseAuthReturn => {
           default:
             errorMessage = error.message || "Erro desconhecido ao fazer login";
         }
-
       } else {
-        errorMessage = (error as Error).message || "Erro inesperado ao fazer login";
+        errorMessage =
+          (error as Error).message || "Erro inesperado ao fazer login";
         console.error("[useAuth] Erro inesperado:", error);
       }
 

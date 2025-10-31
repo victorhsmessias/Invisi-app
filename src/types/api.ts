@@ -9,6 +9,8 @@ export interface LoginResponse {
   token: string;
   success: boolean;
   username: string;
+  id_grupo_usuario?: string;
+  lotacao?: string;
 }
 
 export interface ApiRequestBody {

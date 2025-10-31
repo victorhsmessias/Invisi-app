@@ -129,6 +129,8 @@ export const API_ENDPOINTS = {
 export const STORAGE_KEYS = {
   USER_TOKEN: "userToken",
   USERNAME: "username",
+  USER_ROLE: "userRole",
+  USER_FILIAL: "userFilial",
   TRANSPORT_CACHE: "transportCache",
   CONTRATOS_CACHE: "contratosCache",
   FILTERS_CACHE: "filtersCache",

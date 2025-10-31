@@ -12,8 +12,12 @@ interface VehicleCardProps {
     produto?: string;
     peso?: number;
     veiculos?: number;
+    data?: string;
+    hora?: string;
   };
   badgeColor?: string;
+  borderColor?: string;
+  borderWidth?: number;
   onPress?: () => void;
   additionalFields?: Array<{
     label: string;
@@ -24,6 +28,7 @@ interface VehicleCardProps {
     balanceValue?: number;
   }>;
   containerStyle?: any;
+  showEntryTime?: boolean;
 }
 
 const formatPeso = (peso?: number): string => {
@@ -38,25 +43,59 @@ const VehicleCard = React.memo<VehicleCardProps>(
   ({
     item,
     badgeColor = colors.success,
+    borderColor,
+    borderWidth = 5,
     onPress,
     additionalFields = [],
     containerStyle,
+    showEntryTime = false,
   }) => {
     const grupo = item?.grupo || "N/A";
     const fila = item?.fila || "N/A";
     const produto = item?.produto || "Não informado";
     const peso = item?.peso || 0;
     const veiculos = item?.veiculos || 0;
+    const data = item?.data;
+    const hora = item?.hora;
 
     const pesoFormatado = useMemo(() => formatPeso(peso), [peso]);
 
+    const formatEntryDateTime = useMemo(() => {
+      if (!hora) return null;
+      if (!data) return hora.substring(0, 5);
+
+      const [year, month, day] = data.split("-");
+      const formattedDate = `${day}/${month}`;
+      const formattedTime = hora.substring(0, 5);
+
+      return `${formattedDate} às ${formattedTime}`;
+    }, [data, hora]);
+
+    const cardStyle = useMemo(() => {
+      const baseStyle = [styles.card, containerStyle];
+      if (borderColor) {
+        if (borderWidth > 5) {
+          baseStyle.push({
+            borderWidth: borderWidth,
+            borderColor: borderColor,
+            shadowColor: borderColor,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 6,
+            elevation: 8,
+          });
+        } else {
+          baseStyle.push({
+            borderLeftWidth: borderWidth,
+            borderLeftColor: borderColor,
+          });
+        }
+      }
+      return baseStyle;
+    }, [borderColor, borderWidth, containerStyle]);
+
     return (
-      <Card
-        mode="elevated"
-        elevation={2}
-        onPress={onPress}
-        style={[styles.card, containerStyle]}
-      >
+      <Card mode="elevated" elevation={2} onPress={onPress} style={cardStyle}>
         <Card.Content>
           <View style={styles.header}>
             <View style={styles.headerLeft}>
@@ -74,6 +113,18 @@ const VehicleCard = React.memo<VehicleCardProps>(
                 <Text variant="bodySmall" style={styles.filaText}>
                   Fila {fila}
                 </Text>
+              )}
+              {showEntryTime && formatEntryDateTime && (
+                <View style={styles.timeContainer}>
+                  <Ionicons
+                    name="time-outline"
+                    size={14}
+                    color={colors.textSecondary}
+                  />
+                  <Text variant="bodySmall" style={styles.timeText}>
+                    Entrada: {formatEntryDateTime}
+                  </Text>
+                </View>
               )}
             </View>
 
@@ -154,6 +205,17 @@ const styles = StyleSheet.create({
   filaText: {
     color: colors.textSecondary,
     marginLeft: spacing.xl + 2,
+  },
+  timeContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: spacing.xl + 2,
+    marginTop: spacing.xs,
+  },
+  timeText: {
+    color: colors.textSecondary,
+    marginLeft: spacing.xs,
+    fontSize: 12,
   },
   chip: {
     height: 32,

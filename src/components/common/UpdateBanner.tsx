@@ -66,6 +66,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     marginHorizontal: spacing.md,
     marginBottom: spacing.sm,
+    minHeight: spacing.xxl,
     backgroundColor: colors.surfaceVariant,
     borderRadius: borderRadius.md,
   },

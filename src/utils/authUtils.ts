@@ -269,7 +269,9 @@ export const validateToken = (token: string | null | undefined): boolean => {
 
 export const saveAuthData = async (
   token: string,
-  username: string
+  username: string,
+  userRole?: string | null,
+  userFilial?: string | null
 ): Promise<boolean> => {
   try {
     if (!validateToken(token)) {
@@ -279,10 +281,20 @@ export const saveAuthData = async (
       );
     }
 
-    await AsyncStorage.multiSet([
+    const dataToSave: [string, string][] = [
       [STORAGE_KEYS.USER_TOKEN, token],
       [STORAGE_KEYS.USERNAME, username],
-    ]);
+    ];
+
+    if (userRole) {
+      dataToSave.push([STORAGE_KEYS.USER_ROLE, userRole]);
+    }
+
+    if (userFilial) {
+      dataToSave.push([STORAGE_KEYS.USER_FILIAL, userFilial]);
+    }
+
+    await AsyncStorage.multiSet(dataToSave);
 
     return true;
   } catch (error) {
@@ -296,6 +308,8 @@ export const clearAuthData = async (): Promise<boolean> => {
     await AsyncStorage.multiRemove([
       STORAGE_KEYS.USER_TOKEN,
       STORAGE_KEYS.USERNAME,
+      STORAGE_KEYS.USER_ROLE,
+      STORAGE_KEYS.USER_FILIAL,
     ]);
     return true;
   } catch (error) {

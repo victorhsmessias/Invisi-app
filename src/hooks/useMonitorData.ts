@@ -33,6 +33,7 @@ export const useMonitorData = (
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [totals, setTotals] = useState<Totals>({ veiculos: 0, peso: 0 });
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const isRequestInProgress = useRef(false);
   const DATA_PATH_MAP = {
     monitor_transito: "dados.listaTransito.transitoVeiculos",
@@ -89,16 +90,22 @@ export const useMonitorData = (
       const prefix = FIELD_PREFIXES[tipoOperacao];
       if (!prefix) return rawData;
 
-      return rawData.map((item) => {
-        const normalizedItem: Record<string, any> = {};
+      const prefixLength = prefix.length;
 
-        Object.keys(item).forEach((key) => {
+      return rawData.map((item) => {
+        const normalizedItem: Record<string, any> = { ...item };
+
+        for (const key in item) {
           if (key.startsWith(prefix)) {
-            const normalizedKey = key.substring(prefix.length);
+            const normalizedKey = key.substring(prefixLength);
             normalizedItem[normalizedKey] = item[key];
           }
-          normalizedItem[key] = item[key];
-        });
+        }
+
+        if (item.lfd_data) normalizedItem.data = item.lfd_data;
+        if (item.lfd_hora) normalizedItem.hora = item.lfd_hora;
+        if (item.lfc_data) normalizedItem.data = item.lfc_data;
+        if (item.lfc_hora) normalizedItem.hora = item.lfc_hora;
 
         return normalizedItem;
       });
@@ -111,42 +118,41 @@ export const useMonitorData = (
       return { veiculos: 0, peso: 0, grupos: 0 };
     }
 
-    const totalVehicles = dataArray.reduce((sum, item) => {
-      const veiculosValue =
-        item.veiculos ||
-        item.t_veiculos ||
-        item.fd_veiculos ||
-        item.fc_veiculos ||
-        item.pd_veiculos ||
-        item.pc_veiculos ||
-        item.d_veiculos ||
-        item.c_veiculos ||
-        0;
+    const result = dataArray.reduce(
+      (acc, item) => {
+        const veiculosValue =
+          item.veiculos ||
+          item.t_veiculos ||
+          item.fd_veiculos ||
+          item.fc_veiculos ||
+          item.pd_veiculos ||
+          item.pc_veiculos ||
+          item.d_veiculos ||
+          item.c_veiculos ||
+          0;
 
-      return sum + parseInt(veiculosValue || 0);
-    }, 0);
+        const pesoValue =
+          item.peso ||
+          item.t_peso ||
+          item.fd_peso ||
+          item.fc_peso ||
+          item.pd_peso ||
+          item.pc_peso ||
+          item.d_peso ||
+          item.c_peso ||
+          0;
 
-    const totalWeight = dataArray.reduce((sum, item) => {
-      const pesoValue =
-        item.peso ||
-        item.t_peso ||
-        item.fd_peso ||
-        item.fc_peso ||
-        item.pd_peso ||
-        item.pc_peso ||
-        item.d_peso ||
-        item.c_peso ||
-        0;
-
-      return sum + parseFloat(pesoValue || 0);
-    }, 0);
-
-    const totalGroups = dataArray.length;
+        acc.veiculos += parseInt(veiculosValue || 0);
+        acc.peso += parseFloat(pesoValue || 0);
+        return acc;
+      },
+      { veiculos: 0, peso: 0 }
+    );
 
     return {
-      veiculos: totalVehicles,
-      peso: totalWeight,
-      grupos: totalGroups,
+      veiculos: result.veiculos,
+      peso: result.peso,
+      grupos: dataArray.length,
     };
   }, []);
 
@@ -230,6 +236,7 @@ export const useMonitorData = (
 
         setData(normalizedData);
         setTotals(calculatedTotals);
+        setLastUpdate(new Date());
       } catch (err: any) {
         console.error(`[useMonitorData] Error for ${tipoOperacao}:`, err);
         setError(err?.message || "Erro ao carregar dados. Tente novamente.");
@@ -269,6 +276,7 @@ export const useMonitorData = (
     totals,
     error,
     refresh,
+    lastUpdate,
   };
 };
 

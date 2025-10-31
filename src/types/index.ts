@@ -96,6 +96,11 @@ export type RootStackParamList = {
   DescargasHoje: undefined;
   Transito: undefined;
   FilaDescarga: undefined;
+  FilaDescargaDetalhes: {
+    fila: string;
+    grupo: string;
+    produto: string;
+  };
   FilaCarga: undefined;
   PatioDescarga: undefined;
   PatioCarga: undefined;

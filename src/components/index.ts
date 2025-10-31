@@ -13,5 +13,6 @@ export { default as UpdateBanner } from "./common/UpdateBanner";
 export { default as SummaryCard } from "./common/SummaryCard";
 export { default as EmptyView } from "./common/EmptyView";
 export { default as VehicleCard } from "./common/VehicleCard";
+export { default as VehicleListCard } from "./common/VehicleListCard";
 export { default as FilterModal } from "./common/FilterModal";
 export { default as LocationHeader } from "./common/LocationHeader";

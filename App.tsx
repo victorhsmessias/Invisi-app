@@ -16,6 +16,7 @@ import LoginScreen from "./src/screens/LoginScreen";
 import HomeScreen from "./src/screens/HomeScreen";
 import TransitoScreen from "./src/screens/TransitoScreen";
 import FilaDescargaScreen from "./src/screens/FilaDescargaScreen";
+import FilaDescargaDetalhesScreen from "./src/screens/FilaDescargaDetalhesScreen";
 import FilaCargaScreen from "./src/screens/FilaCargaScreen";
 import PatioDescargaScreen from "./src/screens/PatioDescargaScreen";
 import PatioCargaScreen from "./src/screens/PatioCargaScreen";
@@ -75,6 +76,11 @@ const AppNavigator: React.FC = () => {
           name={SCREEN_NAMES.FILA_DESCARGA}
           component={FilaDescargaScreen}
           options={{ title: "Fila de Descarga" }}
+        />
+        <Stack.Screen
+          name="FilaDescargaDetalhes"
+          component={FilaDescargaDetalhesScreen}
+          options={{ title: "Veículos da Fila" }}
         />
         <Stack.Screen
           name={SCREEN_NAMES.FILA_CARGA}

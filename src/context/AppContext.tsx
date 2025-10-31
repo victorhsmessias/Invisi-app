@@ -22,8 +22,12 @@ import type {
 const initialState: AppState = {
   isLoggedIn: false,
   isLoading: true,
+  isInitializing: false,
   username: "",
   token: null,
+  userRole: null,
+  userFilial: null,
+  allowedFilials: [],
 
   selectedFilial: FILIAIS[0] as Filial,
 
@@ -61,6 +65,9 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
     case "SET_LOADING":
       return { ...state, isLoading: action.payload };
 
+    case "SET_INITIALIZING":
+      return { ...state, isInitializing: action.payload };
+
     case "SET_AUTH":
       return {
         ...state,
@@ -71,6 +78,15 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
 
     case "SET_USERNAME":
       return { ...state, username: action.payload };
+
+    case "SET_USER_ROLE":
+      return { ...state, userRole: action.payload };
+
+    case "SET_USER_FILIAL":
+      return { ...state, userFilial: action.payload };
+
+    case "SET_ALLOWED_FILIALS":
+      return { ...state, allowedFilials: action.payload };
 
     case "SET_FILIAL":
       return { ...state, selectedFilial: action.payload };
@@ -156,6 +172,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       setLoading: (loading: boolean) =>
         dispatch({ type: "SET_LOADING", payload: loading }),
 
+      setInitializing: (initializing: boolean) =>
+        dispatch({ type: "SET_INITIALIZING", payload: initializing }),
+
       setAuth: (isLoggedIn: boolean, token: string | null = null) =>
         dispatch({
           type: "SET_AUTH",
@@ -164,6 +183,15 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
       setUsername: (username: string) =>
         dispatch({ type: "SET_USERNAME", payload: username }),
+
+      setUserRole: (role: string | null) =>
+        dispatch({ type: "SET_USER_ROLE", payload: role }),
+
+      setUserFilial: (filial: Filial | null) =>
+        dispatch({ type: "SET_USER_FILIAL", payload: filial }),
+
+      setAllowedFilials: (filials: readonly Filial[]) =>
+        dispatch({ type: "SET_ALLOWED_FILIALS", payload: filials }),
 
       setFilial: (filial: Filial) =>
         dispatch({ type: "SET_FILIAL", payload: filial }),
@@ -215,6 +243,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           await AsyncStorage.multiRemove([
             STORAGE_KEYS.USER_TOKEN,
             STORAGE_KEYS.USERNAME,
+            STORAGE_KEYS.USER_ROLE,
+            STORAGE_KEYS.USER_FILIAL,
           ]);
           dispatch({ type: "LOGOUT" });
         } catch (error) {
@@ -228,18 +258,28 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   useEffect(() => {
     const checkLoginStatus = async () => {
       try {
-        const [token, username] = await AsyncStorage.multiGet([
+        const [token, username, userRole, userFilial] = await AsyncStorage.multiGet([
           STORAGE_KEYS.USER_TOKEN,
           STORAGE_KEYS.USERNAME,
+          STORAGE_KEYS.USER_ROLE,
+          STORAGE_KEYS.USER_FILIAL,
         ]);
 
         const userToken = token[1];
         const savedUsername = username[1];
+        const savedUserRole = userRole[1];
+        const savedUserFilial = userFilial[1] as Filial | null;
 
         if (userToken) {
           actions.setAuth(true, userToken);
           if (savedUsername) {
             actions.setUsername(savedUsername);
+          }
+          if (savedUserRole) {
+            actions.setUserRole(savedUserRole);
+          }
+          if (savedUserFilial) {
+            actions.setUserFilial(savedUserFilial);
           }
         } else {
           actions.setAuth(false);
@@ -253,10 +293,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     checkLoginStatus();
   }, []);
 
-  const value: AppContextValue = {
-    state,
-    actions,
-  };
+  const value: AppContextValue = useMemo(
+    () => ({
+      state,
+      actions,
+    }),
+    [state, actions]
+  );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };

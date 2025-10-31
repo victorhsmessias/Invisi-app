@@ -75,7 +75,7 @@ const PatioDescargaScreen: React.FC<Props> = ({ navigation }) => {
     };
   }, [getFilters]);
 
-  const { data, loading, refreshing, totals, error, refresh } = useMonitorData(
+  const { data, loading, refreshing, totals, error, refresh, lastUpdate } = useMonitorData(
     "monitor_patio_desc_local",
     state.selectedFilial,
     apiFilters
@@ -210,14 +210,16 @@ const PatioDescargaScreen: React.FC<Props> = ({ navigation }) => {
     const fila = item.pd_fila || item.fila || "";
     const produto = item.pd_produto || item.produto || item.tp_prod || "";
     const local = item.pd_local_desc || item.local_desc || "";
+    const peso = item.pd_peso || item.peso || "";
+    const veiculos = item.pd_veiculos || item.veiculos || "";
 
     if (grupo && produto && local) {
-      return `${local}-${grupo}-${produto}-${index}`;
+      return `${local}-${grupo}-${produto}-${peso}-${veiculos}`;
     }
     if (fila && produto && local) {
-      return `${local}-${fila}-${produto}-${index}`;
+      return `${local}-${fila}-${produto}-${peso}-${veiculos}`;
     }
-    return `item-${index}`;
+    return `item-${local}-${grupo || fila}-${produto}-${index}`;
   }, []);
 
   const renderSectionFooter = useCallback(() => {
@@ -228,7 +230,7 @@ const PatioDescargaScreen: React.FC<Props> = ({ navigation }) => {
     return (
       <>
         <UpdateBanner
-          lastUpdate={new Date()}
+          lastUpdate={lastUpdate || new Date()}
           onFilterPress={handleOpenFilter}
           showFilterButton={true}
           hasActiveFilters={hasActiveFilters}
@@ -236,7 +238,7 @@ const PatioDescargaScreen: React.FC<Props> = ({ navigation }) => {
         <SummaryCard items={summaryItems} />
       </>
     );
-  }, [summaryItems, hasActiveFilters, handleOpenFilter]);
+  }, [summaryItems, hasActiveFilters, handleOpenFilter, lastUpdate]);
 
   const renderEmptyComponent = useCallback(() => {
     if (loading) {

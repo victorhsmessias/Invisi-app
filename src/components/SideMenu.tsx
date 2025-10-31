@@ -33,16 +33,29 @@ interface SideMenuProps {
 
 const SideMenu = memo<SideMenuProps>(({ visible, onClose, navigation }) => {
   const translateX = useRef(new Animated.Value(-screenWidth * 0.75)).current;
+  const [isModalVisible, setIsModalVisible] = React.useState(false);
   const { state } = useApp();
   const { logout } = useAuth();
 
   React.useEffect(() => {
-    Animated.timing(translateX, {
-      toValue: visible ? 0 : -screenWidth * 0.75,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  }, [visible]);
+    if (visible) {
+      setIsModalVisible(true);
+      translateX.setValue(-screenWidth * 0.75);
+      Animated.timing(translateX, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } else if (isModalVisible) {
+      Animated.timing(translateX, {
+        toValue: -screenWidth * 0.75,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        setIsModalVisible(false);
+      });
+    }
+  }, [visible, translateX, isModalVisible]);
 
   const handleLogout = () => {
     onClose();
@@ -66,7 +79,7 @@ const SideMenu = memo<SideMenuProps>(({ visible, onClose, navigation }) => {
 
   return (
     <Modal
-      visible={visible}
+      visible={isModalVisible}
       transparent
       animationType="none"
       onRequestClose={onClose}

@@ -1,10 +1,10 @@
 import type { StackScreenProps } from "@react-navigation/stack";
 import type { RootStackParamList } from "../types";
 import React, { useState, useEffect } from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
 import {
   View,
   StyleSheet,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   Animated,
@@ -21,7 +21,6 @@ import { useAuth } from "../hooks/useAuth";
 import { LoadingSpinner } from "../components";
 import { SCREEN_NAMES } from "../constants";
 import { colors, spacing, borderRadius } from "../constants/theme";
-import { useFilterLoader } from "../hooks/useFilterLoader";
 
 type Props = StackScreenProps<RootStackParamList, "Login">;
 
@@ -30,7 +29,6 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [password, setPassword] = useState("");
   const [secureText, setSecureText] = useState(true);
   const { login, loading, error, isLoggedIn } = useAuth();
-  const { preloadAllFilters } = useFilterLoader();
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -50,7 +48,6 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
     try {
       const result = await login(username, password);
       if (result.success) {
-        preloadAllFilters().catch((error) => {});
         navigation.replace(SCREEN_NAMES.HOME);
       }
     } catch (err) {

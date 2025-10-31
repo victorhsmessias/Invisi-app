@@ -50,7 +50,7 @@ const PatioCargaScreen: React.FC<Props> = ({ navigation }) => {
     };
   }, [getFilters]);
 
-  const { data, loading, refreshing, totals, error, refresh } = useMonitorData(
+  const { data, loading, refreshing, totals, error, refresh, lastUpdate } = useMonitorData(
     "monitor_patio_carga",
     state.selectedFilial,
     apiFilters
@@ -117,7 +117,7 @@ const PatioCargaScreen: React.FC<Props> = ({ navigation }) => {
     return (
       <>
         <UpdateBanner
-          lastUpdate={new Date()}
+          lastUpdate={lastUpdate || new Date()}
           onFilterPress={handleOpenFilter}
           showFilterButton={true}
           hasActiveFilters={hasActiveFilters}
@@ -125,7 +125,7 @@ const PatioCargaScreen: React.FC<Props> = ({ navigation }) => {
         <SummaryCard items={summaryItems} />
       </>
     );
-  }, [summaryItems, hasActiveFilters, handleOpenFilter]);
+  }, [summaryItems, hasActiveFilters, handleOpenFilter, lastUpdate]);
 
   const renderItem = useCallback(({ item }: { item: any }) => {
     return (
@@ -146,14 +146,16 @@ const PatioCargaScreen: React.FC<Props> = ({ navigation }) => {
     const grupo = item.grupo || "";
     const fila = item.fila || "";
     const produto = item.produto || item.tp_prod || "";
+    const peso = item.peso || "";
+    const veiculos = item.veiculos || "";
 
     if (grupo && produto) {
-      return `${grupo}-${produto}-${index}`;
+      return `${grupo}-${produto}-${peso}-${veiculos}`;
     }
     if (fila && produto) {
-      return `${fila}-${produto}-${index}`;
+      return `${fila}-${produto}-${peso}-${veiculos}`;
     }
-    return `item-${index}`;
+    return `item-${grupo || fila}-${produto}-${index}`;
   }, []);
 
   const renderEmptyComponent = useCallback(() => {

@@ -50,7 +50,7 @@ const CargasHojeScreen: React.FC<Props> = ({ navigation }) => {
     };
   }, [getFilters]);
 
-  const { data, loading, refreshing, totals, error, refresh } = useMonitorData(
+  const { data, loading, refreshing, totals, error, refresh, lastUpdate } = useMonitorData(
     "monitor_carga",
     state.selectedFilial,
     apiFilters
@@ -117,7 +117,7 @@ const CargasHojeScreen: React.FC<Props> = ({ navigation }) => {
     return (
       <>
         <UpdateBanner
-          lastUpdate={new Date()}
+          lastUpdate={lastUpdate || new Date()}
           onFilterPress={handleOpenFilter}
           showFilterButton={true}
           hasActiveFilters={hasActiveFilters}
@@ -125,7 +125,7 @@ const CargasHojeScreen: React.FC<Props> = ({ navigation }) => {
         <SummaryCard items={summaryItems} />
       </>
     );
-  }, [summaryItems, hasActiveFilters, handleOpenFilter]);
+  }, [summaryItems, hasActiveFilters, handleOpenFilter, lastUpdate]);
 
   const renderItem = useCallback(({ item }: { item: any }) => {
     const formatDate = (dateStr: string) => {
@@ -160,14 +160,18 @@ const CargasHojeScreen: React.FC<Props> = ({ navigation }) => {
     const grupo = item.grupo || "";
     const fila = item.fila || "";
     const produto = item.produto || item.tp_prod || "";
+    const peso = item.peso || "";
+    const veiculos = item.veiculos || "";
+    const data = item.data || "";
+    const hora = item.hora || "";
 
     if (grupo && produto) {
-      return `${grupo}-${produto}-${index}`;
+      return `${grupo}-${produto}-${peso}-${veiculos}-${data}-${hora}`;
     }
     if (fila && produto) {
-      return `${fila}-${produto}-${index}`;
+      return `${fila}-${produto}-${peso}-${veiculos}-${data}-${hora}`;
     }
-    return `item-${index}`;
+    return `item-${grupo || fila}-${produto}-${data}-${hora}-${index}`;
   }, []);
 
   const renderEmptyComponent = useCallback(() => {

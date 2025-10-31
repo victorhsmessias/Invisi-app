@@ -640,8 +640,8 @@ const MonitorCorteScreen: React.FC<MonitorCorteScreenProps> = ({
         renderItem={({ item }) => <ContratoCard item={item} />}
         keyExtractor={(item, index) =>
           item.fila && item.grupo && item.prod
-            ? `${item.fila}-${item.grupo}-${item.prod}`
-            : `fallback-${index}`
+            ? `${item.fila}-${item.grupo}-${item.prod}-${item.peso_origem || ""}-${item.peso_destino || ""}`
+            : `fallback-${item.grupo || "g"}-${item.prod || "p"}-${item.fila || "f"}-${index}`
         }
         refreshControl={
           <RefreshControl

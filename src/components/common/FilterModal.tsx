@@ -72,80 +72,80 @@ const FilterModal: React.FC<FilterModalProps> = ({
             contentContainerStyle={styles.contentContainer}
             showsVerticalScrollIndicator={false}
           >
-            {filterGroups.length === 0 && (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>Nenhum filtro disponível</Text>
-              </View>
-            )}
-
-            {filterGroups.map((group, groupIndex) => (
-              <View key={groupIndex} style={styles.filterGroup}>
-                <Text style={styles.groupTitle}>{group.title}</Text>
-
-                <View style={styles.optionsContainer}>
-                  {group.options && group.options.length > 0 ? (
-                    group.options.map((option, optionIndex) => {
-                      const isSelected = group.selected
-                        ? group.selected.includes(option.key)
-                        : false;
-
-                      return (
-                        <TouchableOpacity
-                          key={optionIndex}
-                          style={[styles.chip, isSelected && styles.chipActive]}
-                          onPress={() => {
-                            if (group.onToggle) {
-                              group.onToggle(option.key);
-                            }
-                          }}
-                          activeOpacity={0.7}
-                        >
-                          <Text
-                            style={[
-                              styles.chipText,
-                              isSelected && styles.chipTextActive,
-                            ]}
-                          >
-                            {option.label}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })
-                  ) : (
-                    <Text style={styles.noOptionsText}>
-                      Nenhuma opção disponível
-                    </Text>
-                  )}
+              {filterGroups.length === 0 && (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyText}>Nenhum filtro disponível</Text>
                 </View>
-              </View>
-            ))}
-          </ScrollView>
+              )}
 
-          <View style={styles.footer}>
-            {hasActiveFilters && onReset && (
+              {filterGroups.map((group, groupIndex) => (
+                <View key={groupIndex} style={styles.filterGroup}>
+                  <Text style={styles.groupTitle}>{group.title}</Text>
+
+                  <View style={styles.optionsContainer}>
+                    {group.options && group.options.length > 0 ? (
+                      group.options.map((option, optionIndex) => {
+                        const isSelected = group.selected
+                          ? group.selected.includes(option.key)
+                          : false;
+
+                        return (
+                          <TouchableOpacity
+                            key={optionIndex}
+                            style={[styles.chip, isSelected && styles.chipActive]}
+                            onPress={() => {
+                              if (group.onToggle) {
+                                group.onToggle(option.key);
+                              }
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <Text
+                              style={[
+                                styles.chipText,
+                                isSelected && styles.chipTextActive,
+                              ]}
+                            >
+                              {option.label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })
+                    ) : (
+                      <Text style={styles.noOptionsText}>
+                        Nenhuma opção disponível
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+
+            <View style={styles.footer}>
+              {hasActiveFilters && onReset && (
+                <TouchableOpacity
+                  style={styles.resetButton}
+                  onPress={onReset}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.resetButtonText}>Resetar</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
-                style={styles.resetButton}
-                onPress={onReset}
+                style={[
+                  styles.applyButton,
+                  hasActiveFilters && onReset && styles.applyButtonWithReset,
+                ]}
+                onPress={handleApply}
                 activeOpacity={0.8}
               >
-                <Text style={styles.resetButtonText}>Resetar</Text>
+                <Text style={styles.applyButtonText}>Aplicar Filtros</Text>
               </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={[
-                styles.applyButton,
-                hasActiveFilters && onReset && styles.applyButtonWithReset,
-              ]}
-              onPress={handleApply}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.applyButtonText}>Aplicar Filtros</Text>
-            </TouchableOpacity>
+            </View>
           </View>
         </View>
-      </View>
-    </Modal>
-  );
+      </Modal>
+    );
 };
 
 const styles = StyleSheet.create({
@@ -306,5 +306,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
 });
+
+FilterModal.displayName = "FilterModal";
 
 export default FilterModal;

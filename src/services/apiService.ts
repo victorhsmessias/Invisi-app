@@ -104,15 +104,19 @@ class ApiService {
       await rateLimiter.checkRateLimit(sanitized.username);
 
       const urls = Object.values(API_CONFIG.FILIAL_URLS);
-      let lastError: Error | null = null;
+      const filialKeys = Object.keys(API_CONFIG.FILIAL_URLS);
 
-      const maxUrlAttempts = Math.min(urls.length, 2);
-
-      for (let i = 0; i < maxUrlAttempts; i++) {
-        const url = urls[i];
-
-        try {
-          const response = await fetch(`${url}/login.php`, {
+      const abortControllers = urls.map(() => new AbortController());
+      const results: Array<
+        | { status: "fulfilled"; value: any; index: number }
+        | { status: "rejected"; reason: any; index: number }
+        | null
+      > = Array(urls.length).fill(null);
+      let completedCount = 0;
+      let firstSuccessTime: number | null = null;
+      const racePromise = new Promise((resolve, reject) => {
+        const loginAttempts = urls.map((url, index) =>
+          fetch(`${url}/login.php`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -122,35 +126,135 @@ class ApiService {
               id_nome: sanitized.username,
               senha: sanitized.password,
             }),
-          });
+            signal: abortControllers[index].signal,
+          })
+            .then(async (response) => {
+              const responseText = await response.text();
+              validateLoginResponse(response, responseText);
+              const token = extractToken(response, responseText);
 
-          const responseText = await response.text();
+              let id_grupo_usuario: string | undefined;
+              let lotacao: string | undefined;
 
-          validateLoginResponse(response, responseText);
-          const token = extractToken(response, responseText);
-          await saveAuthData(token, sanitized.username);
-          rateLimiter.resetAttempts(sanitized.username);
+              try {
+                const responseData = JSON.parse(responseText);
+                id_grupo_usuario = responseData.id_grupo_usuario;
+                lotacao = responseData.lotacao;
+              } catch (parseError) {
+                console.warn(
+                  "[ApiService] Não foi possível extrair dados adicionais do login"
+                );
+              }
 
-          return {
-            token,
-            success: true,
-            username: sanitized.username,
-          };
-        } catch (error) {
-          lastError = error as Error;
+              console.log(
+                `[ApiService] Login bem-sucedido na filial ${filialKeys[index]} (${url})`
+              );
 
-          if (
+              return {
+                token,
+                id_grupo_usuario,
+                lotacao,
+                url,
+                filial: filialKeys[index],
+                index,
+              };
+            })
+            .then((data) => {
+              results[index] = { status: "fulfilled", value: data, index };
+              completedCount++;
+
+              if (firstSuccessTime === null) {
+                firstSuccessTime = Date.now();
+                setTimeout(() => {
+                  for (let i = 0; i < results.length; i++) {
+                    if (results[i]?.status === "fulfilled") {
+                      const successData = (results[i] as any).value;
+                      console.log(
+                        `[ApiService] Usando filial ${
+                          filialKeys[i]
+                        } (prioridade ${i + 1})`
+                      );
+
+                      abortControllers.forEach((controller, idx) => {
+                        if (idx !== i) {
+                          controller.abort();
+                        }
+                      });
+
+                      resolve(successData);
+                      return;
+                    }
+                  }
+                }, 100);
+              }
+            })
+            .catch((error) => {
+              results[index] = { status: "rejected", reason: error, index };
+              completedCount++;
+
+              if (error.name !== "AbortError") {
+                console.log(
+                  `[ApiService] Falha na URL ${filialKeys[index]} (${url}):`,
+                  error instanceof AuthenticationError
+                    ? error.code
+                    : error.message
+                );
+              }
+
+              if (completedCount === urls.length && firstSuccessTime === null) {
+                reject(results);
+              }
+            })
+        );
+      });
+
+      let loginData: {
+        token: string;
+        id_grupo_usuario: string | undefined;
+        lotacao: string | undefined;
+      };
+      try {
+        loginData = (await racePromise) as any;
+      } catch (failedResults) {
+        const errors = (failedResults as any[])
+          .filter((result) => result?.status === "rejected")
+          .map((result) => result.reason);
+
+        const hasInvalidCredentials = errors.some(
+          (error) =>
             error instanceof AuthenticationError &&
             error.code === AUTH_ERROR_CODES.INVALID_CREDENTIALS
-          ) {
-            break;
-          }
+        );
+
+        if (hasInvalidCredentials) {
+          throw new AuthenticationError(
+            "Usuário ou senha incorretos",
+            AUTH_ERROR_CODES.INVALID_CREDENTIALS
+          );
         }
+
+        throw (
+          errors[0] ||
+          new AuthenticationError(
+            "Não foi possível conectar aos servidores",
+            AUTH_ERROR_CODES.NETWORK_ERROR
+          )
+        );
       }
 
-      throw lastError;
+      const { token, id_grupo_usuario, lotacao } = loginData;
+
+      await saveAuthData(token, sanitized.username, id_grupo_usuario, lotacao);
+      rateLimiter.resetAttempts(sanitized.username);
+
+      return {
+        token,
+        success: true,
+        username: sanitized.username,
+        id_grupo_usuario,
+        lotacao,
+      };
     } catch (error) {
-      console.error("[ApiService] Error in login:", error);
       throw error;
     }
   }
@@ -241,7 +345,8 @@ class ApiService {
           tipoOperacao,
           filtro_filial: filial,
           filtro_servico: filtros.filtro_servico || DEFAULT_API_FILTERS.SERVICO,
-          filtro_op_padrao: filtros.filtro_op_padrao || DEFAULT_API_FILTERS.OP_PADRAO,
+          filtro_op_padrao:
+            filtros.filtro_op_padrao || DEFAULT_API_FILTERS.OP_PADRAO,
         },
       };
 
@@ -329,6 +434,26 @@ class ApiService {
       filtro_servico: filtroServico,
       filtro_op_padrao: filtroOpPadrao,
     });
+  }
+
+  async getFilaDescargaVeiculosLista(
+    filial: Filial,
+    fila: string
+  ): Promise<any> {
+    try {
+      const requestBody = {
+        AttApi: {
+          tipoOperacao: "monitor_lista_fila_desc",
+          filial: filial,
+          fila: fila,
+        },
+      };
+
+      return this.requestWithRetry("/monitor.php", requestBody, filial);
+    } catch (error) {
+      console.error("[ApiService] Error in getFilaDescargaVeiculosLista:", error);
+      throw error;
+    }
   }
 
   async getFilaCargaData(

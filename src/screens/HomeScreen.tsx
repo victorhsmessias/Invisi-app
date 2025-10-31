@@ -35,6 +35,7 @@ import {
 import { COLORS, FILIAIS, SCREEN_NAMES } from "../constants";
 import { SHORT_DELAY, AUTO_HIDE_SHORT } from "../constants/timing";
 import type { RootStackParamList, Filial } from "../types";
+import { shouldShowFilialSelector, isAdmin } from "../utils/permissions";
 
 interface TransportCardData {
   id: string;
@@ -87,18 +88,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       setHasShownInitialData(true);
     }
   }, [data, state.isLoggedIn]);
-
-  useEffect(() => {
-    if (state.isLoggedIn) {
-      const timer = setTimeout(() => {
-        preloadAllFilters().catch((error) => {
-          console.error("[HomeScreen] Erro no precarregamento:", error);
-        });
-      }, SHORT_DELAY);
-
-      return () => clearTimeout(timer);
-    }
-  }, [state.isLoggedIn, preloadAllFilters]);
 
   const onRefresh = async () => {
     updateActivity();
@@ -259,6 +248,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     return <LoadingSpinner text="Carregando aplicação..." />;
   }
 
+  if (state.isInitializing) {
+    return (
+      <LoadingSpinner
+        text={
+          isAdmin(state.userRole)
+            ? "Carregando filtros de todas as filiais..."
+            : "Preparando sua filial..."
+        }
+      />
+    );
+  }
+
   if (loading && !hasShownInitialData) {
     return (
       <SafeAreaView style={styles.container}>
@@ -269,12 +270,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           showRefreshButton={false}
         />
 
-        <FilialSelector
-          filiais={FILIAIS}
-          selectedFilial={state.selectedFilial}
-          onFilialChange={handleFilialChange}
-          disabled={true}
-        />
+        {shouldShowFilialSelector(state.userRole) && (
+          <FilialSelector
+            filiais={FILIAIS}
+            selectedFilial={state.selectedFilial}
+            onFilialChange={handleFilialChange}
+            disabled={true}
+          />
+        )}
 
         <FlatList
           data={skeletonData}
@@ -330,13 +333,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         )}
 
-        <FilialSelector
-          filiais={FILIAIS}
-          selectedFilial={state.selectedFilial}
-          onFilialChange={handleFilialChange}
-          isLoading={isFilialChanging}
-          disabled={isRefreshing || isFilialChanging}
-        />
+        {shouldShowFilialSelector(state.userRole) && (
+          <FilialSelector
+            filiais={FILIAIS}
+            selectedFilial={state.selectedFilial}
+            onFilialChange={handleFilialChange}
+            isLoading={isFilialChanging}
+            disabled={isRefreshing || isFilialChanging}
+          />
+        )}
 
         <FlatList
           data={transportCards}
