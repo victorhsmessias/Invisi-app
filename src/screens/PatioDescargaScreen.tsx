@@ -75,11 +75,12 @@ const PatioDescargaScreen: React.FC<Props> = ({ navigation }) => {
     };
   }, [getFilters]);
 
-  const { data, loading, refreshing, totals, error, refresh, lastUpdate } = useMonitorData(
-    "monitor_patio_desc_local",
-    state.selectedFilial,
-    apiFilters
-  );
+  const { data, loading, refreshing, totals, error, refresh, lastUpdate } =
+    useMonitorData(
+      "monitor_patio_desc_local",
+      state.selectedFilial,
+      apiFilters
+    );
 
   const groupedDataByLocation = useMemo(() => {
     if (!data || data.length === 0) return [];
@@ -103,13 +104,19 @@ const PatioDescargaScreen: React.FC<Props> = ({ navigation }) => {
       .map((location) => {
         const vehicles = grouped[location];
 
-        const vehicleCount = vehicles.reduce((sum: number, item: VehicleItem) => {
-          return sum + (item.pd_veiculos || item.veiculos || 0);
-        }, 0);
+        const vehicleCount = vehicles.reduce(
+          (sum: number, item: VehicleItem) => {
+            return sum + (item.pd_veiculos || item.veiculos || 0);
+          },
+          0
+        );
 
-        const totalWeight = vehicles.reduce((sum: number, item: VehicleItem) => {
-          return sum + (item.pd_peso || item.peso || 0);
-        }, 0);
+        const totalWeight = vehicles.reduce(
+          (sum: number, item: VehicleItem) => {
+            return sum + (item.pd_peso || item.peso || 0);
+          },
+          0
+        );
 
         return {
           title: location,
@@ -156,10 +163,7 @@ const PatioDescargaScreen: React.FC<Props> = ({ navigation }) => {
   }, [applyTempFilters]);
 
   const formatWeight = useCallback((weight: number) => {
-    if (weight >= 1000) {
-      return `${(weight / 1000).toFixed(1)}t`;
-    }
-    return `${weight.toLocaleString("pt-BR")}kg`;
+    return `${weight.toLocaleString("pt-BR")}`;
   }, []);
 
   const summaryItems = useMemo(() => {
@@ -174,7 +178,7 @@ const PatioDescargaScreen: React.FC<Props> = ({ navigation }) => {
       },
       {
         value: formatWeight(totals.peso || 0),
-        label: "Peso Total",
+        label: "Peso Total(kg)",
       },
     ];
   }, [totals, groupedDataByLocation.length, formatWeight]);

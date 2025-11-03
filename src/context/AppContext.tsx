@@ -18,6 +18,12 @@ import type {
   ContratoData,
   FilterOptions,
 } from "../types";
+import { clearAuthData } from "../utils/authUtils";
+import {
+  isAdmin,
+  getAllowedFilials,
+  getInitialFilial,
+} from "../utils/permissions";
 
 const initialState: AppState = {
   isLoggedIn: false,
@@ -258,12 +264,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   useEffect(() => {
     const checkLoginStatus = async () => {
       try {
-        const [token, username, userRole, userFilial] = await AsyncStorage.multiGet([
-          STORAGE_KEYS.USER_TOKEN,
-          STORAGE_KEYS.USERNAME,
-          STORAGE_KEYS.USER_ROLE,
-          STORAGE_KEYS.USER_FILIAL,
-        ]);
+        const [token, username, userRole, userFilial] =
+          await AsyncStorage.multiGet([
+            STORAGE_KEYS.USER_TOKEN,
+            STORAGE_KEYS.USERNAME,
+            STORAGE_KEYS.USER_ROLE,
+            STORAGE_KEYS.USER_FILIAL,
+          ]);
 
         const userToken = token[1];
         const savedUsername = username[1];
@@ -271,6 +278,23 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         const savedUserFilial = userFilial[1] as Filial | null;
 
         if (userToken) {
+          if (!isAdmin(savedUserRole) && !savedUserFilial) {
+            console.log("[AppContext] Sessão inválida: usuário sem lotação.");
+            await clearAuthData();
+            actions.setAuth(false);
+            return;
+          }
+
+          const allowedFilials = getAllowedFilials(
+            savedUserRole,
+            savedUserFilial
+          );
+          const initialFilial = getInitialFilial(
+            savedUserRole,
+            savedUserFilial,
+            FILIAIS[0]
+          );
+
           actions.setAuth(true, userToken);
           if (savedUsername) {
             actions.setUsername(savedUsername);
@@ -281,6 +305,14 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           if (savedUserFilial) {
             actions.setUserFilial(savedUserFilial);
           }
+          actions.setAllowedFilials(allowedFilials);
+          actions.setFilial(initialFilial);
+
+          console.log(
+            `[AppContext] Sessão restaurada: ${savedUsername} | Filial: ${initialFilial} | Permitidas: ${allowedFilials.join(
+              ", "
+            )}`
+          );
         } else {
           actions.setAuth(false);
         }

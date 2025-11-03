@@ -166,9 +166,6 @@ const ContratosDetalhesScreen: React.FC<Props> = ({ navigation, route }) => {
     );
 
     const formatWeight = (weight: number) => {
-      if (Math.abs(weight) >= 1000) {
-        return `${(weight / 1000).toFixed(1)}t`;
-      }
       return `${weight.toLocaleString()}kg`;
     };
 

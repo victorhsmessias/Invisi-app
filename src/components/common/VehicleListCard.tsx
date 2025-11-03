@@ -19,11 +19,8 @@ interface VehicleListCardProps {
 }
 
 const formatPeso = (peso?: number): string => {
-  if (!peso || peso === 0) return "0kg";
-  if (peso >= 1000) {
-    return `${(peso / 1000).toFixed(1)}t`;
-  }
-  return `${peso.toLocaleString("pt-BR")}kg`;
+  if (!peso || peso === 0) return "0";
+  return `${peso.toLocaleString("pt-BR")}`;
 };
 
 const formatData = (data?: string): string => {

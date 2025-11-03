@@ -3,8 +3,8 @@ import type { DateTimeFormatOptions } from "../types";
 export const formatPeso = (
   peso: number | string | null | undefined
 ): string => {
-  if (!peso || isNaN(Number(peso))) return "0 kg";
-  return Number(peso).toLocaleString("pt-BR") + " kg";
+  if (!peso || isNaN(Number(peso))) return "0";
+  return Number(peso).toLocaleString("pt-BR");
 };
 
 export const formatPercentual = (

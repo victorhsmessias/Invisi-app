@@ -5,6 +5,7 @@ import {
   AuthenticationError,
   AUTH_ERROR_CODES,
   clearAuthData,
+  saveAuthData,
 } from "../utils/authUtils";
 import { mapLotacaoToFilial, isValidLotacao } from "../utils/filialMapper";
 import {
@@ -53,6 +54,13 @@ export const useAuth = (): UseAuthReturn => {
           userRole,
           userFilial,
           state.selectedFilial
+        );
+
+        await saveAuthData(
+          result.token,
+          result.username || username.trim().toUpperCase(),
+          userRole,
+          userFilial
         );
 
         actions.setAuth(true, result.token);

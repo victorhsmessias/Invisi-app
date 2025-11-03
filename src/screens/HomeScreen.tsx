@@ -13,6 +13,7 @@ import {
   RefreshControl,
   Animated,
   Platform,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { StackScreenProps } from "@react-navigation/stack";
@@ -35,7 +36,11 @@ import {
 import { COLORS, FILIAIS, SCREEN_NAMES } from "../constants";
 import { SHORT_DELAY, AUTO_HIDE_SHORT } from "../constants/timing";
 import type { RootStackParamList, Filial } from "../types";
-import { shouldShowFilialSelector, isAdmin } from "../utils/permissions";
+import {
+  shouldShowFilialSelector,
+  isAdmin,
+  canAccessFilial,
+} from "../utils/permissions";
 
 interface TransportCardData {
   id: string;
@@ -106,6 +111,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     async (filial: Filial) => {
       if (filial === state.selectedFilial) return;
 
+      if (!canAccessFilial(filial, state.userRole, state.userFilial)) {
+        console.error("[HomeScreen] Acesso negado à filial:", filial);
+        Alert.alert(
+          "Acesso Negado",
+          "Você não tem permissão para acessar esta filial."
+        );
+        return;
+      }
+
       setIsFilialChanging(true);
 
       Animated.timing(fadeAnim, {
@@ -125,7 +139,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         }).start();
       }, 500);
     },
-    [actions, hasValidCache, state.selectedFilial, fadeAnim]
+    [
+      actions,
+      hasValidCache,
+      state.selectedFilial,
+      state.userRole,
+      state.userFilial,
+      fadeAnim,
+    ]
   );
 
   const transportCards = useMemo<TransportCardData[]>(
@@ -272,7 +293,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
         {shouldShowFilialSelector(state.userRole) && (
           <FilialSelector
-            filiais={FILIAIS}
+            filiais={state.allowedFilials}
             selectedFilial={state.selectedFilial}
             onFilialChange={handleFilialChange}
             disabled={true}
@@ -335,7 +356,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
         {shouldShowFilialSelector(state.userRole) && (
           <FilialSelector
-            filiais={FILIAIS}
+            filiais={state.allowedFilials}
             selectedFilial={state.selectedFilial}
             onFilialChange={handleFilialChange}
             isLoading={isFilialChanging}

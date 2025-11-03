@@ -14,7 +14,6 @@ import {
   validateAndSanitizeCredentials,
   validateLoginResponse,
   extractToken,
-  saveAuthData,
 } from "../utils/authUtils";
 import type {
   LoginCredentials,
@@ -244,7 +243,6 @@ class ApiService {
 
       const { token, id_grupo_usuario, lotacao } = loginData;
 
-      await saveAuthData(token, sanitized.username, id_grupo_usuario, lotacao);
       rateLimiter.resetAttempts(sanitized.username);
 
       return {

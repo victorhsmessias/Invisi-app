@@ -12,10 +12,7 @@ interface LocationHeaderProps {
 
 const formatWeight = (weight?: number): string | null => {
   if (!weight || weight === 0) return null;
-  if (weight >= 1000) {
-    return `${(weight / 1000).toFixed(1)}t`;
-  }
-  return `${weight.toLocaleString("pt-BR")}kg`;
+  return `${weight.toLocaleString("pt-BR")}`;
 };
 
 const LocationHeader = React.memo<LocationHeaderProps>(

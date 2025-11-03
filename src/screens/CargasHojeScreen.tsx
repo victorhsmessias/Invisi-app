@@ -50,11 +50,8 @@ const CargasHojeScreen: React.FC<Props> = ({ navigation }) => {
     };
   }, [getFilters]);
 
-  const { data, loading, refreshing, totals, error, refresh, lastUpdate } = useMonitorData(
-    "monitor_carga",
-    state.selectedFilial,
-    apiFilters
-  );
+  const { data, loading, refreshing, totals, error, refresh, lastUpdate } =
+    useMonitorData("monitor_carga", state.selectedFilial, apiFilters);
 
   const filterGroups = useMemo(
     () => [
@@ -90,10 +87,7 @@ const CargasHojeScreen: React.FC<Props> = ({ navigation }) => {
   }, [applyTempFilters]);
 
   const formatWeight = useCallback((weight: number) => {
-    if (weight >= 1000) {
-      return `${(weight / 1000).toFixed(1)}t`;
-    }
-    return `${weight.toLocaleString("pt-BR")}kg`;
+    return `${weight.toLocaleString("pt-BR")}`;
   }, []);
 
   const summaryItems = useMemo(() => {
@@ -108,7 +102,7 @@ const CargasHojeScreen: React.FC<Props> = ({ navigation }) => {
       },
       {
         value: formatWeight(totals.peso || 0),
-        label: "Peso Total",
+        label: "Peso Total(kg)",
       },
     ];
   }, [totals, formatWeight]);
@@ -177,10 +171,7 @@ const CargasHojeScreen: React.FC<Props> = ({ navigation }) => {
   const renderEmptyComponent = useCallback(() => {
     if (loading) {
       return (
-        <EmptyView
-          icon="cube-outline"
-          message="Carregando cargas de hoje..."
-        />
+        <EmptyView icon="cube-outline" message="Carregando cargas de hoje..." />
       );
     }
     return (

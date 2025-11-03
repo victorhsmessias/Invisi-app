@@ -44,10 +44,7 @@ const FilaDescargaDetalhesScreen: React.FC<Props> = ({ navigation, route }) => {
   const isRequestInProgress = useRef(false);
 
   const formatWeight = useCallback((weight: number) => {
-    if (weight >= 1000) {
-      return `${(weight / 1000).toFixed(1)}t`;
-    }
-    return `${weight.toLocaleString("pt-BR")}kg`;
+    return `${weight.toLocaleString("pt-BR")}`;
   }, []);
 
   const calculateTotals = useCallback((vehicles: VehicleItem[]) => {
@@ -75,7 +72,7 @@ const FilaDescargaDetalhesScreen: React.FC<Props> = ({ navigation, route }) => {
       },
       {
         value: formatWeight(totals.peso || 0),
-        label: "Peso Total",
+        label: "Peso Total(kg)",
       },
     ];
   }, [totals, formatWeight]);
