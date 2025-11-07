@@ -34,6 +34,7 @@ export const COLORS = {
 export const SCREEN_NAMES = {
   LOGIN: "Login",
   HOME: "Home",
+  GRAFICOS: "Graficos",
   MONITOR_CORTE: "MonitorCorte",
   CONTRATOS_DETALHES: "ContratosDetalhes",
   CARGAS_HOJE: "CargasHoje",

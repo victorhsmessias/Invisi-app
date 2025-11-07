@@ -87,6 +87,7 @@ export interface DateTimeFormatOptions {
 export type RootStackParamList = {
   Login: undefined;
   Home: undefined;
+  Graficos: undefined;
   MonitorCorte: undefined;
   ContratosDetalhes: {
     contrato: ContratoData;

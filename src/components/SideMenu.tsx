@@ -116,6 +116,15 @@ const SideMenu = memo<SideMenuProps>(({ visible, onClose, navigation }) => {
                 />
 
                 <List.Item
+                  title="Gráficos"
+                  left={(props) => (
+                    <List.Icon {...props} icon="chart-bar" />
+                  )}
+                  onPress={() => handleNavigate(SCREEN_NAMES.GRAFICOS)}
+                  titleStyle={styles.listItemTitle}
+                />
+
+                <List.Item
                   title="Monitor Corte"
                   left={(props) => (
                     <List.Icon {...props} icon="chart-timeline-variant" />

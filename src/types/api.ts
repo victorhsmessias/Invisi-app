@@ -108,3 +108,40 @@ export interface ContratosFilaParams {
     veiculos_meia_carga?: number;
   };
 }
+
+export interface DMonitorMovimento {
+  filial: Filial;
+  periodo: string;
+  grupo: string;
+  produto: string;
+  veiculos_descarga: number;
+  peso_origem: number;
+  peso_descarga: number;
+  veiculos_carga: number;
+  peso_carga: number;
+}
+
+export interface DMonitorFilters {
+  filtro_filial: Filial;
+  filtro_servico?: Record<string, 0 | 1>;
+  filtro_op_padrao?: Record<string, 0 | 1>;
+  filtro_data_inicio: string;
+  filtro_data_fim: string;
+  filtro_acumulador: {
+    dia: 0 | 1;
+    mes: 0 | 1;
+    ano: 0 | 1;
+  };
+  filtro_grupo?: string;
+  filtro_produto?: string;
+}
+
+export interface DMonitorResponse {
+  mensagemRetorno: {
+    codigo: string;
+    descricao: string;
+  };
+  dados: {
+    movto: DMonitorMovimento[];
+  };
+}

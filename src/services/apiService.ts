@@ -24,6 +24,8 @@ import type {
   ContratosFilaParams,
   MonitorDataResponse,
   MonitorFilters,
+  DMonitorFilters,
+  DMonitorResponse,
 } from "../types/api";
 
 class ApiService {
@@ -565,6 +567,45 @@ class ApiService {
       );
     } catch (error) {
       console.error("[ApiService] Error in getContratosFilaData:", error);
+      throw error;
+    }
+  }
+
+  async getDMonitorData(filters: DMonitorFilters): Promise<DMonitorResponse> {
+    try {
+      const filial = filters.filtro_filial;
+      if (!filial) {
+        throw new Error("Filial é obrigatória para getDMonitorData");
+      }
+
+      const requestBody = {
+        AttApi: {
+          tipoOperacao: "d_monitor",
+          filtro_filial: filial,
+          filtro_servico: filters.filtro_servico || DEFAULT_API_FILTERS.SERVICO,
+          filtro_op_padrao: filters.filtro_op_padrao || DEFAULT_API_FILTERS.OP_PADRAO,
+          filtro_data_inicio: filters.filtro_data_inicio,
+          filtro_data_fim: filters.filtro_data_fim,
+          filtro_acumulador: filters.filtro_acumulador,
+          filtro_grupo: filters.filtro_grupo || "",
+          filtro_produto: filters.filtro_produto || "",
+        },
+      };
+
+      console.log("[ApiService] Making d_monitor request:", {
+        filial,
+        data_inicio: filters.filtro_data_inicio,
+        data_fim: filters.filtro_data_fim,
+        acumulador: filters.filtro_acumulador,
+      });
+
+      return this.requestWithRetry<DMonitorResponse>(
+        "/d_monitor.php",
+        requestBody,
+        filial
+      );
+    } catch (error) {
+      console.error("[ApiService] Error in getDMonitorData:", error);
       throw error;
     }
   }

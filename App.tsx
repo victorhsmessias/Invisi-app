@@ -14,6 +14,7 @@ import type { RootStackParamList } from "./src/types";
 
 import LoginScreen from "./src/screens/LoginScreen";
 import HomeScreen from "./src/screens/HomeScreen";
+import GraficosScreen from "./src/screens/GraficosScreen";
 import TransitoScreen from "./src/screens/TransitoScreen";
 import FilaDescargaScreen from "./src/screens/FilaDescargaScreen";
 import FilaDescargaDetalhesScreen from "./src/screens/FilaDescargaDetalhesScreen";
@@ -48,6 +49,11 @@ const AppNavigator: React.FC = () => {
       >
         <Stack.Screen name={SCREEN_NAMES.LOGIN} component={LoginScreen} />
         <Stack.Screen name={SCREEN_NAMES.HOME} component={HomeScreen} />
+        <Stack.Screen
+          name={SCREEN_NAMES.GRAFICOS}
+          component={GraficosScreen}
+          options={{ title: "Gráficos" }}
+        />
         <Stack.Screen
           name={SCREEN_NAMES.MONITOR_CORTE}
           component={MonitorCorteScreen}
