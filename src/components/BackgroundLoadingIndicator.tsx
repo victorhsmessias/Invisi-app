@@ -112,7 +112,9 @@ const BackgroundLoadingIndicator: React.FC<BackgroundLoadingIndicatorProps> = ({
   );
 };
 
-export const HeaderLoadingIndicator: React.FC<HeaderLoadingIndicatorProps> = ({ visible }) => {
+export const HeaderLoadingIndicator: React.FC<HeaderLoadingIndicatorProps> = ({
+  visible,
+}) => {
   const [rotateAnim] = React.useState(new Animated.Value(0));
 
   React.useEffect(() => {
@@ -140,7 +142,7 @@ export const HeaderLoadingIndicator: React.FC<HeaderLoadingIndicatorProps> = ({ 
     <Animated.View
       style={[styles.headerIndicator, { transform: [{ rotate }] }]}
     >
-      <Text style={styles.syncIcon}>⟳</Text>
+      <Text style={styles.syncIcon}></Text>
     </Animated.View>
   );
 };
@@ -199,9 +201,11 @@ const styles = StyleSheet.create({
   discreteContainer: {
     position: "absolute",
     top: 60,
-    left: 16,
-    right: 16,
+    left: 0,
+    right: 0,
     zIndex: 1000,
+    alignItems: "center",
+    justifyContent: "center",
   },
   discreteContent: {
     flexDirection: "row",

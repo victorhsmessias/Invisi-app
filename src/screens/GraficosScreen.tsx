@@ -1,55 +1,38 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import {
   View,
   StyleSheet,
   ScrollView,
-  RefreshControl,
   Dimensions,
-  Text as RNText,
   Modal,
-  TouchableOpacity,
   Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Text, Button, Divider, Card } from "react-native-paper";
-import { BarChart, StackedBarChart } from "react-native-chart-kit";
+import { Text, Divider, Card } from "react-native-paper";
+import { BarChart } from "react-native-gifted-charts";
 import type { StackScreenProps } from "@react-navigation/stack";
 import { useApp } from "../context/AppContext";
 import { useChartData, type ProductData } from "../hooks/useChartData";
 import { DateRangePicker } from "../components/DateRangePicker";
-import { Header, LoadingSpinner, ErrorMessage } from "../components";
+import { Header, LoadingSpinner, ErrorMessage, SideMenu } from "../components";
+import BackgroundLoadingIndicator from "../components/BackgroundLoadingIndicator";
 import { colors, spacing } from "../constants/theme";
 import type { RootStackParamList } from "../types";
 
 type GraficosScreenProps = StackScreenProps<RootStackParamList, "Graficos">;
 
 const screenWidth = Dimensions.get("window").width;
-const chartWidth = screenWidth - 48;
+const chartWidth = screenWidth - 80;
 
-const chartConfig = {
-  backgroundColor: colors.surface,
-  backgroundGradientFrom: colors.surface,
-  backgroundGradientTo: colors.surface,
-  decimalPlaces: 0,
-  color: (opacity = 1) => `rgba(0, 55, 110, ${opacity})`,
-  labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-  style: {
-    borderRadius: 16,
-  },
-  propsForDots: {
-    r: "4",
-    strokeWidth: "2",
-    stroke: colors.primary,
-  },
-  barPercentage: 0.3,
-  barRadius: 2,
-  propsForBackgroundLines: {
-    strokeWidth: 1,
-    stroke: "#e3e3e3",
-  },
-  propsForLabels: {
-    fontSize: 12,
-  },
+const formatPeso = (peso: number): string => {
+  return (peso / 1000).toFixed(1) + "t";
+};
+
+const formatKg = (kg: number): string => {
+  return kg.toLocaleString("pt-BR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
 };
 
 const GraficosScreen: React.FC<GraficosScreenProps> = ({ navigation }) => {
@@ -73,8 +56,8 @@ const GraficosScreen: React.FC<GraficosScreenProps> = ({ navigation }) => {
     total: number;
     peso: number;
     type: "descarga" | "carga";
-    position: { x: number; y: number };
   } | null>(null);
+  const [menuVisible, setMenuVisible] = useState(false);
 
   const handleDateChange = useCallback(
     (newStartDate: Date, newEndDate: Date) => {
@@ -120,14 +103,9 @@ const GraficosScreen: React.FC<GraficosScreenProps> = ({ navigation }) => {
         ano: 0,
       },
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.selectedFilial]);
+  }, [state.selectedFilial, fetchData, startDate, endDate, acumuladorTipo]);
 
-  const formatPeso = (peso: number): string => {
-    return (peso / 1000).toFixed(1) + "t";
-  };
-
-  const renderLegend = (products: ProductData[]) => {
+  const renderLegend = useCallback((products: ProductData[]) => {
     if (products.length === 0) return null;
 
     return (
@@ -142,82 +120,49 @@ const GraficosScreen: React.FC<GraficosScreenProps> = ({ navigation }) => {
         ))}
       </View>
     );
-  };
+  }, []);
 
-  interface ChartPressData {
-    index?: number;
-    x?: number;
-    y?: number;
-  }
+  const handleBarPress = useCallback(
+    (index: number, type: "descarga" | "carga") => {
+      const label = chartData.labels[index];
+      const products =
+        type === "descarga"
+          ? chartData.descargaByProduct
+          : chartData.cargaByProduct;
 
-  const handleChartPress = (
-    data: ChartPressData,
-    type: "descarga" | "carga"
-  ) => {
-    const { index, x, y } = data;
-    if (index === undefined) return;
+      const productValues = products
+        .map((product) => ({
+          name: product.name,
+          value: product.data[index] || 0,
+          peso: product.pesoData[index] || 0,
+          color: product.color,
+        }))
+        .filter((p) => p.value > 0);
 
-    const label = chartData.labels[index];
-    const products =
-      type === "descarga"
-        ? chartData.descargaByProduct
-        : chartData.cargaByProduct;
+      const total =
+        type === "descarga"
+          ? chartData.descargaVeiculos[index]
+          : chartData.cargaVeiculos[index];
 
-    const productValues = products
-      .map((product) => ({
-        name: product.name,
-        value: product.data[index] || 0,
-        peso: product.pesoData[index] || 0,
-        color: product.color,
-      }))
-      .filter((p) => p.value > 0);
+      const peso =
+        type === "descarga"
+          ? chartData.descargaPeso[index]
+          : chartData.cargaPeso[index];
 
-    const total =
-      type === "descarga"
-        ? chartData.descargaVeiculos[index]
-        : chartData.cargaVeiculos[index];
+      setTooltipData({
+        label,
+        products: productValues,
+        total,
+        peso,
+        type,
+      });
+      setTooltipVisible(true);
+    },
+    [chartData]
+  );
 
-    const peso =
-      type === "descarga"
-        ? chartData.descargaPeso[index]
-        : chartData.cargaPeso[index];
-
-    setTooltipData({
-      label,
-      products: productValues,
-      total,
-      peso,
-      type,
-      position: { x: x || 0, y: y || 0 },
-    });
-    setTooltipVisible(true);
-  };
-
-  const formatKg = (kg: number): string => {
-    return kg.toLocaleString("pt-BR", {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    });
-  };
-
-  const renderTooltip = () => {
+  const renderTooltip = useCallback(() => {
     if (!tooltipData) return null;
-
-    // Posição do tooltip próximo ao toque
-    const tooltipWidth = 240;
-    const tooltipHeight = 200;
-    const margin = 20;
-
-    // Calcula posição horizontal: centraliza no ponto clicado, mas mantém dentro da tela
-    let tooltipLeft = tooltipData.position.x - tooltipWidth / 2;
-    tooltipLeft = Math.max(margin, Math.min(tooltipLeft, screenWidth - tooltipWidth - margin));
-
-    // Calcula posição vertical: acima do ponto clicado, mas mantém dentro da tela
-    let tooltipTop = tooltipData.position.y - tooltipHeight - 20;
-    if (tooltipTop < 60) {
-      // Se não couber acima, mostra abaixo
-      tooltipTop = tooltipData.position.y + 20;
-    }
 
     return (
       <Modal
@@ -230,46 +175,56 @@ const GraficosScreen: React.FC<GraficosScreenProps> = ({ navigation }) => {
           style={styles.tooltipOverlay}
           onPress={() => setTooltipVisible(false)}
         >
-          <View
-            style={[
-              styles.tooltipFloating,
-              { left: tooltipLeft, top: tooltipTop },
-            ]}
+          <Pressable
+            style={styles.tooltipContainer}
+            onPress={(e) => e.stopPropagation()}
           >
             <Card style={styles.tooltipCard}>
               <Card.Content>
-                <Text style={styles.tooltipTitle}>
-                  {tooltipData.label} -{" "}
-                  {tooltipData.type === "descarga" ? "Descarga" : "Carga"}
-                </Text>
+                <View style={styles.tooltipHeader}>
+                  <Text style={styles.tooltipTitle}>
+                    {tooltipData.label} -{" "}
+                    {tooltipData.type === "descarga" ? "Descarga" : "Carga"}
+                  </Text>
+                  <Pressable
+                    onPress={() => setTooltipVisible(false)}
+                    style={styles.closeButton}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Text style={styles.closeButtonText}>✕</Text>
+                  </Pressable>
+                </View>
                 <Divider style={styles.tooltipDivider} />
 
-                <View style={styles.tooltipSection}>
-                  <Text style={styles.tooltipSectionTitle}>Por Produto:</Text>
-                  {tooltipData.products.map((product, index) => (
-                    <View key={index} style={styles.tooltipProductRow}>
-                      <View style={styles.tooltipProductInfo}>
-                        <View
-                          style={[
-                            styles.tooltipProductColor,
-                            { backgroundColor: product.color },
-                          ]}
-                        />
-                        <View style={styles.tooltipProductDetails}>
-                          <Text style={styles.tooltipProductName}>
-                            {product.name}
-                          </Text>
-                          <Text style={styles.tooltipProductValue}>
-                            {product.value} veículos
-                          </Text>
-                          <Text style={styles.tooltipProductPeso}>
-                            {formatKg(product.peso)} kg ({formatPeso(product.peso)})
-                          </Text>
+                {tooltipData.products.length > 0 && (
+                  <View style={styles.tooltipSection}>
+                    <Text style={styles.tooltipSectionTitle}>Por Produto:</Text>
+                    {tooltipData.products.map((product, index) => (
+                      <View key={index} style={styles.tooltipProductRow}>
+                        <View style={styles.tooltipProductInfo}>
+                          <View
+                            style={[
+                              styles.tooltipProductColor,
+                              { backgroundColor: product.color },
+                            ]}
+                          />
+                          <View style={styles.tooltipProductDetails}>
+                            <Text style={styles.tooltipProductName}>
+                              {product.name}
+                            </Text>
+                            <Text style={styles.tooltipProductValue}>
+                              {product.value} veículos
+                            </Text>
+                            <Text style={styles.tooltipProductPeso}>
+                              {formatKg(product.peso)} kg (
+                              {formatPeso(product.peso)})
+                            </Text>
+                          </View>
                         </View>
                       </View>
-                    </View>
-                  ))}
-                </View>
+                    ))}
+                  </View>
+                )}
 
                 <Divider style={styles.tooltipDivider} />
 
@@ -291,11 +246,65 @@ const GraficosScreen: React.FC<GraficosScreenProps> = ({ navigation }) => {
                 </View>
               </Card.Content>
             </Card>
-          </View>
+          </Pressable>
         </Pressable>
       </Modal>
     );
-  };
+  }, [tooltipData, tooltipVisible]);
+
+  const convertToStackData = useCallback(
+    (labels: string[], products: ProductData[], type: "descarga" | "carga") => {
+      return labels.map((label, index) => {
+        const stacks = products
+          .map((product) => ({
+            value: product.data[index] || 0,
+            color: product.color,
+            label: product.name,
+            peso: product.pesoData[index] || 0,
+          }))
+          .filter((stack) => stack.value > 0);
+
+        return {
+          stacks: stacks.length > 0 ? stacks : [{ value: 0, color: "#E0E0E0" }],
+          label: label,
+          onPress: () => handleBarPress(index, type),
+        };
+      });
+    },
+    [handleBarPress]
+  );
+
+  const descargaStackData = useMemo(
+    () =>
+      convertToStackData(
+        chartData.labels,
+        chartData.descargaByProduct,
+        "descarga"
+      ),
+    [chartData.labels, chartData.descargaByProduct, convertToStackData]
+  );
+
+  const cargaStackData = useMemo(
+    () =>
+      convertToStackData(chartData.labels, chartData.cargaByProduct, "carga"),
+    [chartData.labels, chartData.cargaByProduct, convertToStackData]
+  );
+
+  const descargaMaxValue = useMemo(() => {
+    const max =
+      chartData.descargaVeiculos.length > 0
+        ? Math.max(...chartData.descargaVeiculos)
+        : 0;
+    return max > 0 ? max * 1.1 : 10;
+  }, [chartData.descargaVeiculos]);
+
+  const cargaMaxValue = useMemo(() => {
+    const max =
+      chartData.cargaVeiculos.length > 0
+        ? Math.max(...chartData.cargaVeiculos)
+        : 0;
+    return max > 0 ? max * 1.1 : 10;
+  }, [chartData.cargaVeiculos]);
 
   const hasData = chartData.labels.length > 0;
 
@@ -305,8 +314,14 @@ const GraficosScreen: React.FC<GraficosScreenProps> = ({ navigation }) => {
         <Header
           title="Gráficos"
           subtitle={`Filial: ${state.selectedFilial}`}
-          showBackButton
-          onBackPress={() => navigation.goBack()}
+          onMenuPress={() => setMenuVisible(true)}
+          showRefreshButton={false}
+          showLoadingIndicator={true}
+        />
+        <SideMenu
+          visible={menuVisible}
+          onClose={() => setMenuVisible(false)}
+          navigation={navigation}
         />
         <LoadingSpinner text="Carregando dados dos gráficos..." />
       </SafeAreaView>
@@ -318,22 +333,31 @@ const GraficosScreen: React.FC<GraficosScreenProps> = ({ navigation }) => {
       <Header
         title="Gráficos"
         subtitle={`Filial: ${state.selectedFilial}`}
-        showBackButton
-        onBackPress={() => navigation.goBack()}
+        onMenuPress={() => setMenuVisible(true)}
+        onRefreshPress={onRefresh}
+        isRefreshing={isRefreshing}
+        showRefreshButton={true}
+        showLoadingIndicator={loading}
+      />
+
+      <SideMenu
+        visible={menuVisible}
+        onClose={() => setMenuVisible(false)}
+        navigation={navigation}
       />
 
       {renderTooltip()}
 
+      <BackgroundLoadingIndicator
+        visible={loading && hasData}
+        text="Atualizando dados..."
+        variant="discrete"
+        autoHide={false}
+      />
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={onRefresh}
-            colors={[colors.primary]}
-          />
-        }
       >
         <DateRangePicker
           startDate={startDate}
@@ -367,69 +391,38 @@ const GraficosScreen: React.FC<GraficosScreenProps> = ({ navigation }) => {
                 Quantidade de veículos descarregados por produto
               </Text>
               {renderLegend(chartData.descargaByProduct)}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {chartData.descargaByProduct.length > 0 ? (
-                  <StackedBarChart
-                    data={{
-                      labels: chartData.labels,
-                      legend: chartData.descargaByProduct.map((p) => p.name),
-                      data: chartData.labels.map((_, index) =>
-                        chartData.descargaByProduct.map(
-                          (p) => p.data[index] || 0
-                        )
-                      ),
-                      barColors: chartData.descargaByProduct.map(
-                        (p) => p.color
-                      ),
-                    }}
-                    width={Math.max(chartWidth, chartData.labels.length * 60)}
-                    height={240}
-                    chartConfig={{
-                      ...chartConfig,
-                      color: (opacity = 1) => `rgba(0, 55, 110, ${opacity})`,
-                      barPercentage: 0.4,
-                    }}
-                    style={styles.chart}
-                    withHorizontalLabels={true}
-                    hideLegend={true}
-                    showBarTops={true}
-                    withVerticalLabels={true}
-                    segments={5}
-                    onDataPointClick={(data) =>
-                      handleChartPress(data, "descarga")
-                    }
-                  />
-                ) : (
-                  <BarChart
-                    data={{
-                      labels: chartData.labels,
-                      datasets: [
-                        {
-                          data:
-                            chartData.descargaVeiculos.length > 0
-                              ? chartData.descargaVeiculos
-                              : [0],
-                        },
-                      ],
-                    }}
-                    width={Math.max(chartWidth, chartData.labels.length * 60)}
-                    height={240}
-                    yAxisLabel=""
-                    yAxisSuffix=""
-                    chartConfig={{
-                      ...chartConfig,
-                      barPercentage: 0.4,
-                    }}
-                    style={styles.chart}
-                    withInnerLines={true}
-                    fromZero={true}
-                    showValuesOnTopOfBars={true}
-                    onDataPointClick={(data) =>
-                      handleChartPress(data, "descarga")
-                    }
-                  />
-                )}
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.chartScrollView}
+                contentContainerStyle={{ paddingRight: 10 }}
+              >
+                <BarChart
+                  data={descargaStackData}
+                  width={
+                    chartData.labels.length *
+                      (chartData.labels.length > 15 ? 38 : 53) +
+                    50
+                  }
+                  height={240}
+                  barWidth={chartData.labels.length > 15 ? 20 : 28}
+                  spacing={chartData.labels.length > 15 ? 18 : 25}
+                  stackData={descargaStackData}
+                  barBorderRadius={4}
+                  xAxisThickness={1}
+                  yAxisThickness={1}
+                  yAxisTextStyle={{ color: colors.textSecondary, fontSize: 11 }}
+                  xAxisLabelTextStyle={{ color: colors.text, fontSize: 11 }}
+                  noOfSections={5}
+                  maxValue={descargaMaxValue}
+                  isAnimated
+                  animationDuration={500}
+                  initialSpacing={10}
+                  endSpacing={0}
+                />
               </ScrollView>
+
               <View style={styles.summaryContainer}>
                 <View style={styles.summaryItem}>
                   <Text style={styles.summaryLabel}>Total Veículos:</Text>
@@ -440,9 +433,10 @@ const GraficosScreen: React.FC<GraficosScreenProps> = ({ navigation }) => {
                 <View style={styles.summaryItem}>
                   <Text style={styles.summaryLabel}>Peso Total:</Text>
                   <Text style={styles.summaryValue}>
-                    {formatPeso(
+                    {formatKg(
                       chartData.descargaPeso.reduce((a, b) => a + b, 0)
-                    )}
+                    )}{" "}
+                    kg
                   </Text>
                 </View>
               </View>
@@ -458,62 +452,38 @@ const GraficosScreen: React.FC<GraficosScreenProps> = ({ navigation }) => {
                 Quantidade de veículos carregados por produto
               </Text>
               {renderLegend(chartData.cargaByProduct)}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {chartData.cargaByProduct.length > 0 ? (
-                  <StackedBarChart
-                    data={{
-                      labels: chartData.labels,
-                      legend: chartData.cargaByProduct.map((p) => p.name),
-                      data: chartData.labels.map((_, index) =>
-                        chartData.cargaByProduct.map((p) => p.data[index] || 0)
-                      ),
-                      barColors: chartData.cargaByProduct.map((p) => p.color),
-                    }}
-                    width={Math.max(chartWidth, chartData.labels.length * 60)}
-                    height={240}
-                    chartConfig={{
-                      ...chartConfig,
-                      color: (opacity = 1) => `rgba(46, 125, 50, ${opacity})`,
-                      barPercentage: 0.5,
-                    }}
-                    style={styles.chart}
-                    withHorizontalLabels={true}
-                    hideLegend={true}
-                    showBarTops={true}
-                    withVerticalLabels={true}
-                    segments={5}
-                    onDataPointClick={(data) => handleChartPress(data, "carga")}
-                  />
-                ) : (
-                  <BarChart
-                    data={{
-                      labels: chartData.labels,
-                      datasets: [
-                        {
-                          data:
-                            chartData.cargaVeiculos.length > 0
-                              ? chartData.cargaVeiculos
-                              : [0],
-                        },
-                      ],
-                    }}
-                    width={Math.max(chartWidth, chartData.labels.length * 60)}
-                    height={240}
-                    yAxisLabel=""
-                    yAxisSuffix=""
-                    chartConfig={{
-                      ...chartConfig,
-                      color: (opacity = 1) => `rgba(46, 125, 50, ${opacity})`,
-                      barPercentage: 0.5,
-                    }}
-                    style={styles.chart}
-                    withInnerLines={true}
-                    fromZero={true}
-                    showValuesOnTopOfBars={true}
-                    onDataPointClick={(data) => handleChartPress(data, "carga")}
-                  />
-                )}
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.chartScrollView}
+                contentContainerStyle={{ paddingRight: 10 }}
+              >
+                <BarChart
+                  data={cargaStackData}
+                  width={
+                    chartData.labels.length *
+                      (chartData.labels.length > 15 ? 38 : 53) +
+                    50
+                  }
+                  height={240}
+                  barWidth={chartData.labels.length > 15 ? 20 : 28}
+                  spacing={chartData.labels.length > 15 ? 18 : 25}
+                  stackData={cargaStackData}
+                  barBorderRadius={4}
+                  xAxisThickness={1}
+                  yAxisThickness={1}
+                  yAxisTextStyle={{ color: colors.textSecondary, fontSize: 11 }}
+                  xAxisLabelTextStyle={{ color: colors.text, fontSize: 11 }}
+                  noOfSections={5}
+                  maxValue={cargaMaxValue}
+                  isAnimated
+                  animationDuration={500}
+                  initialSpacing={10}
+                  endSpacing={0}
+                />
               </ScrollView>
+
               <View style={styles.summaryContainer}>
                 <View style={styles.summaryItem}>
                   <Text style={styles.summaryLabel}>Total Veículos:</Text>
@@ -524,7 +494,8 @@ const GraficosScreen: React.FC<GraficosScreenProps> = ({ navigation }) => {
                 <View style={styles.summaryItem}>
                   <Text style={styles.summaryLabel}>Peso Total:</Text>
                   <Text style={styles.summaryValue}>
-                    {formatPeso(chartData.cargaPeso.reduce((a, b) => a + b, 0))}
+                    {formatKg(chartData.cargaPeso.reduce((a, b) => a + b, 0))}{" "}
+                    kg
                   </Text>
                 </View>
               </View>
@@ -570,9 +541,8 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: spacing.md,
   },
-  chart: {
-    marginVertical: spacing.sm,
-    borderRadius: 12,
+  chartScrollView: {
+    marginVertical: spacing.md,
   },
   summaryContainer: {
     flexDirection: "row",
@@ -612,17 +582,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: "center",
   },
-  infoContainer: {
-    backgroundColor: colors.surface,
-    borderRadius: 8,
-    padding: spacing.md,
-    marginTop: spacing.md,
-  },
-  infoText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
-  },
   legendContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -652,12 +611,13 @@ const styles = StyleSheet.create({
   },
   tooltipOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  tooltipFloating: {
-    position: "absolute",
-    width: 240,
-    maxWidth: screenWidth - 40,
+  tooltipContainer: {
+    width: screenWidth - 80,
+    maxWidth: 400,
   },
   tooltipCard: {
     backgroundColor: colors.surface,
@@ -668,11 +628,30 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
   },
+  tooltipHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: spacing.sm,
+  },
   tooltipTitle: {
     fontSize: 18,
     fontWeight: "700",
     color: colors.text,
-    marginBottom: spacing.sm,
+    flex: 1,
+    paddingRight: spacing.sm,
+  },
+  closeButton: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  closeButtonText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: colors.text,
+    lineHeight: 20,
   },
   tooltipDivider: {
     marginVertical: spacing.sm,
@@ -706,6 +685,7 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 2,
     marginRight: spacing.sm,
+    marginTop: 4,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -713,11 +693,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.text,
     flex: 1,
+    fontWeight: "600",
   },
   tooltipProductValue: {
     fontSize: 12,
     fontWeight: "600",
-    color: colors.text,
+    color: colors.primary,
     marginTop: 2,
   },
   tooltipProductPeso: {
@@ -743,9 +724,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     color: colors.primary,
-  },
-  tooltipCloseButton: {
-    marginTop: spacing.md,
   },
 });
 

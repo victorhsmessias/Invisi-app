@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { useApp } from "../context/AppContext";
 import apiService from "../services/apiService";
 import type { Filial } from "../constants/api";
 import type {
@@ -119,7 +120,6 @@ const aggregateData = (
     allProducts.add(mov.produto || "OUTROS");
   });
 
-  // Ordena produtos alfabeticamente para consistência
   const sortedProducts = Array.from(allProducts).sort();
 
   const cargaByProduct: ProductData[] = sortedProducts.map(
@@ -158,6 +158,7 @@ const aggregateData = (
 };
 
 export const useChartData = (filial: Filial): UseChartDataReturn => {
+  const { state } = useApp();
   const [data, setData] = useState<DMonitorMovimento[]>([]);
   const [chartData, setChartData] = useState<AggregatedChartData>({
     labels: [],
@@ -174,6 +175,11 @@ export const useChartData = (filial: Filial): UseChartDataReturn => {
 
   const fetchData = useCallback(
     async (filters: Partial<DMonitorFilters>) => {
+      if (!state.isLoggedIn || !state.token) {
+        console.log("[useChartData] Não autenticado, ignorando requisição");
+        return;
+      }
+
       try {
         setLoading(true);
         setError(null);
@@ -233,7 +239,7 @@ export const useChartData = (filial: Filial): UseChartDataReturn => {
         setLoading(false);
       }
     },
-    [filial]
+    [filial, state.isLoggedIn, state.token]
   );
 
   const refreshData = useCallback(async () => {
@@ -241,9 +247,10 @@ export const useChartData = (filial: Filial): UseChartDataReturn => {
   }, [fetchData, lastFilters]);
 
   useEffect(() => {
-    fetchData({});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filial]);
+    if (state.isLoggedIn && state.token) {
+      fetchData({});
+    }
+  }, [filial, state.isLoggedIn, state.token, fetchData]);
 
   return {
     data,

@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { useFocusEffect } from "@react-navigation/native";
+import { useApp } from "../context/AppContext";
 import apiService from "../services/apiService";
 import type { Filial } from "../constants/api";
 
@@ -28,6 +29,7 @@ export const useMonitorData = (
   filial: Filial,
   filters: MonitorFilters = {}
 ) => {
+  const { state } = useApp();
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -158,6 +160,11 @@ export const useMonitorData = (
 
   const fetchData = useCallback(
     async (isRefreshing = false): Promise<void> => {
+      if (!state.isLoggedIn || !state.token) {
+        console.log("[useMonitorData] Não autenticado, ignorando requisição");
+        return;
+      }
+
       if (isRequestInProgress.current) {
         return;
       }

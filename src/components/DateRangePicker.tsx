@@ -69,15 +69,6 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
           >
             15 dias
           </Button>
-          <Button
-            mode="outlined"
-            onPress={() => handlePresetRange(30)}
-            style={styles.presetButton}
-            compact
-            disabled={disabled}
-          >
-            30 dias
-          </Button>
         </View>
       </View>
 

@@ -52,33 +52,6 @@ export const formatDateTime = (
   return dateObj.toLocaleString(format);
 };
 
-export const formatTimeAgo = (
-  date: string | Date | null | undefined
-): string => {
-  if (!date) return "";
-
-  const now = new Date();
-  const past = typeof date === "string" ? new Date(date) : date;
-  const diffInSeconds = Math.floor((now.getTime() - past.getTime()) / 1000);
-
-  if (diffInSeconds < 60) {
-    return "agora há pouco";
-  }
-
-  const diffInMinutes = Math.floor(diffInSeconds / 60);
-  if (diffInMinutes < 60) {
-    return `há ${diffInMinutes} min`;
-  }
-
-  const diffInHours = Math.floor(diffInMinutes / 60);
-  if (diffInHours < 24) {
-    return `há ${diffInHours}h`;
-  }
-
-  const diffInDays = Math.floor(diffInHours / 24);
-  return `há ${diffInDays} dias`;
-};
-
 export const truncateText = (
   text: string | null | undefined,
   maxLength: number = 50
@@ -157,7 +130,6 @@ export default {
   formatNumber,
   formatCurrency,
   formatDateTime,
-  formatTimeAgo,
   truncateText,
   capitalizeFirst,
   formatPhoneNumber,
