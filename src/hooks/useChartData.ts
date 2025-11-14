@@ -43,10 +43,16 @@ interface UseChartDataReturn {
 
 const formatDateLabel = (periodo: string): string => {
   try {
+    const [year, month, day] = periodo.split(/[-T\s]/);
+
+    if (year && month && day) {
+      return `${day.padStart(2, "0")}/${month.padStart(2, "0")}`;
+    }
+
     const date = new Date(periodo);
-    const day = date.getDate().toString().padStart(2, "0");
-    const month = (date.getMonth() + 1).toString().padStart(2, "0");
-    return `${day}/${month}`;
+    const dayNum = date.getDate().toString().padStart(2, "0");
+    const monthNum = (date.getMonth() + 1).toString().padStart(2, "0");
+    return `${dayNum}/${monthNum}`;
   } catch {
     return periodo.split(" ")[0];
   }
