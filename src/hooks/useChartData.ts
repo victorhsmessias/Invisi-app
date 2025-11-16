@@ -41,6 +41,20 @@ interface UseChartDataReturn {
   refreshData: () => Promise<void>;
 }
 
+// Função auxiliar para criar data sem problemas de timezone
+const createLocalDate = (dateString: string): Date => {
+  const [year, month, day] = dateString.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
+// Converte Date para string YYYY-MM-DD sem problemas de timezone
+const formatDateToString = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 const formatDateLabel = (periodo: string): string => {
   try {
     const [year, month, day] = periodo.split(/[-T\s]/);
@@ -49,7 +63,8 @@ const formatDateLabel = (periodo: string): string => {
       return `${day.padStart(2, "0")}/${month.padStart(2, "0")}`;
     }
 
-    const date = new Date(periodo);
+    // Fallback usando createLocalDate para evitar problemas de timezone
+    const date = createLocalDate(periodo);
     const dayNum = date.getDate().toString().padStart(2, "0");
     const monthNum = (date.getMonth() + 1).toString().padStart(2, "0");
     return `${dayNum}/${monthNum}`;
@@ -80,7 +95,10 @@ const getProductColor = (index: number): string => {
 };
 
 const aggregateData = (
-  movimentos: DMonitorMovimento[]
+  movimentos: DMonitorMovimento[],
+  dataInicio?: string,
+  dataFim?: string,
+  acumulador?: { dia: 0 | 1; mes: 0 | 1; ano: 0 | 1 }
 ): AggregatedChartData => {
   const groupedByPeriod = movimentos.reduce((acc, mov) => {
     const periodo = mov.periodo;
@@ -117,7 +135,61 @@ const aggregateData = (
     return acc;
   }, {} as Record<string, any>);
 
-  const sortedPeriods = Object.values(groupedByPeriod).sort((a, b) => {
+  // Gera array completo de períodos baseado no filtro
+  let allPeriods: string[] = [];
+  if (dataInicio && dataFim && acumulador) {
+    const start = createLocalDate(dataInicio);
+    const end = createLocalDate(dataFim);
+
+    if (acumulador.dia === 1) {
+      // Agregação por dia - cria array de todas as datas
+      const current = new Date(start);
+      while (current <= end) {
+        const year = current.getFullYear();
+        const month = String(current.getMonth() + 1).padStart(2, '0');
+        const day = String(current.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
+        allPeriods.push(dateStr);
+        current.setDate(current.getDate() + 1);
+      }
+    } else if (acumulador.mes === 1) {
+      // Agregação por mês - cria array de todos os meses
+      const current = new Date(start);
+      while (current <= end) {
+        const yearMonth = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-01`;
+        if (!allPeriods.includes(yearMonth)) {
+          allPeriods.push(yearMonth);
+        }
+        current.setMonth(current.getMonth() + 1);
+      }
+    }
+  }
+
+  // Se não conseguiu gerar períodos, usa apenas os que existem nos dados
+  if (allPeriods.length === 0) {
+    allPeriods = Object.keys(groupedByPeriod).sort((a, b) => {
+      return new Date(a).getTime() - new Date(b).getTime();
+    });
+  }
+
+  // Garante que todos os períodos existem no groupedByPeriod
+  allPeriods.forEach(periodo => {
+    if (!groupedByPeriod[periodo]) {
+      groupedByPeriod[periodo] = {
+        periodo,
+        cargaVeiculos: 0,
+        cargaPeso: 0,
+        descargaVeiculos: 0,
+        descargaPeso: 0,
+        cargaByProduct: {} as Record<string, number>,
+        descargaByProduct: {} as Record<string, number>,
+        cargaPesoByProduct: {} as Record<string, number>,
+        descargaPesoByProduct: {} as Record<string, number>,
+      };
+    }
+  });
+
+  const sortedPeriods = allPeriods.map(periodo => groupedByPeriod[periodo]).sort((a, b) => {
     return new Date(a.periodo).getTime() - new Date(b.periodo).getTime();
   });
 
@@ -200,9 +272,9 @@ export const useChartData = (filial: Filial): UseChartDataReturn => {
           filtro_op_padrao: DEFAULT_API_FILTERS.OP_PADRAO,
           filtro_data_inicio:
             filters.filtro_data_inicio ||
-            sevenDaysAgo.toISOString().split("T")[0],
+            formatDateToString(sevenDaysAgo),
           filtro_data_fim:
-            filters.filtro_data_fim || today.toISOString().split("T")[0],
+            filters.filtro_data_fim || formatDateToString(today),
           filtro_acumulador: filters.filtro_acumulador || {
             dia: 1,
             mes: 0,
@@ -221,7 +293,12 @@ export const useChartData = (filial: Filial): UseChartDataReturn => {
           response.dados?.movto
         ) {
           setData(response.dados.movto);
-          const aggregated = aggregateData(response.dados.movto);
+          const aggregated = aggregateData(
+            response.dados.movto,
+            defaultFilters.filtro_data_inicio,
+            defaultFilters.filtro_data_fim,
+            defaultFilters.filtro_acumulador
+          );
           setChartData(aggregated);
         } else {
           throw new Error(

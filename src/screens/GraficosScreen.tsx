@@ -24,6 +24,14 @@ type GraficosScreenProps = StackScreenProps<RootStackParamList, "Graficos">;
 const screenWidth = Dimensions.get("window").width;
 const chartWidth = screenWidth - 80;
 
+// Converte Date para string YYYY-MM-DD sem problemas de timezone
+const formatDateToString = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 const formatPeso = (peso: number): string => {
   return (peso / 1000).toFixed(1) + "t";
 };
@@ -72,8 +80,8 @@ const GraficosScreen: React.FC<GraficosScreenProps> = ({ navigation }) => {
       setAcumuladorTipo(newAcumulador);
 
       fetchData({
-        filtro_data_inicio: newStartDate.toISOString().split("T")[0],
-        filtro_data_fim: newEndDate.toISOString().split("T")[0],
+        filtro_data_inicio: formatDateToString(newStartDate),
+        filtro_data_fim: formatDateToString(newEndDate),
         filtro_acumulador: {
           dia: newAcumulador === "dia" ? 1 : 0,
           mes: newAcumulador === "mes" ? 1 : 0,
@@ -95,8 +103,8 @@ const GraficosScreen: React.FC<GraficosScreenProps> = ({ navigation }) => {
 
   useEffect(() => {
     fetchData({
-      filtro_data_inicio: startDate.toISOString().split("T")[0],
-      filtro_data_fim: endDate.toISOString().split("T")[0],
+      filtro_data_inicio: formatDateToString(startDate),
+      filtro_data_fim: formatDateToString(endDate),
       filtro_acumulador: {
         dia: acumuladorTipo === "dia" ? 1 : 0,
         mes: acumuladorTipo === "mes" ? 1 : 0,
@@ -397,8 +405,10 @@ const GraficosScreen: React.FC<GraficosScreenProps> = ({ navigation }) => {
                 showsHorizontalScrollIndicator={false}
                 style={styles.chartScrollView}
                 contentContainerStyle={{ paddingRight: 10 }}
+                key={`descarga-${chartData.labels.join('-')}`}
               >
                 <BarChart
+                  key={`descarga-chart-${chartData.labels.join('-')}`}
                   data={descargaStackData}
                   width={
                     chartData.labels.length *
@@ -458,8 +468,10 @@ const GraficosScreen: React.FC<GraficosScreenProps> = ({ navigation }) => {
                 showsHorizontalScrollIndicator={false}
                 style={styles.chartScrollView}
                 contentContainerStyle={{ paddingRight: 10 }}
+                key={`carga-${chartData.labels.join('-')}`}
               >
                 <BarChart
+                  key={`carga-chart-${chartData.labels.join('-')}`}
                   data={cargaStackData}
                   width={
                     chartData.labels.length *
