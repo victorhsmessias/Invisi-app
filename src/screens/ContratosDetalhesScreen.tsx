@@ -76,7 +76,6 @@ const ContratosDetalhesScreen: React.FC<Props> = ({ navigation, route }) => {
           return;
         }
       } catch (err) {
-        console.error("[ContratosDetalhesScreen] Error:", err);
         setError("Erro ao carregar detalhes dos contratos");
         return;
       } finally {

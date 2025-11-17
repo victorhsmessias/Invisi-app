@@ -204,7 +204,6 @@ const MonitorCorteScreen: React.FC<MonitorCorteScreenProps> = ({
 
         setHasShownInitialData(true);
       } catch (err) {
-        console.error("[MonitorCorteScreen] Error:", err);
         setHasShownInitialData(true);
         setError("Erro ao carregar monitor corte");
       } finally {

@@ -90,7 +90,6 @@ export const extractVehicleArray = (
   const mapping = API_FIELD_MAPPINGS[dataType];
 
   if (!mapping) {
-    console.warn(`[ApiAdapter] Tipo de dados desconhecido: ${dataType}`);
     return [];
   }
 
@@ -143,7 +142,6 @@ export const calculateVehicleCount = (
   const mapping = API_FIELD_MAPPINGS[dataType];
 
   if (!mapping) {
-    console.warn(`[ApiAdapter] Tipo de dados desconhecido: ${dataType}`);
     return 0;
   }
 
@@ -167,7 +165,6 @@ export const processUnifiedDashboardResponse = (
   apiResponse: any
 ): Record<DataType, number> => {
   if (!apiResponse || !apiResponse.dados) {
-    console.warn("[ApiAdapter] Resposta unificada inválida ou vazia");
     return {
       transito: 0,
       filaDescarga: 0,
@@ -247,7 +244,6 @@ export const normalizeApiResponse = (
   const mapping = API_FIELD_MAPPINGS[dataType];
 
   if (!mapping) {
-    console.warn(`[ApiAdapter] Tipo desconhecido: ${dataType}`);
     return {
       vehicles: [],
       count: 0,

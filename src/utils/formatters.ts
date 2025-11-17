@@ -95,7 +95,6 @@ export const calculateWaitTimeInHours = (
 
     return Math.max(0, diffInHours);
   } catch (error) {
-    console.error("Erro ao calcular tempo de espera:", error);
     return 0;
   }
 };

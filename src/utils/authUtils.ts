@@ -298,7 +298,6 @@ export const saveAuthData = async (
 
     return true;
   } catch (error) {
-    console.error("[authUtils] Erro ao salvar dados de autenticação:", error);
     throw error;
   }
 };
@@ -313,7 +312,6 @@ export const clearAuthData = async (): Promise<boolean> => {
     ]);
     return true;
   } catch (error) {
-    console.error("[authUtils] Erro ao limpar dados de autenticação:", error);
     throw error;
   }
 };

@@ -101,7 +101,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       await manualRefresh();
       setHasShownInitialData(true);
     } catch (err) {
-      console.error("Erro ao fazer refresh:", err);
+      // Erro ao fazer refresh
     } finally {
       setIsRefreshing(false);
     }
@@ -112,7 +112,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       if (filial === state.selectedFilial) return;
 
       if (!canAccessFilial(filial, state.userRole, state.userFilial)) {
-        console.error("[HomeScreen] Acesso negado à filial:", filial);
         Alert.alert(
           "Acesso Negado",
           "Você não tem permissão para acessar esta filial."

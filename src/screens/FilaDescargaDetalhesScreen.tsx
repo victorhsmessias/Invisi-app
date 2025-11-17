@@ -104,10 +104,6 @@ const FilaDescargaDetalhesScreen: React.FC<Props> = ({ navigation, route }) => {
         setData(vehiclesList);
         setLastUpdate(new Date());
       } catch (err: any) {
-        console.error(
-          "[FilaDescargaDetalhesScreen] Error fetching vehicles:",
-          err
-        );
         setError(err?.message || "Erro ao carregar veículos. Tente novamente.");
         setData([]);
       } finally {

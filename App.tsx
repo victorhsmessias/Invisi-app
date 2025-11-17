@@ -84,7 +84,7 @@ const AppNavigator: React.FC = () => {
           options={{ title: "Fila de Descarga" }}
         />
         <Stack.Screen
-          name="FilaDescargaDetalhes"
+          name={SCREEN_NAMES.FILA_DESCARGA_DETALHES}
           component={FilaDescargaDetalhesScreen}
           options={{ title: "Veículos da Fila" }}
         />

@@ -97,11 +97,6 @@ export const useFilterLoader = () => {
 
         return filterData;
       } catch (error) {
-        console.error(
-          `[useFilterLoader] Erro ao carregar filtros para ${filial}:`,
-          error
-        );
-
         logFallbackUsage(
           "filtros completos",
           `loadFiltersForFilial - Erro ao carregar filtros para ${filial}`
@@ -134,9 +129,6 @@ export const useFilterLoader = () => {
         const filiais = filiaisPermitidas || stateRef.current.allowedFilials;
 
         if (!filiais || filiais.length === 0) {
-          console.warn(
-            "[useFilterLoader] Nenhuma filial permitida para preload"
-          );
           return;
         }
 
@@ -159,15 +151,8 @@ export const useFilterLoader = () => {
           (r) => r.status === "fulfilled" && r.value
         ).length;
         const failed = results.filter((r) => r.status === "rejected").length;
-
-        console.log(
-          `[useFilterLoader] Preload concluído: ${successful}/${filiais.length} filiais carregadas`
-        );
       } catch (error) {
-        console.error(
-          "[useFilterLoader] Erro no precarregamento de filtros:",
-          error
-        );
+        // Erro no precarregamento de filtros
       }
     },
     [getCurrentCache, loadFiltersForFilial]
@@ -218,11 +203,6 @@ export const useFilterLoader = () => {
 
         return basicFilters;
       } catch (error) {
-        console.error(
-          `[useFilterLoader] Erro ao carregar filtros básicos para ${filial}:`,
-          error
-        );
-
         logFallbackUsage(
           "filtros básicos",
           `loadBasicFilters - Erro ao carregar para ${filial}`

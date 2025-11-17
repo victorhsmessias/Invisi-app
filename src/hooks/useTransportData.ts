@@ -50,7 +50,7 @@ export const useTransportData = (): UseTransportDataReturn => {
         }
       }
     } catch (error) {
-      console.error("Erro ao carregar cache:", error);
+      // Erro ao carregar cache
     }
   }, [state.selectedFilial]);
 
@@ -93,8 +93,6 @@ export const useTransportData = (): UseTransportDataReturn => {
           })
         );
       } catch (error) {
-        console.error("Erro ao buscar dados de transporte:", error);
-
         if (source !== "background") {
           actionsRef.current.setError("Erro ao carregar dados de transporte");
         }

@@ -254,7 +254,6 @@ export const useChartData = (filial: Filial): UseChartDataReturn => {
   const fetchData = useCallback(
     async (filters: Partial<DMonitorFilters>) => {
       if (!state.isLoggedIn || !state.token) {
-        console.log("[useChartData] Não autenticado, ignorando requisição");
         return;
       }
 
@@ -306,7 +305,6 @@ export const useChartData = (filial: Filial): UseChartDataReturn => {
           );
         }
       } catch (err: any) {
-        console.error("[useChartData] Error fetching data:", err);
         setError(err.message || "Erro ao carregar dados dos gráficos");
         setData([]);
         setChartData({

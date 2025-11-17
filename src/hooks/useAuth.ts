@@ -84,9 +84,8 @@ export const useAuth = (): UseAuthReturn => {
             timeoutPromise,
           ]);
 
-          console.log("[useAuth] Filtros carregados com sucesso");
         } catch (filterError) {
-          console.warn("[useAuth] Erro ao carregar filtros:", filterError);
+          // Erro ao carregar filtros
         } finally {
           actions.setInitializing(false);
         }
@@ -128,7 +127,6 @@ export const useAuth = (): UseAuthReturn => {
       } else {
         errorMessage =
           (error as Error).message || "Erro inesperado ao fazer login";
-        console.error("[useAuth] Erro inesperado:", error);
       }
 
       actions.setError(errorMessage);
@@ -144,7 +142,7 @@ export const useAuth = (): UseAuthReturn => {
       await clearAuthData();
       await actions.logout();
     } catch (error) {
-      console.error("[useAuth] Erro ao fazer logout:", error);
+      // Erro ao fazer logout
     } finally {
       setLoading(false);
     }

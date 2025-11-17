@@ -254,7 +254,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           ]);
           dispatch({ type: "LOGOUT" });
         } catch (error) {
-          console.error("Erro ao fazer logout:", error);
+          // Erro ao fazer logout
         }
       },
     }),
@@ -279,7 +279,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
         if (userToken) {
           if (!isAdmin(savedUserRole) && !savedUserFilial) {
-            console.log("[AppContext] Sessão inválida: usuário sem lotação.");
             await clearAuthData();
             actions.setAuth(false);
             return;
@@ -308,16 +307,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           actions.setAllowedFilials(allowedFilials);
           actions.setFilial(initialFilial);
 
-          console.log(
-            `[AppContext] Sessão restaurada: ${savedUsername} | Filial: ${initialFilial} | Permitidas: ${allowedFilials.join(
-              ", "
-            )}`
-          );
         } else {
           actions.setAuth(false);
         }
       } catch (error) {
-        console.error("Erro ao verificar login:", error);
         actions.setAuth(false);
       }
     };

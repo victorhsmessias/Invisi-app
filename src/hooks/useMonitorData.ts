@@ -161,7 +161,6 @@ export const useMonitorData = (
   const fetchData = useCallback(
     async (isRefreshing = false): Promise<void> => {
       if (!state.isLoggedIn || !state.token) {
-        console.log("[useMonitorData] Não autenticado, ignorando requisição");
         return;
       }
 
@@ -245,7 +244,6 @@ export const useMonitorData = (
         setTotals(calculatedTotals);
         setLastUpdate(new Date());
       } catch (err: any) {
-        console.error(`[useMonitorData] Error for ${tipoOperacao}:`, err);
         setError(err?.message || "Erro ao carregar dados. Tente novamente.");
         setData([]);
         setTotals({ veiculos: 0, peso: 0, grupos: 0 });

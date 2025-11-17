@@ -142,14 +142,8 @@ class ApiService {
                 id_grupo_usuario = responseData.id_grupo_usuario;
                 lotacao = responseData.lotacao;
               } catch (parseError) {
-                console.warn(
-                  "[ApiService] Não foi possível extrair dados adicionais do login"
-                );
+                // Não foi possível extrair dados adicionais do login
               }
-
-              console.log(
-                `[ApiService] Login bem-sucedido na filial ${filialKeys[index]} (${url})`
-              );
 
               return {
                 token,
@@ -170,11 +164,7 @@ class ApiService {
                   for (let i = 0; i < results.length; i++) {
                     if (results[i]?.status === "fulfilled") {
                       const successData = (results[i] as any).value;
-                      console.log(
-                        `[ApiService] Usando filial ${
-                          filialKeys[i]
-                        } (prioridade ${i + 1})`
-                      );
+
 
                       abortControllers.forEach((controller, idx) => {
                         if (idx !== i) {
@@ -194,12 +184,7 @@ class ApiService {
               completedCount++;
 
               if (error.name !== "AbortError") {
-                console.log(
-                  `[ApiService] Falha na URL ${filialKeys[index]} (${url}):`,
-                  error instanceof AuthenticationError
-                    ? error.code
-                    : error.message
-                );
+
               }
 
               if (completedCount === urls.length && firstSuccessTime === null) {
@@ -325,7 +310,6 @@ class ApiService {
         filial
       );
     } catch (error) {
-      console.error("[ApiService] Error in getContratosData:", error);
       throw error;
     }
   }
@@ -356,7 +340,6 @@ class ApiService {
         filial
       );
     } catch (error) {
-      console.error("[ApiService] Error in getMonitorData:", error);
       throw error;
     }
   }
@@ -407,7 +390,6 @@ class ApiService {
 
       return this.requestWithRetry("/monitor.php", requestBody, filial);
     } catch (error) {
-      console.error("[ApiService] Error in getAllDashboardData:", error);
       throw error;
     }
   }
@@ -451,7 +433,6 @@ class ApiService {
 
       return this.requestWithRetry("/monitor.php", requestBody, filial);
     } catch (error) {
-      console.error("[ApiService] Error in getFilaDescargaVeiculosLista:", error);
       throw error;
     }
   }
@@ -553,12 +534,6 @@ class ApiService {
         },
       };
 
-      console.log("[ApiService] Making contratos fila request:", {
-        filial,
-        fila,
-        grupo,
-        produto,
-      });
 
       return this.requestWithRetry(
         "/monitor_contratos_fila.php",
@@ -566,7 +541,6 @@ class ApiService {
         filial
       );
     } catch (error) {
-      console.error("[ApiService] Error in getContratosFilaData:", error);
       throw error;
     }
   }
@@ -592,12 +566,6 @@ class ApiService {
         },
       };
 
-      console.log("[ApiService] Making d_monitor request:", {
-        filial,
-        data_inicio: filters.filtro_data_inicio,
-        data_fim: filters.filtro_data_fim,
-        acumulador: filters.filtro_acumulador,
-      });
 
       return this.requestWithRetry<DMonitorResponse>(
         "/d_monitor.php",
@@ -605,7 +573,6 @@ class ApiService {
         filial
       );
     } catch (error) {
-      console.error("[ApiService] Error in getDMonitorData:", error);
       throw error;
     }
   }

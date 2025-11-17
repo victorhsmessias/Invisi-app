@@ -41,6 +41,7 @@ export const SCREEN_NAMES = {
   DESCARGAS_HOJE: "DescargasHoje",
   TRANSITO: "Transito",
   FILA_DESCARGA: "FilaDescarga",
+  FILA_DESCARGA_DETALHES: "FilaDescargaDetalhes",
   FILA_CARGA: "FilaCarga",
   PATIO_DESCARGA: "PatioDescarga",
   PATIO_CARGA: "PatioCarga",
