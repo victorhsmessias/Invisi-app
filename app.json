@@ -25,7 +25,6 @@
       "package": "com.invisi.app",
       "versionCode": 3,
       "permissions": ["INTERNET", "ACCESS_NETWORK_STATE"],
-      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#00376e"
