@@ -4,21 +4,47 @@
     "slug": "Invisi-app",
     "version": "1.0.3",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#00376e"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.invisi.app"
     },
     "android": {
       "package": "com.invisi.app",
-      "versionCode": 2,
-      "permissions": ["INTERNET", "ACCESS_NETWORK_STATE"]
+      "versionCode": 3,
+      "permissions": ["INTERNET", "ACCESS_NETWORK_STATE"],
+      "usesCleartextTraffic": true,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#00376e"
+      }
     },
     "extra": {
       "eas": {
         "projectId": "6e87b0b3-3c00-4a55-b593-160c1074ad9c"
       }
     },
-    "plugins": []
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ]
   }
 }

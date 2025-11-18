@@ -85,7 +85,6 @@ export const useAuth = (): UseAuthReturn => {
           ]);
 
         } catch (filterError) {
-          // Erro ao carregar filtros
         } finally {
           actions.setInitializing(false);
         }
@@ -142,7 +141,6 @@ export const useAuth = (): UseAuthReturn => {
       await clearAuthData();
       await actions.logout();
     } catch (error) {
-      // Erro ao fazer logout
     } finally {
       setLoading(false);
     }

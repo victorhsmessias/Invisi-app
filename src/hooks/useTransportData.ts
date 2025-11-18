@@ -50,7 +50,6 @@ export const useTransportData = (): UseTransportDataReturn => {
         }
       }
     } catch (error) {
-      // Erro ao carregar cache
     }
   }, [state.selectedFilial]);
 

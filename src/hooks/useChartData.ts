@@ -41,13 +41,11 @@ interface UseChartDataReturn {
   refreshData: () => Promise<void>;
 }
 
-// Função auxiliar para criar data sem problemas de timezone
 const createLocalDate = (dateString: string): Date => {
   const [year, month, day] = dateString.split('-').map(Number);
   return new Date(year, month - 1, day);
 };
 
-// Converte Date para string YYYY-MM-DD sem problemas de timezone
 const formatDateToString = (date: Date): string => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -63,7 +61,6 @@ const formatDateLabel = (periodo: string): string => {
       return `${day.padStart(2, "0")}/${month.padStart(2, "0")}`;
     }
 
-    // Fallback usando createLocalDate para evitar problemas de timezone
     const date = createLocalDate(periodo);
     const dayNum = date.getDate().toString().padStart(2, "0");
     const monthNum = (date.getMonth() + 1).toString().padStart(2, "0");
@@ -135,14 +132,12 @@ const aggregateData = (
     return acc;
   }, {} as Record<string, any>);
 
-  // Gera array completo de períodos baseado no filtro
   let allPeriods: string[] = [];
   if (dataInicio && dataFim && acumulador) {
     const start = createLocalDate(dataInicio);
     const end = createLocalDate(dataFim);
 
     if (acumulador.dia === 1) {
-      // Agregação por dia - cria array de todas as datas
       const current = new Date(start);
       while (current <= end) {
         const year = current.getFullYear();
@@ -153,7 +148,6 @@ const aggregateData = (
         current.setDate(current.getDate() + 1);
       }
     } else if (acumulador.mes === 1) {
-      // Agregação por mês - cria array de todos os meses
       const current = new Date(start);
       while (current <= end) {
         const yearMonth = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-01`;
@@ -165,14 +159,12 @@ const aggregateData = (
     }
   }
 
-  // Se não conseguiu gerar períodos, usa apenas os que existem nos dados
   if (allPeriods.length === 0) {
     allPeriods = Object.keys(groupedByPeriod).sort((a, b) => {
       return new Date(a).getTime() - new Date(b).getTime();
     });
   }
 
-  // Garante que todos os períodos existem no groupedByPeriod
   allPeriods.forEach(periodo => {
     if (!groupedByPeriod[periodo]) {
       groupedByPeriod[periodo] = {

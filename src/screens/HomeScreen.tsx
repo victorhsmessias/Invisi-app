@@ -101,7 +101,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       await manualRefresh();
       setHasShownInitialData(true);
     } catch (err) {
-      // Erro ao fazer refresh
     } finally {
       setIsRefreshing(false);
     }

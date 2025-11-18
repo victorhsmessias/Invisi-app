@@ -142,7 +142,6 @@ class ApiService {
                 id_grupo_usuario = responseData.id_grupo_usuario;
                 lotacao = responseData.lotacao;
               } catch (parseError) {
-                // Não foi possível extrair dados adicionais do login
               }
 
               return {

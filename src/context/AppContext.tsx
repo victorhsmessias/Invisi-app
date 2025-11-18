@@ -254,7 +254,6 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           ]);
           dispatch({ type: "LOGOUT" });
         } catch (error) {
-          // Erro ao fazer logout
         }
       },
     }),

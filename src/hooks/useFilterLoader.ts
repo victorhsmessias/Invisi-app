@@ -152,7 +152,6 @@ export const useFilterLoader = () => {
         ).length;
         const failed = results.filter((r) => r.status === "rejected").length;
       } catch (error) {
-        // Erro no precarregamento de filtros
       }
     },
     [getCurrentCache, loadFiltersForFilial]

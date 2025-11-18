@@ -24,7 +24,6 @@ type GraficosScreenProps = StackScreenProps<RootStackParamList, "Graficos">;
 const screenWidth = Dimensions.get("window").width;
 const chartWidth = screenWidth - 80;
 
-// Converte Date para string YYYY-MM-DD sem problemas de timezone
 const formatDateToString = (date: Date): string => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
